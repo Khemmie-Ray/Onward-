@@ -26,7 +26,7 @@ const Header = () => {
   };
   
   return (
-    <header className="py-6 mb-6" >
+    <header className="py-8 mb-2" >
       <nav
         className="flex items-center justify-between"
         style={{ animation: "fade-up 0.8s 0.05s ease both" }}

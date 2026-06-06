@@ -91,13 +91,14 @@ export default function Home() {
               </div>
             </div>
           </div>
-          <div className="relative flex lg:w-[55%] md:w-[55%] w-full items-center justify-center animate-[fade-up_0.9s_0.4s_ease_both] mb-4">
+          <div className="relative flex lg:w-[55%] md:w-[55%] w-full items-center justify-center animate-[fade-up_0.9s_0.4s_ease_both] mb-4 min-h-[520px]">
          <Image 
          src="/hero.png"
          alt=""
          width={300}
          height={300}
          className="w-full"
+         priority
          />
           </div>
         </div>
