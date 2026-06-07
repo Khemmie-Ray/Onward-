@@ -34,7 +34,7 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className={`${bricolage.variable} ${sora.variable}`}>
-      <body className="bg-canvas text-fg max-w-387.5 mx-auto w-full">
+      <body className="bg-canvas text-fg mx-auto w-full">
         <Providers cookies={cookies}>{children}</Providers></body>
     </html>
   );

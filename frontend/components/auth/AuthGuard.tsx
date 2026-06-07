@@ -1,16 +1,22 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react"; // 1. Added useState
 import { useRouter, usePathname } from "next/navigation";
 import { useAppKitAccount } from "@reown/appkit/react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
+  const [isMounted, setIsMounted] = useState(false); // 2. Add mounted state
+
   const router = useRouter();
   const pathname = usePathname();
   const { isConnected, address, status } = useAppKitAccount();
   const authFetch = useAuthFetch();
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   const isHydrating = status === "connecting" || status === "reconnecting";
 
@@ -21,14 +27,14 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       if (!res.ok) throw new Error("Status check failed");
       return res.json() as Promise<{ hasUsername: boolean }>;
     },
-    enabled: isConnected && !isHydrating && !!address,
+    enabled: isMounted && isConnected && !isHydrating && !!address,
     staleTime: 60_000,
   });
 
   const isOnboardingPath = pathname.startsWith("/onboarding");
 
   useEffect(() => {
-    if (isHydrating) return;
+    if (!isMounted || isHydrating) return;
 
     if (!isConnected) {
       console.log("[AuthGuard] redirecting to / (not connected)");
@@ -52,6 +58,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
 
     console.log("[AuthGuard] no redirect — staying on", pathname);
   }, [
+    isMounted, 
     isHydrating,
     isConnected,
     isLoading,
@@ -61,10 +68,14 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     pathname,
   ]);
 
-  if (isHydrating) return <AuthLoadingScreen message="Connecting wallet…" />;
-  if (!isConnected) return null; // brief flash before redirect
-  if (isLoading && !data)
+  if (!isMounted || isHydrating) {
+    return <AuthLoadingScreen message="Connecting wallet…" />;
+  }
+
+  if (!isConnected) return null;
+  if (isLoading && !data) {
     return <AuthLoadingScreen message="Loading your profile…" />;
+  }
 
   if (data && !data.hasUsername && !isOnboardingPath) return null;
   if (data && data.hasUsername && isOnboardingPath) return null;

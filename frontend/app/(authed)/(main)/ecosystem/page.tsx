@@ -12,7 +12,7 @@ export default function EcosystemPage() {
     <>
       <div
         aria-hidden
-        className="pointer-events-none absolute right-[-10%] top-[8%] h-[500px] w-[500px] rounded-full opacity-50 blur-[80px] bg-[radial-gradient(circle,rgba(58,107,71,0.35)_0%,transparent_70%)]"
+        className="pointer-events-none absolute right-[10%] top-[8%] h-[400px] w-[400px] rounded-full opacity-50 blur-[80px] bg-[radial-gradient(circle,rgba(58,107,71,0.35)_0%,transparent_70%)]"
       />
       <section className="mb-8 animate-[fade-up_0.8s_0.05s_ease_both]">
         <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-forest mb-2">

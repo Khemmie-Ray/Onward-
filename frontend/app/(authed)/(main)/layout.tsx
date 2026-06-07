@@ -7,14 +7,12 @@ import { AuthGuard } from "@/components/auth/AuthGuard";
 export default function AuthedLayout({ children }: { children: ReactNode }) {
   return (
     <AuthGuard>
-    <main className="mx-auto lg:w-[80%] md:w-[80%] w-[90%]">
-      <div className="w-full">
+    <main className="mx-auto lg:w-[80%] md:w-[80%] w-[90%]  h-screen overflow-hidden flex flex-col">
         <Header />
         <Nav />
-        <div className="lg:h-[75vh] md:h-[70vh] overflow-y-scroll">
+        <div className="flex-1 overflow-y-auto no-scrollbar">
         {children}
         </div>
-      </div>
     </main>
     </AuthGuard>
   );

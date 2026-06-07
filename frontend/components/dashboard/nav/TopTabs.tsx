@@ -17,7 +17,7 @@ export function TopTabs({
   const pathname = usePathname();
 
   return (
-    <nav className="hidden lg:block md:block w-full mb-8" aria-label="Primary">
+    <nav className="hidden lg:block md:block w-full mb-6" aria-label="Primary">
       <ul className="flex items-center gap-1 rounded-full bg-paper p-2.5 shadow-[0_4px_14px_rgba(31,58,110,0.06)] w-fit">
         {destinations.map((dest) => {
           const active = isActiveDestination(pathname, dest.href);

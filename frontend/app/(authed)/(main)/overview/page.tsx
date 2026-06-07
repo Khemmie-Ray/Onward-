@@ -25,7 +25,7 @@ const Overview = () => {
 
   const { balance: walletBalance, refetch: refetchBalance } = useGDollarBalance(
     address as Address | undefined,
-    true
+    true,
   );
 
   useEffect(() => {
@@ -80,7 +80,7 @@ const Overview = () => {
   }
 
   const walletBalanceDisplay = parseFloat(
-    formatUnits(walletBalance, 18)
+    formatUnits(walletBalance, 18),
   ).toLocaleString(undefined, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
@@ -90,7 +90,7 @@ const Overview = () => {
     <>
       <div
         aria-hidden
-        className="pointer-events-none absolute right-[-10%] top-[8%] h-[500px] w-[500px] rounded-full opacity-60 blur-[80px] bg-[radial-gradient(circle,rgba(230,180,72,0.45)_0%,transparent_70%)]"
+        className="pointer-events-none absolute right-[10%] top-[8%] h-[400px] w-[400px] rounded-full opacity-60 blur-[80px] bg-[radial-gradient(circle,rgba(230,180,72,0.45)_0%,transparent_70%)]"
       />
       <section className="flex flex-wrap items-end justify-between gap-4 mb-8 animate-[fade-up_0.8s_0.05s_ease_both]">
         <div>
@@ -106,8 +106,8 @@ const Overview = () => {
             {data.currentModule
               ? "Pick up where you left off, or explore something new."
               : data.modulesCompleted > 0
-              ? "Nice work. Pick your next module."
-              : "Pick where to spend the next five minutes."}
+                ? "Nice work. Pick your next module."
+                : "Pick where to spend the next five minutes."}
           </p>
         </div>
         <div className="flex items-center gap-3 rounded-full bg-paper px-4 py-2.5 shadow-[0_4px_12px_rgba(31,58,110,0.06)]">
@@ -148,8 +148,8 @@ const Overview = () => {
             data.currentModule
               ? `${data.currentModule.title} in progress`
               : data.modulesCompleted > 0
-              ? `${data.modulesTotal - data.modulesCompleted} remaining`
-              : "Pick your next module"
+                ? `${data.modulesTotal - data.modulesCompleted} remaining`
+                : "Pick your next module"
           }
           tone="forest"
         />
@@ -221,14 +221,12 @@ const Overview = () => {
               View all <ArrowRight size={12} strokeWidth={2.8} />
             </Link>
           </div>
-          <div className="flex justify-between items-center">
-              {data.recentBadges.map((badge) => (
-            <div className="lg:w-[32%] md:w-[32%] w-full">
-
+          <div className="flex justify-between items-center lg:flex-row md:flex-row flex-wrap flex-col mb-10">
+            {data.recentBadges.map((badge) => (
+              <div className="lg:w-[32%] md:w-[32%] w-full mb-3">
                 <RecentBadge key={badge.moduleSlug} badge={badge} />
-            </div>
-
-              ))}
+              </div>
+            ))}
           </div>
         </section>
       )}

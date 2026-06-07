@@ -69,7 +69,7 @@ const Profile = () => {
     <>
       <div
         aria-hidden
-        className="pointer-events-none absolute right-[-10%] top-[8%] h-[500px] w-[500px] rounded-full opacity-50 blur-[80px] bg-[radial-gradient(circle,rgba(199,93,63,0.30)_0%,transparent_70%)]"
+        className="pointer-events-none absolute right-[10%] top-[8%] h-[400px] w-[400px] rounded-full opacity-50 blur-[80px] bg-[radial-gradient(circle,rgba(199,93,63,0.30)_0%,transparent_70%)]"
       />
       <ProfileHeader 
         displayName={data.displayName} 
