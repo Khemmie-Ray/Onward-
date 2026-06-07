@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { HandMetal, ArrowRight } from "lucide-react";
-import { MudclothPattern } from "@/components/home/motifs";
 import type { FlipCard as FlipCardData } from "@/lib/lessons/lesson-data";
 
 export function FlipCard({
@@ -23,12 +22,12 @@ export function FlipCard({
   return (
     <div
       className="lg:w-[35%] md:w-[35%] w-full mx-auto"
-      style={{ perspective: "1200px" }}
+      // style={{ perspective: "1200px" }}
     >
       <button
         onClick={handleClick}
         aria-label={flipped ? "Show question" : "Reveal answer"}
-        className="relative w-full aspect-[9/14] cursor-pointer"
+        className="relative w-full aspect-4/3 cursor-pointer"
         style={{
           transformStyle: "preserve-3d",
           transition: "transform 0.7s cubic-bezier(0.22,1,0.36,1)",
@@ -42,12 +41,6 @@ export function FlipCard({
             WebkitBackfaceVisibility: "hidden",
           }}
         >
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 text-indigo opacity-[0.05]"
-          >
-            <MudclothPattern />
-          </div>
           <div className="relative flex flex-col h-full">
             <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-mustard mb-auto">
               The question

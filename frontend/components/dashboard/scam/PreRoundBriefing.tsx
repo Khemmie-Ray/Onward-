@@ -28,7 +28,7 @@ export function PreRoundBriefing({
   isStarting = false,
 }: Props) {
   return (
-    <div className="w-full max-w-[440px] mx-auto">
+    <div className="w-full">
       <div className="flex flex-col items-center mb-6">
         <div className="relative w-24 h-24 rounded-2xl bg-aubergine/95 flex items-center justify-center shadow-[0_8px_24px_rgba(91,46,92,0.25)] mb-3">
           <Image

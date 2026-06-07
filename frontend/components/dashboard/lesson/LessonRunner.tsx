@@ -213,7 +213,7 @@ export function LessonRunner({
         </div>
       )}
 
-      <div className="flex-1 flex items-center justify-center px-6 py-4">
+      <div className="flex items-center justify-center px-6 py-4">
         {currentCard.type === "flip" && (
           <FlipCard data={currentCard} onFlip={setFlipped} />
         )}

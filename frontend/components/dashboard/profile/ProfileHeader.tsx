@@ -1,16 +1,22 @@
 import React from "react";
 import { Award } from "lucide-react";
 import { SunMotif } from "@/components/home/motifs";
+import { UserAvatar } from "@/components/shared/UserAvatar";
 
 interface ProfileHeaderProps {
   displayName: string;
+  avatarId: string | null;
   walletAddress: string;
   daysOnOnward: number;
 }
 
-const ProfileHeader = ({ displayName, walletAddress, daysOnOnward }: ProfileHeaderProps) => {
+const ProfileHeader = ({
+  displayName,
+  avatarId,
+  walletAddress,
+  daysOnOnward,
+}: ProfileHeaderProps) => {
   const truncatedAddress = `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`;
-  const avatarInitial = (displayName[0] || "R").toUpperCase();
 
   return (
     <section className="mb-10 animate-[fade-up_0.8s_0.05s_ease_both]">
@@ -23,8 +29,13 @@ const ProfileHeader = ({ displayName, walletAddress, daysOnOnward }: ProfileHead
           >
             <SunMotif size={110} rays={10} />
           </div>
-          <div className="relative flex h-[80px] w-[80px] items-center justify-center rounded-full bg-terracotta text-[32px] font-bold text-paper shadow-[0_8px_20px_rgba(199,93,63,0.30)]">
-            {avatarInitial}
+          <div className="relative shadow-[0_8px_20px_rgba(199,93,63,0.30)] rounded-full">
+            <UserAvatar
+              avatarId={avatarId}
+              size={80}
+              priority
+              className="border-2 border-paper"
+            />
           </div>
         </div>
         <div className="flex-1 min-w-0">
@@ -46,6 +57,6 @@ const ProfileHeader = ({ displayName, walletAddress, daysOnOnward }: ProfileHead
       </div>
     </section>
   );
-}
+};
 
 export default ProfileHeader;

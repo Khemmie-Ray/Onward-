@@ -7,28 +7,54 @@ interface LifetimeStatProps {
   value: string;
   tone: Tone;
   icon: React.ReactNode;
+  sub?: string;
 }
 
-const LifetimeStat = ({ label, value, tone: toneName, icon }: LifetimeStatProps) => {
+const LifetimeStat = ({
+  label,
+  value,
+  tone: toneName,
+  icon,
+  sub,
+}: LifetimeStatProps) => {
   const t = TONE_MAP[toneName];
   return (
-    <div className={`relative overflow-hidden rounded-[16px] p-5 ${t.bg} ${t.shadow}`}>
-      <div aria-hidden className={`pointer-events-none absolute inset-0 ${t.fg} opacity-[0.06]`}>
+    <div
+      className={`relative overflow-hidden rounded-[16px] p-5 ${t.bg} ${t.shadow}`}
+    >
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 ${t.fg} opacity-[0.06]`}
+      >
         <MudclothPattern />
       </div>
-      <div aria-hidden className={`pointer-events-none absolute right-3 top-3 ${t.fg} opacity-30`}>
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute right-3 top-3 ${t.fg} opacity-30`}
+      >
         {icon}
       </div>
       <div className="relative">
-        <div className={`text-[10px] font-bold uppercase tracking-[0.14em] ${t.subFg} mb-2`}>
+        <div
+          className={`text-[10px] font-bold uppercase tracking-[0.14em] ${t.subFg} mb-2`}
+        >
           {label}
         </div>
-        <div className={`display text-[32px] font-bold leading-none tabular-nums ${t.fg}`}>
+        <div
+          className={`display text-[32px] font-bold leading-none tabular-nums ${t.fg}`}
+        >
           {value}
         </div>
+        {sub && (
+          <div
+            className={`mt-2 text-[10.5px] font-medium ${t.subFg} opacity-80 leading-tight`}
+          >
+            {sub}
+          </div>
+        )}
       </div>
     </div>
   );
-}
+};
 
 export default LifetimeStat;

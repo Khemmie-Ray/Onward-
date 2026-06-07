@@ -2,13 +2,22 @@
 
 import Link from "next/link";
 import { useState, useRef, useEffect } from "react";
-import { ChevronDown, Copy, LogOut, User as UserIcon, Check } from "lucide-react";
+import {
+  ChevronDown,
+  Copy,
+  LogOut,
+  User as UserIcon,
+  Check,
+} from "lucide-react";
+import { UserAvatar } from "../shared/UserAvatar";
 
 export function WalletPill({
   address,
+  avatarId,
   onDisconnect,
 }: {
   address: string;
+  avatarId: string | null;
   onDisconnect: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -27,7 +36,6 @@ export function WalletPill({
   }, [open]);
 
   const displayString = `${address.slice(0, 6)}…${address.slice(-4)}`;
-  const avatarInitial = address.slice(2, 3).toUpperCase();
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(address);
@@ -44,16 +52,16 @@ export function WalletPill({
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 rounded-full bg-paper py-1.5 pl-1.5 pr-3 shadow-[0_4px_12px_rgba(31,58,110,0.06)] transition-all hover:shadow-[0_6px_16px_rgba(31,58,110,0.10)]"
       >
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-terracotta text-[12px] font-bold text-paper">
-          {avatarInitial}
-        </div>
+        <UserAvatar avatarId={avatarId} size={32} />
         <span className="text-[12px] font-semibold text-indigo">
           {displayString}
         </span>
         <ChevronDown
           size={14}
           strokeWidth={2.5}
-          className={`text-fg-soft transition-transform ${open ? "rotate-180" : ""}`}
+          className={`text-fg-soft transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
         />
       </button>
 
