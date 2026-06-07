@@ -20,6 +20,7 @@ export type ProfileData = {
   walletAddress: string;
   joinedAt: string;
   daysOnOnward: number;
+  avatarId: string | null;
 
   totalGEarned: number;
   modulesCompleted: number;
@@ -79,6 +80,7 @@ export async function loadProfileData(user: DbUser): Promise<ProfileData> {
     walletAddress: user.wallet_address,
     joinedAt: user.created_at,
     daysOnOnward,
+    avatarId: user.avatar_id ?? null,
     totalGEarned: Number(user.total_g_earned),
     modulesCompleted: badges.filter((b) => b.earned).length,
     modulesTotal: badges.length,

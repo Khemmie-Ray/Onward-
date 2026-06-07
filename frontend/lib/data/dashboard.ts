@@ -16,6 +16,7 @@ export type DashboardData = {
   totalGEarned: number;
   gEarnedThisWeek: number;
   currentLevel: number;
+  avatarId: string | null;
 
   modulesCompleted: number;
   modulesTotal: number;
@@ -151,6 +152,7 @@ export async function loadDashboardData(user: DbUser): Promise<DashboardData> {
     walletAddress: user.wallet_address,
     currentStreak: user.current_streak,
     longestStreak: user.longest_streak,
+    avatarId: user.avatar_id ?? null,
     totalGEarned: Number(user.total_g_earned),
     gEarnedThisWeek,
     currentLevel: user.current_level,

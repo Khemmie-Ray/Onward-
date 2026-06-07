@@ -9,12 +9,11 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { celoSepolia } from "viem/chains";
-import OnwardBadgesAbi from "@/constants/abis/abi.json";
+import { onwardBadgesAbi } from "@/constants/abis";
 import { CONTRACT_ADDRESSES } from "@/constants/contracts/address";
 
 const BACKEND_PRIVATE_KEY = process.env.BACKEND_SIGNER_PRIVATE_KEY!;
-const RPC_URL =
-  process.env.NEXT_PUBLIC_CELOSEPOLIA_URL!;
+const RPC_URL = process.env.NEXT_PUBLIC_CELOSEPOLIA_URL!;
 
 const account = privateKeyToAccount(
   BACKEND_PRIVATE_KEY.startsWith("0x")
@@ -33,6 +32,12 @@ export const walletClient = createWalletClient({
   transport: http(RPC_URL),
 });
 
+const ZERO_HASH = ("0x" + "0".repeat(64)) as `0x${string}`;
+
+// ============================================================
+// Helpers
+// ============================================================
+
 export function slugHash(slug: string): `0x${string}` {
   return keccak256(toBytes(slug));
 }
@@ -44,83 +49,137 @@ export function makeClaimId(
   return keccak256(toBytes(`${userWallet.toLowerCase()}:${moduleSlug}`));
 }
 
+export function ipfsToHttp(uri: string): string {
+  if (uri.startsWith("ipfs://")) {
+    return `https://gateway.pinata.cloud/ipfs/${uri.slice(7)}`;
+  }
+  return uri;
+}
+
+// ============================================================
+// Process completion (mint + distribute|accrue)
+// ============================================================
 
 export type CompletionTxResult = {
-  badgeTxHash: `0x${string}`;
+  txHash: `0x${string}`;
   badgeTokenId: bigint;
-  rewardTxHash: `0x${string}`;
+  wasPaidDirect: boolean;
+  /** Set to true only when the contract reports the claim went straight to pending. */
+  wasAccrued: boolean;
 };
 
-const ZERO_HASH =
-  ("0x" + "0".repeat(64)) as `0x${string}`;
-
+/**
+ * Single atomic call: mints badge AND either pays or accrues reward.
+ *
+ * Returns the tx hash, the badge token ID, and whether payment was direct
+ * (vs accrued to pending). The boolean reflects what actually happened
+ * onchain: even if isVerified=true was passed, the claimId might already
+ * be used, in which case wasPaidDirect=false but the badge still mints.
+ *
+ * @param userWallet — recipient
+ * @param moduleSlug — e.g. "what-is-gooddollar"
+ * @param rewardAmountG — G$ amount as a plain number (5 not 5e18)
+ * @param isVerified — frontend-determined verification status
+ */
 export async function processCompletion(args: {
   userWallet: Address;
   moduleSlug: string;
   rewardAmountG: number;
+  isVerified: boolean;
 }): Promise<CompletionTxResult> {
-  const { userWallet, moduleSlug, rewardAmountG } = args;
+  const { userWallet, moduleSlug, rewardAmountG, isVerified } = args;
   const contract = CONTRACT_ADDRESSES.onwardBadges;
+  const amount = parseUnits(rewardAmountG.toString(), 18);
+  const claimId = makeClaimId(userWallet, moduleSlug);
 
-  const existingTokenId = (await publicClient.readContract({
+  // Submit the single-tx processCompletion call
+  const txHash = await walletClient.writeContract({
     address: contract,
-    abi: OnwardBadgesAbi,
+    abi: onwardBadgesAbi,
+    functionName: "processCompletion",
+    args: [userWallet, moduleSlug, amount, claimId, isVerified],
+  });
+
+  await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+  // After the tx settles, read the canonical state
+  const badgeTokenId = (await publicClient.readContract({
+    address: contract,
+    abi: onwardBadgesAbi,
     functionName: "earnedTokenId",
     args: [userWallet, slugHash(moduleSlug)],
   })) as bigint;
 
-  let badgeTxHash: `0x${string}`;
-  let badgeTokenId: bigint;
-
-  if (existingTokenId > 0n) {
-    badgeTxHash = ZERO_HASH;
-    badgeTokenId = existingTokenId;
-  } else {
-    badgeTxHash = await walletClient.writeContract({
-      address: contract,
-      abi: OnwardBadgesAbi,
-      functionName: "mint",
-      args: [userWallet, moduleSlug],
-    });
-    await publicClient.waitForTransactionReceipt({ hash: badgeTxHash });
-    badgeTokenId = (await publicClient.readContract({
-      address: contract,
-      abi: OnwardBadgesAbi,
-      functionName: "earnedTokenId",
-      args: [userWallet, slugHash(moduleSlug)],
-    })) as bigint;
-  }
-
-  // ─── Reward distribution (skip if already claimed) ───────
-  const claimId = makeClaimId(userWallet, moduleSlug);
-  const alreadyClaimed = (await publicClient.readContract({
+  const claimedFlag = (await publicClient.readContract({
     address: contract,
-    abi: OnwardBadgesAbi,
+    abi: onwardBadgesAbi,
     functionName: "claimed",
     args: [claimId],
   })) as boolean;
 
-  let rewardTxHash: `0x${string}`;
+  const wasPaidDirect = claimedFlag && isVerified;
+  const wasAccrued = claimedFlag && !isVerified;
 
-  if (alreadyClaimed) {
-    rewardTxHash = ZERO_HASH;
-  } else {
-    const amount = parseUnits(rewardAmountG.toString(), 18);
-    rewardTxHash = await walletClient.writeContract({
-      address: contract,
-      abi: OnwardBadgesAbi,
-      functionName: "distribute",
-      args: [userWallet, amount, claimId],
-    });
-    await publicClient.waitForTransactionReceipt({ hash: rewardTxHash });
-  }
-
-  return { badgeTxHash, badgeTokenId, rewardTxHash };
+  return {
+    txHash,
+    badgeTokenId,
+    wasPaidDirect,
+    wasAccrued,
+  };
 }
 
-export function ipfsToHttp(uri: string): string {
-  if (uri.startsWith("ipfs://")) {
-    return `https://ipfs.io/ipfs/${uri.slice(7)}`;
+// ============================================================
+// Claim pending (signer releases user's pending balance)
+// ============================================================
+
+export type ClaimPendingResult = {
+  txHash: `0x${string}`;
+  amount: bigint;
+};
+
+export async function claimPendingForUser(
+  userWallet: Address
+): Promise<ClaimPendingResult> {
+  const contract = CONTRACT_ADDRESSES.onwardBadges;
+
+  // Read pending balance BEFORE the tx (after the tx it's zeroed)
+  const pendingBefore = (await publicClient.readContract({
+    address: contract,
+    abi: onwardBadgesAbi,
+    functionName: "pendingClaim",
+    args: [userWallet],
+  })) as bigint;
+
+  if (pendingBefore === 0n) {
+    return { txHash: ZERO_HASH, amount: 0n };
   }
-  return uri;
+
+  const txHash = await walletClient.writeContract({
+    address: contract,
+    abi: onwardBadgesAbi,
+    functionName: "claimPending",
+    args: [userWallet],
+  });
+
+  await publicClient.waitForTransactionReceipt({ hash: txHash });
+
+  return {
+    txHash,
+    amount: pendingBefore,
+  };
+}
+
+// ============================================================
+// Read pending balance (used by API routes)
+// ============================================================
+
+export async function getPendingBalance(
+  userWallet: Address
+): Promise<bigint> {
+  return (await publicClient.readContract({
+    address: CONTRACT_ADDRESSES.onwardBadges,
+    abi: onwardBadgesAbi,
+    functionName: "pendingClaim",
+    args: [userWallet],
+  })) as bigint;
 }

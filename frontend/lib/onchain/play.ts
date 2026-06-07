@@ -1,6 +1,5 @@
 import { keccak256, toBytes, parseUnits, type Address } from "viem";
-import onwardBadgesAbi from "@/constants/abis/abi.json";
-import whackStakeAbi from "@/constants/abis/whackStake.json";
+import { onwardBadgesAbi, whackStakeAbi } from "@/constants/abis";
 import { CONTRACT_ADDRESSES } from "@/constants/contracts/address";
 import { publicClient, walletClient } from "./badges";
 
@@ -9,28 +8,44 @@ export type PlayResolutionResult = {
   stakeResolveTxHash: `0x${string}` | null;
   levelBadgeTxHash: `0x${string}` | null;
   levelBadgeTokenId: bigint | null;
+  wasPaidDirect: boolean;
+  wasAccrued: boolean;
 };
 
 const ZERO_HASH = ("0x" + "0".repeat(64)) as `0x${string}`;
+const WHACK_REWARD_SLUG = "whack-round";
 
 export async function resolveRoundOnchain(args: {
   userWallet: Address;
   roundId: string;
   mode: "free" | "premium";
   passed: boolean;
-  rewardAmountG: number; // for free mode only; premium uses contract bonus
+  rewardAmountG: number;
+  isVerified: boolean;
   levelBefore: number;
   levelAfter: number;
 }): Promise<PlayResolutionResult> {
-  const { userWallet, roundId, mode, passed, rewardAmountG, levelBefore, levelAfter } = args;
+  const {
+    userWallet,
+    roundId,
+    mode,
+    passed,
+    rewardAmountG,
+    isVerified,
+    levelBefore,
+    levelAfter,
+  } = args;
+
   const result: PlayResolutionResult = {
     rewardTxHash: null,
     stakeResolveTxHash: null,
     levelBadgeTxHash: null,
     levelBadgeTokenId: null,
+    wasPaidDirect: false,
+    wasAccrued: false,
   };
 
-  // ─── Free mode reward distribution ───────────────────────
+  // ─── Free mode reward distribution ────────────────────────
   if (mode === "free" && passed) {
     const claimId = keccak256(
       toBytes(`${userWallet.toLowerCase()}:round:${roundId}`)
@@ -49,18 +64,22 @@ export async function resolveRoundOnchain(args: {
         address: CONTRACT_ADDRESSES.onwardBadges,
         abi: onwardBadgesAbi,
         functionName: "distribute",
-        args: [userWallet, amount, claimId],
+        args: [userWallet, amount, claimId, WHACK_REWARD_SLUG, isVerified],
       });
       await publicClient.waitForTransactionReceipt({ hash: txHash });
       result.rewardTxHash = txHash;
+      if (isVerified) {
+        result.wasPaidDirect = true;
+      } else {
+        result.wasAccrued = true;
+      }
     } else {
       result.rewardTxHash = ZERO_HASH;
     }
   }
 
-  // ─── Premium mode stake resolution ───────────────────────
+  // ─── Premium mode stake resolution ────────────────────────
   if (mode === "premium") {
-    
     const roundIdHash = keccak256(toBytes(roundId));
 
     const stake = (await publicClient.readContract({
@@ -70,7 +89,10 @@ export async function resolveRoundOnchain(args: {
       args: [roundIdHash],
     })) as readonly [Address, bigint, boolean];
 
-    if (stake[0] !== "0x0000000000000000000000000000000000000000" && !stake[2]) {
+    if (
+      stake[0] !== "0x0000000000000000000000000000000000000000" &&
+      !stake[2]
+    ) {
       const txHash = await walletClient.writeContract({
         address: CONTRACT_ADDRESSES.whackStake,
         abi: whackStakeAbi,
@@ -82,6 +104,7 @@ export async function resolveRoundOnchain(args: {
     }
   }
 
+  // ─── Level badge mint (if milestone crossed) ──────────────
   const milestone = findMilestoneCrossed(levelBefore, levelAfter);
   if (milestone) {
     const slug = `level-${milestone}`;
@@ -121,7 +144,10 @@ export async function resolveRoundOnchain(args: {
   return result;
 }
 
-export async function verifyStakePlaced(roundId: string, userWallet: Address): Promise<boolean> {
+export async function verifyStakePlaced(
+  roundId: string,
+  userWallet: Address
+): Promise<boolean> {
   const roundIdHash = keccak256(toBytes(roundId));
   const stake = (await publicClient.readContract({
     address: CONTRACT_ADDRESSES.whackStake,
@@ -133,7 +159,7 @@ export async function verifyStakePlaced(roundId: string, userWallet: Address): P
   return (
     stake[0].toLowerCase() === userWallet.toLowerCase() &&
     stake[1] > 0n &&
-    !stake[2] 
+    !stake[2]
   );
 }
 
