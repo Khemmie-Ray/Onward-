@@ -9,6 +9,7 @@ type SubmitBody = {
   correct_whacks?: number;
   wrong_whacks?: number;
   missed_scams?: number;
+  isVerified?: boolean;
 };
 
 const FREE_REWARD_G = 5;
@@ -23,6 +24,8 @@ export async function POST(request: Request) {
   if (!body?.round_id) {
     return NextResponse.json({ error: "Missing round_id" }, { status: 400 });
   }
+
+  const isVerified = body.isVerified === true;
 
   const { data: session } = await supabaseAdmin
     .from("game_sessions")
@@ -73,14 +76,25 @@ export async function POST(request: Request) {
     })
     .eq("id", session.id);
 
+  // ─── Streak + DB credits ────────────────────────────────
+  // For free mode: only credit total_g_earned if user is verified.
+  // Unverified users' rewards accrue to pendingClaim onchain; total_g_earned
+  // gets credited later when they claim via /api/badges/claim-pending.
+  //
+  // For premium mode: the 5 G$ bonus comes from WhackStake (always direct,
+  // no verification gate), so we always credit when passed.
   if (passed) {
     const userUpdate: { current_level: number; total_g_earned?: number } = {
       current_level: levelAfter,
     };
 
     if (mode === "free") {
-      userUpdate.total_g_earned =
-        Number(user.total_g_earned) + rewardAmount;
+      if (isVerified) {
+        userUpdate.total_g_earned =
+          Number(user.total_g_earned) + rewardAmount;
+      }
+      // If unverified, total_g_earned isn't touched here — claim-pending
+      // will credit it when the user releases their pending balance.
 
       const today = new Date();
       today.setUTCHours(0, 0, 0, 0);
@@ -113,6 +127,7 @@ export async function POST(request: Request) {
 
       await recomputeUserStreak(user.id);
     } else {
+      // Premium win: bonus is always direct (from WhackStake)
       userUpdate.total_g_earned =
         Number(user.total_g_earned) + PREMIUM_BONUS_G;
     }
@@ -120,11 +135,14 @@ export async function POST(request: Request) {
     await supabaseAdmin.from("users").update(userUpdate).eq("id", user.id);
   }
 
+  // ─── Onchain resolution ─────────────────────────────────
   let onchain = {
     rewardTxHash: null as string | null,
     stakeResolveTxHash: null as string | null,
     levelBadgeTxHash: null as string | null,
     levelBadgeTokenId: null as string | null,
+    wasPaidDirect: false,
+    wasAccrued: false,
     onchainError: null as string | null,
   };
 
@@ -135,6 +153,7 @@ export async function POST(request: Request) {
       mode,
       passed,
       rewardAmountG: rewardAmount,
+      isVerified,
       levelBefore,
       levelAfter,
     });
@@ -143,6 +162,8 @@ export async function POST(request: Request) {
       stakeResolveTxHash: r.stakeResolveTxHash,
       levelBadgeTxHash: r.levelBadgeTxHash,
       levelBadgeTokenId: r.levelBadgeTokenId?.toString() ?? null,
+      wasPaidDirect: r.wasPaidDirect,
+      wasAccrued: r.wasAccrued,
       onchainError: null,
     };
     await supabaseAdmin

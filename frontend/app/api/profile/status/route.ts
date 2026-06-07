@@ -13,5 +13,6 @@ export async function GET(request: Request) {
     hasUsername: hasName && hasAvatar,
     hasName,
     hasAvatar,
+    avatarId: user.avatar_id ?? null,
   });
 }
