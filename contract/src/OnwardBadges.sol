@@ -2,118 +2,119 @@
 pragma solidity ^0.8.20;
 
 import {
-    ERC721Upgradeable
-} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
-import {
     OwnableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {
     PausableUpgradeable
 } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {ReentrancyGuardLite} from "./ReentrancyGuardLite.sol";
 import {
     UUPSUpgradeable
 } from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {
     Initializable
 } from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {
+    ERC721Upgradeable
+} from "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {
+    SafeERC20
+} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract OnwardBadges is
     Initializable,
-    ERC721Upgradeable,
     OwnableUpgradeable,
     PausableUpgradeable,
-    UUPSUpgradeable
+    ReentrancyGuardLite,
+    UUPSUpgradeable,
+    ERC721Upgradeable
 {
+    using SafeERC20 for IERC20;
+
     // ============================================================
-    // State variables
+    // State (do not reorder — UUPS upgrade safety)
     // ============================================================
 
-    /// @notice The backend wallet authorized to mint badges and distribute rewards.
     address public signer;
-
-    /// @notice The G$ ERC-20 token contract.
     IERC20 public gDollar;
-
-    /// @notice Auto-incrementing token ID counter. Starts at 1 (0 is sentinel for "not owned").
     uint256 public nextTokenId;
 
-    /// @notice slug hash → token metadata URI
-    mapping(bytes32 => string) public moduleTokenURI;
-
-    /// @notice user address → slug hash → tokenId (0 means not earned)
     mapping(address => mapping(bytes32 => uint256)) public earnedTokenId;
-
-    /// @notice tokenId → slug hash (reverse lookup)
-    mapping(uint256 => bytes32) public tokenIdToSlugHash;
-
-    /// @notice claim ID → has been paid out
+    mapping(bytes32 => string) public moduleTokenURI;
     mapping(bytes32 => bool) public claimed;
+    mapping(address => uint256) public pendingClaim;
+    mapping(uint256 => bytes32) public tokenSlug;
 
-    /// @notice Lifetime G$ distributed via this contract (pitch metric).
     uint256 public totalDistributed;
+    uint256 public totalAccrued;
+    uint256 public totalClaimed;
+    uint256 public totalPending;
 
-    /// @notice Lifetime G$ flowed in from WhackStake forfeits.
-    uint256 public totalReplenished;
-
-    /// @notice Flag for permanent upgrade renunciation.
     bool public upgradeRenounced;
 
-    /// @dev Storage gap reserved for future versions. Decrement when adding new state vars.
-    uint256[42] private __gap;
+    uint256[40] private __gap;
 
     // ============================================================
     // Events
     // ============================================================
 
     event BadgeMinted(
-        address indexed to,
+        address indexed user,
+        bytes32 indexed slugHash,
         uint256 indexed tokenId,
-        bytes32 indexed slugHash
+        string slug
     );
     event RewardDistributed(
-        address indexed to,
+        address indexed user,
         uint256 amount,
-        bytes32 indexed claimId
+        bytes32 indexed claimId,
+        string slug
+    );
+    event RewardAccrued(
+        address indexed user,
+        uint256 amount,
+        bytes32 indexed claimId,
+        string slug
+    );
+    event PendingClaimed(
+        address indexed user,
+        uint256 amount,
+        address indexed triggeredBy
     );
     event ReserveReplenished(
         address indexed from,
         uint256 amount,
         string source
     );
-    event ModuleURISet(bytes32 indexed slugHash, string uri);
-    event SignerChanged(
-        address indexed previousSigner,
-        address indexed newSigner
+    event SignerChanged(address indexed previous, address indexed current);
+    event ModuleURIChanged(bytes32 indexed slugHash, string uri);
+    event EmergencyWithdrawn(
+        address indexed token,
+        address indexed to,
+        uint256 amount
     );
     event UpgradeRenounced();
-    event Withdrawn(address indexed to, uint256 amount);
 
     // ============================================================
     // Errors
     // ============================================================
 
     error NotSigner();
-    error AlreadyEarned();
-    error AlreadyClaimed();
-    error URINotConfigured();
-    error TransferFailed();
-    error SoulboundCannotTransfer();
-    error UpgradeAlreadyRenounced();
     error ZeroAddress();
     error ZeroAmount();
+    error InsufficientReserve();
+    error NoPendingClaim();
+    error SoulboundCannotTransfer();
+    error UpgradeAlreadyRenounced();
 
     // ============================================================
     // Modifiers
     // ============================================================
 
     modifier onlySigner() {
-        _onlySigner();
-        _;
-    }
-
-    function _onlySigner() internal {
         if (msg.sender != signer) revert NotSigner();
+        _;
     }
 
     // ============================================================
@@ -125,11 +126,6 @@ contract OnwardBadges is
         _disableInitializers();
     }
 
-    /**
-     * @param _owner Multisig that controls config, pause, upgrade authority
-     * @param _signer Backend wallet authorized to mint + distribute
-     * @param _gDollar G$ ERC-20 address on the target chain
-     */
     function initialize(
         address _owner,
         address _signer,
@@ -139,13 +135,12 @@ contract OnwardBadges is
             _owner == address(0) ||
             _signer == address(0) ||
             _gDollar == address(0)
-        ) {
-            revert ZeroAddress();
-        }
+        ) revert ZeroAddress();
 
-        __ERC721_init("Onward Badges", "ONWARD");
         __Ownable_init(_owner);
         __Pausable_init();
+        __ReentrancyGuard_init();
+        __ERC721_init("Onward Badge", "ONWARD");
 
         signer = _signer;
         gDollar = IERC20(_gDollar);
@@ -153,171 +148,175 @@ contract OnwardBadges is
     }
 
     // ============================================================
-    // Badge minting (signer-only)
+    // Backend operations (signer-only)
     // ============================================================
 
     /**
-     * @notice Mint a badge to `to` for the module identified by `slug`.
-     * @dev Idempotent: reverts if `to` already owns the badge for this slug.
+     * @notice One-shot: mint badge + distribute or accrue reward.
+     * @param user Recipient
+     * @param slug Module slug (e.g. "what-is-gooddollar")
+     * @param rewardAmount G$ in wei
+     * @param claimId Unique per (user, module). Reused = no-op.
+     * @param isVerified Frontend-determined verification status.
+     *                   true → direct payout; false → accrue to pending.
+     * @return tokenId Badge token ID (new or existing).
+     * @return wasPaidDirect true if G$ transferred now, false if accrued.
      */
-    function mint(
-        address to,
-        string calldata slug
-    ) external onlySigner whenNotPaused {
-        if (to == address(0)) revert ZeroAddress();
-
-        bytes32 slugHash = keccak256(bytes(slug));
-
-        if (earnedTokenId[to][slugHash] != 0) revert AlreadyEarned();
-        if (bytes(moduleTokenURI[slugHash]).length == 0)
-            revert URINotConfigured();
-
-        uint256 tokenId = nextTokenId++;
-        earnedTokenId[to][slugHash] = tokenId;
-        tokenIdToSlugHash[tokenId] = slugHash;
-
-        _safeMint(to, tokenId);
-        emit BadgeMinted(to, tokenId, slugHash);
-    }
-
-    // ============================================================
-    // Reward distribution (signer-only)
-    // ============================================================
-
-    /**
-     * @notice Transfer `amount` of G$ to `to`, marking `claimId` as paid.
-     * @dev Idempotent: reverts if claimId already used. Off-chain code generates
-     *      claimId as keccak256(user + ":" + scope). Same claimId twice = no double-pay.
-     */
-    function distribute(
-        address to,
-        uint256 amount,
-        bytes32 claimId
-    ) external onlySigner whenNotPaused {
-        if (to == address(0)) revert ZeroAddress();
-        if (amount == 0) revert ZeroAmount();
-        if (claimed[claimId]) revert AlreadyClaimed();
-
-        claimed[claimId] = true;
-        totalDistributed += amount;
-
-        bool ok = gDollar.transfer(to, amount);
-        if (!ok) revert TransferFailed();
-
-        emit RewardDistributed(to, amount, claimId);
-    }
-
-    /**
-     * @notice Mint a badge AND distribute a reward in one transaction.
-     * @dev Convenience for the most common backend flow (module completion).
-     */
-    function mintAndDistribute(
-        address to,
+    function processCompletion(
+        address user,
         string calldata slug,
+        uint256 rewardAmount,
+        bytes32 claimId,
+        bool isVerified
+    )
+        external
+        onlySigner
+        whenNotPaused
+        nonReentrant
+        returns (uint256 tokenId, bool wasPaidDirect)
+    {
+        tokenId = _mintBadge(user, slug);
+        wasPaidDirect = _distribute(
+            user,
+            rewardAmount,
+            claimId,
+            slug,
+            isVerified
+        );
+    }
+
+    function mint(
+        address user,
+        string calldata slug
+    ) external onlySigner whenNotPaused nonReentrant returns (uint256 tokenId) {
+        return _mintBadge(user, slug);
+    }
+
+    function distribute(
+        address user,
         uint256 amount,
-        bytes32 claimId
-    ) external onlySigner whenNotPaused {
-        if (to == address(0)) revert ZeroAddress();
-        if (amount == 0) revert ZeroAmount();
+        bytes32 claimId,
+        string calldata slug,
+        bool isVerified
+    )
+        external
+        onlySigner
+        whenNotPaused
+        nonReentrant
+        returns (bool wasPaidDirect)
+    {
+        return _distribute(user, amount, claimId, slug, isVerified);
+    }
 
-        bytes32 slugHash = keccak256(bytes(slug));
+    /**
+     * @notice Release accumulated pending balance to a user.
+     * @dev Signer-only. Backend should verify user is whitelisted via
+     *      citizen-sdk before calling. User pays no gas.
+     * @param user Address whose pending balance to release.
+     */
+    function claimPending(
+        address user
+    ) external onlySigner whenNotPaused nonReentrant {
+        if (user == address(0)) revert ZeroAddress();
 
-        // Mint
-        if (earnedTokenId[to][slugHash] != 0) revert AlreadyEarned();
-        if (bytes(moduleTokenURI[slugHash]).length == 0)
-            revert URINotConfigured();
+        uint256 amount = pendingClaim[user];
+        if (amount == 0) revert NoPendingClaim();
+        if (gDollar.balanceOf(address(this)) < amount) {
+            revert InsufficientReserve();
+        }
 
-        uint256 tokenId = nextTokenId++;
-        earnedTokenId[to][slugHash] = tokenId;
-        tokenIdToSlugHash[tokenId] = slugHash;
+        // Effects before interaction (CEI)
+        pendingClaim[user] = 0;
+        totalPending -= amount;
+        totalClaimed += amount;
 
-        _safeMint(to, tokenId);
-        emit BadgeMinted(to, tokenId, slugHash);
+        // Interaction (last)
+        gDollar.safeTransfer(user, amount);
 
-        // Distribute
-        if (claimed[claimId]) revert AlreadyClaimed();
-        claimed[claimId] = true;
-        totalDistributed += amount;
-
-        bool ok = gDollar.transfer(to, amount);
-        if (!ok) revert TransferFailed();
-
-        emit RewardDistributed(to, amount, claimId);
+        emit PendingClaimed(user, amount, msg.sender);
     }
 
     // ============================================================
-    // Reserve management (any caller — designed for WhackStake forfeits)
+    // Reserve funding (open — anyone can replenish)
     // ============================================================
 
-    /**
-     * @notice Accept G$ into the reward reserve from any source. Emits an event so
-     *         forfeit volume is trackable for pitch metrics.
-     * @param amount Amount of G$ being deposited
-     * @param source Human-readable tag like "whack-stake-forfeit" or "manual-topup"
-     * @dev Caller must have approved this contract for `amount` G$ before calling.
-     */
     function replenishReserve(
         uint256 amount,
         string calldata source
-    ) external whenNotPaused {
+    ) external whenNotPaused nonReentrant {
         if (amount == 0) revert ZeroAmount();
-
-        bool ok = gDollar.transferFrom(msg.sender, address(this), amount);
-        if (!ok) revert TransferFailed();
-
-        totalReplenished += amount;
+        gDollar.safeTransferFrom(msg.sender, address(this), amount);
         emit ReserveReplenished(msg.sender, amount, source);
     }
 
     // ============================================================
-    // ERC-721 overrides — enforce soulbound
+    // View helpers
     // ============================================================
 
-    /**
-     * @notice Soulbound: only mint (from == 0) and burn (to == 0) allowed.
-     *         Reverts on any transfer attempt.
-     */
-    function _update(
-        address to,
-        uint256 tokenId,
-        address auth
-    ) internal override returns (address) {
-        address from = _ownerOf(tokenId);
-        if (from != address(0) && to != address(0))
-            revert SoulboundCannotTransfer();
-        return super._update(to, tokenId, auth);
+    function reserveBalance() external view returns (uint256) {
+        return gDollar.balanceOf(address(this));
+    }
+
+    function availableReserve() external view returns (uint256) {
+        uint256 bal = gDollar.balanceOf(address(this));
+        return bal > totalPending ? bal - totalPending : 0;
+    }
+
+    function slugHashOf(string calldata slug) external pure returns (bytes32) {
+        return keccak256(bytes(slug));
     }
 
     function tokenURI(
         uint256 tokenId
     ) public view override returns (string memory) {
         _requireOwned(tokenId);
-        bytes32 slugHash = tokenIdToSlugHash[tokenId];
-        return moduleTokenURI[slugHash];
+        return moduleTokenURI[tokenSlug[tokenId]];
     }
 
     // ============================================================
-    // Admin (owner-only) — for the admin interface
+    // Soulbound enforcement
     // ============================================================
 
-    /// @notice Configure the metadata URI for a module slug. Required before badges of that slug can mint.
-    function setModuleURI(
-        string calldata slug,
-        string calldata uri
-    ) external onlyOwner {
-        bytes32 slugHash = keccak256(bytes(slug));
-        moduleTokenURI[slugHash] = uri;
-        emit ModuleURISet(slugHash, uri);
+    /// @dev Block transfers. Mint (from=0) and burn (to=0) allowed.
+    function _update(
+        address to,
+        uint256 tokenId,
+        address auth
+    ) internal override returns (address) {
+        address from = _ownerOf(tokenId);
+        if (from != address(0) && to != address(0)) {
+            revert SoulboundCannotTransfer();
+        }
+        return super._update(to, tokenId, auth);
     }
 
-    /// @notice Rotate the backend signer wallet (e.g. if the key is compromised).
+    function approve(address, uint256) public pure override {
+        revert SoulboundCannotTransfer();
+    }
+
+    function setApprovalForAll(address, bool) public pure override {
+        revert SoulboundCannotTransfer();
+    }
+
+    // ============================================================
+    // Admin (owner-only)
+    // ============================================================
+
     function setSigner(address newSigner) external onlyOwner {
         if (newSigner == address(0)) revert ZeroAddress();
         emit SignerChanged(signer, newSigner);
         signer = newSigner;
     }
 
-    /// @notice Emergency stop. While paused, mint/distribute/replenish revert.
+    function setModuleURI(
+        string calldata slug,
+        string calldata uri
+    ) external onlyOwner {
+        bytes32 h = keccak256(bytes(slug));
+        moduleTokenURI[h] = uri;
+        emit ModuleURIChanged(h, uri);
+    }
+
     function pause() external onlyOwner {
         _pause();
     }
@@ -326,38 +325,93 @@ contract OnwardBadges is
         _unpause();
     }
 
-    /// @notice Withdraw G$ from the contract — for redistribution to a new contract during migration.
-    function withdraw(address to, uint256 amount) external onlyOwner {
+    /**
+     * @notice Withdraw stuck tokens. G$ withdrawals cannot dip below totalPending.
+     */
+    function emergencyWithdraw(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyOwner nonReentrant {
         if (to == address(0)) revert ZeroAddress();
-        bool ok = gDollar.transfer(to, amount);
-        if (!ok) revert TransferFailed();
-        emit Withdrawn(to, amount);
+        if (amount == 0) revert ZeroAmount();
+
+        if (token == address(gDollar)) {
+            uint256 bal = gDollar.balanceOf(address(this));
+            if (bal < amount) revert InsufficientReserve();
+            if (bal - amount < totalPending) revert InsufficientReserve();
+        }
+
+        IERC20(token).safeTransfer(to, amount);
+        emit EmergencyWithdrawn(token, to, amount);
     }
 
     // ============================================================
-    // Upgrade authority — UUPS pattern
+    // Internal logic
+    // ============================================================
+
+    function _mintBadge(
+        address user,
+        string calldata slug
+    ) internal returns (uint256 tokenId) {
+        if (user == address(0)) revert ZeroAddress();
+
+        bytes32 h = keccak256(bytes(slug));
+        uint256 existing = earnedTokenId[user][h];
+        if (existing != 0) return existing;
+
+        tokenId = nextTokenId++;
+        earnedTokenId[user][h] = tokenId;
+        tokenSlug[tokenId] = h;
+        _safeMint(user, tokenId);
+
+        emit BadgeMinted(user, h, tokenId, slug);
+    }
+
+    function _distribute(
+        address user,
+        uint256 amount,
+        bytes32 claimId,
+        string calldata slug,
+        bool isVerified
+    ) internal returns (bool wasPaidDirect) {
+        if (user == address(0)) revert ZeroAddress();
+        if (amount == 0) revert ZeroAmount();
+        if (claimed[claimId]) return false;
+
+        claimed[claimId] = true;
+
+        if (isVerified) {
+            uint256 bal = gDollar.balanceOf(address(this));
+            if (bal < amount + totalPending) revert InsufficientReserve();
+
+            totalDistributed += amount;
+
+            gDollar.safeTransfer(user, amount);
+
+            emit RewardDistributed(user, amount, claimId, slug);
+            return true;
+        } else {
+            pendingClaim[user] += amount;
+            totalPending += amount;
+            totalAccrued += amount;
+
+            emit RewardAccrued(user, amount, claimId, slug);
+            return false;
+        }
+    }
+
+    // ============================================================
+    // Upgrade authority
     // ============================================================
 
     function _authorizeUpgrade(address) internal view override onlyOwner {
         if (upgradeRenounced) revert UpgradeAlreadyRenounced();
     }
 
-    /**
-     * @notice Permanently disable future upgrades. Once called, this contract becomes immutable.
-     * @dev Irreversible. Use only after the contract is proven stable in production.
-     */
     function renounceUpgradeability() external onlyOwner {
         if (upgradeRenounced) revert UpgradeAlreadyRenounced();
         upgradeRenounced = true;
         emit UpgradeRenounced();
-    }
-
-    // ============================================================
-    // View helpers
-    // ============================================================
-
-    /// @notice Reserve balance available for distributions.
-    function reserveBalance() external view returns (uint256) {
-        return gDollar.balanceOf(address(this));
     }
 }
