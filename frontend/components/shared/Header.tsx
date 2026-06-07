@@ -3,15 +3,27 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  useAppKit,
+  useAppKitAccount,
+  useDisconnect,
+} from "@reown/appkit/react";
 import { LoopSigil } from "@/components/home/motifs";
-import { useAppKit, useAppKitAccount, useDisconnect } from "@reown/appkit/react";
 import { WalletPill } from "../auth/WalletPill";
+import { useAuthFetch } from "@/hooks/useAuthFetch";
+
+type ProfileStatus = {
+  hasUsername: boolean;
+  avatarId: string | null;
+};
 
 const Header = () => {
-  const { open } = useAppKit()
+  const { open } = useAppKit();
   const { isConnected, address, status } = useAppKitAccount();
   const { disconnect } = useDisconnect();
   const router = useRouter();
+  const authFetch = useAuthFetch();
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -20,13 +32,29 @@ const Header = () => {
     status === "connecting" || status === "reconnecting";
   const showControl = mounted && !isHydrating;
 
+  // Reuse the same query key as AuthGuard so TanStack Query dedupes the
+  // request — only one HTTP call to /api/profile/status no matter how many
+  // components ask for it.
+  const { data } = useQuery({
+    queryKey: ["me", "status", address ?? "anon"],
+    queryFn: async () => {
+      const res = await authFetch("/api/profile/status");
+      if (!res.ok) throw new Error("Status check failed");
+      return res.json() as Promise<ProfileStatus>;
+    },
+    enabled: mounted && isConnected && !isHydrating && !!address,
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+
   const handleDisconnect = async () => {
     await disconnect();
     router.push("/");
   };
-  
+
   return (
-    <header className="py-8 mb-2 relative z-10" >
+    <header className="py-8 mb-2 relative z-10">
       <nav
         className="flex items-center justify-between"
         style={{ animation: "fade-up 0.8s 0.05s ease both" }}
@@ -45,7 +73,11 @@ const Header = () => {
 
         {showControl &&
           (isConnected && address ? (
-            <WalletPill address={address} onDisconnect={handleDisconnect} />
+            <WalletPill
+              address={address}
+              avatarId={data?.avatarId ?? null}
+              onDisconnect={handleDisconnect}
+            />
           ) : (
             <button
               onClick={() => open()}
