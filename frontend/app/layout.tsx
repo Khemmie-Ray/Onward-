@@ -3,6 +3,7 @@ import { Bricolage_Grotesque, Sora } from "next/font/google";
 import "./globals.css";
 import Providers from "@/contexts/Providers";
 import { headers } from "next/headers";
+import { Toaster } from 'sonner';
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -35,7 +36,9 @@ export default async function RootLayout({
   return (
     <html lang="en" className={`${bricolage.variable} ${sora.variable}`}>
       <body className="bg-canvas text-fg mx-auto w-full">
-        <Providers cookies={cookies}>{children}</Providers></body>
+        <Providers cookies={cookies}>
+          <Toaster richColors position="top-center" />
+          {children}</Providers></body>
     </html>
   );
 }

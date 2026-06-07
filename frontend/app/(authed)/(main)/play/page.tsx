@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Loader2, Lock, Zap, Trophy } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Lock, Zap, Trophy } from "lucide-react";
 import { useAppKitAccount } from "@reown/appkit/react";
 import { formatUnits, type Address } from "viem";
 
@@ -20,11 +20,8 @@ import {
   useStakeAllowance,
   useGDollarBalance,
 } from "@/hooks/useWhackState";
+import { useIdentityContext } from "@/contexts/IdentityContext";
 import type { WhackIcon } from "@/lib/scam/whackIcon";
-
-// ──────────────────────────────────────────────────────────────
-// Types
-// ──────────────────────────────────────────────────────────────
 
 type Mode = "free" | "premium";
 type Phase = "tab-select" | "briefing" | "playing" | "ended";
@@ -71,16 +68,14 @@ type SubmitResponse = {
 
 type DailyCapMessage = { kind: "cap"; message: string } | null;
 
-// ──────────────────────────────────────────────────────────────
-
 export default function PlayPage() {
   const authFetch = useAuthFetch();
   const { address } = useAppKitAccount();
+  const { isVerified, startVerifying } = useIdentityContext();
 
   const [activeTab, setActiveTab] = useState<Mode>("free");
   const [phase, setPhase] = useState<Phase>("tab-select");
 
-  // Per-tab loading state — each tab tracks its own work independently
   const [freeStep, setFreeStep] = useState<FreeStep>("idle");
   const [premiumStep, setPremiumStep] = useState<PremiumStep>("idle");
 
@@ -89,7 +84,6 @@ export default function PlayPage() {
   const [result, setResult] = useState<WhackResult | null>(null);
   const [submitData, setSubmitData] = useState<SubmitResponse | null>(null);
 
-  // Per-tab messages
   const [freeCapMessage, setFreeCapMessage] = useState<DailyCapMessage>(null);
   const [premiumCapMessage, setPremiumCapMessage] =
     useState<DailyCapMessage>(null);
@@ -108,7 +102,6 @@ export default function PlayPage() {
     setPremiumStep("idle");
   }, []);
 
-  // ─── Free mode ────────────────────────────────────────────
   const startFreeRound = async () => {
     setFreeError(null);
     setFreeCapMessage(null);
@@ -140,7 +133,6 @@ export default function PlayPage() {
     }
   };
 
-  // ─── Premium mode ────────────────────────────────────────
   const isPremiumTab = activeTab === "premium";
   const { stakeAmount } = useStakeAmount(isPremiumTab);
   const { balance, refetch: refetchBalance } = useGDollarBalance(
@@ -251,7 +243,6 @@ export default function PlayPage() {
     })();
   }, [stakeState.isSuccess, premiumStep, authFetch, refetchBalance]);
 
-  // ─── Begin: commit session ──────────────────────────────
   const [isBeginning, setIsBeginning] = useState(false);
 
   const handleStartPlay = async () => {
@@ -302,7 +293,6 @@ export default function PlayPage() {
     }
   };
 
-  // ─── Submit ──────────────────────────────────────────────
   const handleGameComplete = async (r: WhackResult) => {
     setResult(r);
     setPhase("ended");
@@ -317,6 +307,7 @@ export default function PlayPage() {
           correct_whacks: r.correctWhacks,
           wrong_whacks: r.wrongWhacks,
           missed_scams: r.missedScams,
+          isVerified, // ← NEW: backend uses this to decide direct vs accrue
         }),
       });
       if (res.ok) {
@@ -328,11 +319,10 @@ export default function PlayPage() {
     }
   };
 
-  // ─── Briefing phase ─────────────────────────────────────
   if (phase === "briefing" && preview) {
     return (
-      <div className="min-h-screen bg-canvas flex flex-col">
-        <header className="flex items-center justify-between px-6 py-5 max-w-[500px] mx-auto w-full">
+      <div className="min-h-screen bg-canvas flex flex-col lg:w-[40%] md:w-[40%] w-full mx-auto">
+        <header className="flex items-center justify-between px-6 py-5 w-full ">
           <button
             onClick={resetToTabSelect}
             aria-label="Back"
@@ -340,12 +330,13 @@ export default function PlayPage() {
           >
             <ArrowLeft size={18} strokeWidth={2.5} />
           </button>
-          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-fg-soft">
-            {preview.mode === "premium" ? "Premium Round" : "Daily Round"}
+          <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-fg-soft border p-3 rounded-full border-fg">
+            <p>
+              {preview.mode === "premium" ? "Premium Round" : "Daily Round"}
+            </p>
           </div>
-          <div className="w-10" />
         </header>
-        <div className="flex-1 flex items-center justify-center px-4 py-6">
+        <div className="flex items-center justify-center px-4 py-6">
           <PreRoundBriefing
             familyLabel={preview.family_label}
             familyDescription={preview.family_description}
@@ -361,7 +352,7 @@ export default function PlayPage() {
 
   if (phase === "playing" && preview) {
     return (
-      <div className="min-h-screen bg-canvas flex items-center justify-center px-4">
+      <div className="bg-canvas flex items-center justify-center px-4">
         <WhackAScamGame
           onComplete={handleGameComplete}
           boardProgression={preview.board_progression}
@@ -457,6 +448,8 @@ export default function PlayPage() {
                 stakeAmount={stakeAmount}
                 needsApproval={needsApproval}
                 onStart={startPremiumRound}
+                isVerified={isVerified}
+                onVerify={startVerifying}
               />
             </TabsContent>
           </Tabs>
@@ -551,6 +544,8 @@ function PremiumTabContent({
   stakeAmount,
   needsApproval,
   onStart,
+  isVerified,
+  onVerify,
 }: {
   capMessage: DailyCapMessage;
   errorMessage: string | null;
@@ -560,7 +555,37 @@ function PremiumTabContent({
   stakeAmount: bigint;
   needsApproval: boolean;
   onStart: () => void;
+  isVerified: boolean;
+  onVerify: () => void;
 }) {
+  // ─── Verification gate (frontend-only) ─────────────────────
+  // Premium requires GoodID verification. We block here before showing
+  // any stake UI, since unverified users can't safely play premium —
+  // their bonus would accrue but never be claimable.
+  if (!isVerified) {
+    return (
+      <div className="text-center py-2">
+        <div className="mb-3 inline-flex items-center justify-center w-12 h-12 rounded-full bg-mustard/15">
+          <Lock size={20} strokeWidth={2.5} className="text-mustard" />
+        </div>
+        <h2 className="display text-[20px] font-bold text-indigo mb-2">
+          Verify to play premium
+        </h2>
+        <p className="text-sm text-fg-soft mb-5">
+          Premium rounds require a verified GoodID so your bonus pays
+          directly to your wallet. Free rounds work without it.
+        </p>
+        <button
+          onClick={onVerify}
+          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo text-cream font-bold text-sm hover:bg-indigo/90 transition"
+        >
+          Verify with GoodID
+          <ArrowRight size={14} strokeWidth={2.8} />
+        </button>
+      </div>
+    );
+  }
+
   if (capMessage) {
     return (
       <div className="text-center py-2">

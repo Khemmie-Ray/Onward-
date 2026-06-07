@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Award, Coins, Flame, Trophy } from "lucide-react";
+import { formatUnits } from "viem";
 import { LoopSigil } from "@/components/home/motifs";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import { BadgeCard } from "@/components/dashboard/profile/BadgeCard";
@@ -9,12 +10,15 @@ import ProfileHeader from "@/components/dashboard/profile/ProfileHeader";
 import type { ProfileData } from "@/lib/data/profile";
 import LifetimeStat from "@/components/dashboard/profile/LifetimeStat";
 import EmptyBadgeState from "@/components/dashboard/profile/EmptyBadgeState";
-import { AccountSection } from "@/components/dashboard/profile/AccountSection";
+import { PendingClaimCard } from "@/components/dashboard/PendingClaimCard";
+import { usePendingClaim } from "@/hooks/usePendingClaim";
 
 const Profile = () => {
   const authFetch = useAuthFetch();
   const [data, setData] = useState<ProfileData | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const { pendingBalance } = usePendingClaim();
 
   useEffect(() => {
     let cancelled = false;
@@ -65,23 +69,41 @@ const Profile = () => {
 
   const earnedBadges = data.badges.filter((b) => b.earned);
 
+  const pendingG = pendingBalance > 0n
+    ? parseFloat(formatUnits(pendingBalance, 18))
+    : 0;
+  const lifetimeEarned = data.totalGEarned + pendingG;
+
   return (
     <>
       <div
         aria-hidden
         className="pointer-events-none absolute right-[10%] top-[8%] h-[400px] w-[400px] rounded-full opacity-50 blur-[80px] bg-[radial-gradient(circle,rgba(199,93,63,0.30)_0%,transparent_70%)]"
       />
-      <ProfileHeader 
-        displayName={data.displayName} 
-        walletAddress={data.walletAddress} 
-        daysOnOnward={data.daysOnOnward} 
+      <ProfileHeader
+        displayName={data.displayName}
+        avatarId={data.avatarId}
+        walletAddress={data.walletAddress}
+        daysOnOnward={data.daysOnOnward}
       />
+
+      <section className="mb-6 animate-[fade-up_0.8s_0.10s_ease_both]">
+        <PendingClaimCard />
+      </section>
+
       <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-10 animate-[fade-up_0.8s_0.18s_ease_both]">
         <LifetimeStat
           label="g$ earned"
-          value={data.totalGEarned.toLocaleString()}
+          value={lifetimeEarned.toLocaleString(undefined, {
+            maximumFractionDigits: 2,
+          })}
           tone="mustard"
           icon={<Coins size={28} strokeWidth={2} />}
+          sub={
+            pendingG > 0
+              ? `${data.totalGEarned} claimed · ${pendingG.toLocaleString()} pending`
+              : undefined
+          }
         />
         <LifetimeStat
           label="Badges"
@@ -102,6 +124,7 @@ const Profile = () => {
           icon={<Flame size={28} strokeWidth={2} />}
         />
       </section>
+
       <section className="mb-10 animate-[fade-up_0.8s_0.32s_ease_both]">
         <div className="flex items-end justify-between mb-1">
           <h2 className="display text-[22px] font-semibold tracking-[-0.015em] text-indigo">
@@ -123,11 +146,8 @@ const Profile = () => {
           ))}
         </div>
       </section>
-      <section className="mb-10 max-w-[480px] animate-[fade-up_0.8s_0.46s_ease_both]">
-        <AccountSection walletAddress={data.walletAddress} />
-      </section>
     </>
   );
-}
+};
 
 export default Profile;

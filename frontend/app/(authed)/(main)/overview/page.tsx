@@ -16,6 +16,9 @@ import EmptyStateCard from "@/components/dashboard/EmptyStateCard";
 import KeepGoingCard from "@/components/dashboard/KeepGoingCard";
 import WorkspaceCard from "@/components/dashboard/WorkspaceCard";
 import RecentBadge from "@/components/dashboard/RecentBadge";
+import { VerificationBanner } from "@/components/identity/VerificationBanner";
+import { PendingClaimCard } from "@/components/dashboard/PendingClaimCard";
+import { UBIClaimCard } from "@/components/dashboard/UBIClaimCard";
 
 const Overview = () => {
   const authFetch = useAuthFetch();
@@ -37,7 +40,6 @@ const Overview = () => {
         const json = (await res.json()) as DashboardData;
         if (!cancelled) {
           setData(json);
-          // Trigger a fresh wallet balance read whenever dashboard reloads
           refetchBalance();
         }
       } catch (e) {
@@ -86,12 +88,15 @@ const Overview = () => {
     maximumFractionDigits: 2,
   });
 
+  console.log(data)
+
   return (
     <>
       <div
         aria-hidden
         className="pointer-events-none absolute right-[10%] top-[8%] h-[400px] w-[400px] rounded-full opacity-60 blur-[80px] bg-[radial-gradient(circle,rgba(230,180,72,0.45)_0%,transparent_70%)]"
       />
+      <VerificationBanner />
       <section className="flex flex-wrap items-end justify-between gap-4 mb-8 animate-[fade-up_0.8s_0.05s_ease_both]">
         <div>
           <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-terracotta mb-2">
@@ -120,7 +125,6 @@ const Overview = () => {
           </span>
         </div>
       </section>
-
       <section className="grid md:grid-cols-3 gap-4 mb-4 animate-[fade-up_0.8s_0.18s_ease_both]">
         <StatCardHero
           label="Streak"
@@ -154,6 +158,10 @@ const Overview = () => {
           tone="forest"
         />
       </section>
+      <section className="mb-4 animate-[fade-up_0.8s_0.25s_ease_both]">
+        <UBIClaimCard />
+        <PendingClaimCard />
+      </section>
       <section className="mb-4 animate-[fade-up_0.8s_0.32s_ease_both]">
         {data.currentModule ? (
           <NextActionCard module={data.currentModule} />
@@ -166,42 +174,6 @@ const Overview = () => {
           <EmptyStateCard />
         )}
       </section>
-
-      <section className="mb-12 animate-[fade-up_0.8s_0.46s_ease_both]">
-        <h2 className="display text-[20px] font-semibold tracking-[-0.015em] text-indigo mb-1">
-          Or explore
-        </h2>
-        <p className="text-[12.5px] text-fg-soft mb-4">
-          Three workspaces. Use what calls you.
-        </p>
-        <div className="grid md:grid-cols-3 gap-4">
-          <WorkspaceCard
-            href="/modules"
-            icon={BookOpen}
-            title="Modules"
-            copy="Five-minute lessons that pay you in g$ as you learn the ecosystem."
-            count={`${data.modulesCompleted} of ${data.modulesTotal} complete`}
-            tint="mustard"
-          />
-          <WorkspaceCard
-            href="/play"
-            icon={Target}
-            title="Whack-a-scam"
-            copy="Train the muscle that spots fraud. Sixty seconds a day."
-            count={`Level ${data.currentLevel} · Tier 1`}
-            tint="terracotta"
-          />
-          <WorkspaceCard
-            href="/ecosystem"
-            icon={Globe}
-            title="Ecosystem"
-            copy="Learn to use real apps built on GoodDollar."
-            count={`${data.ecosystemAppsExplored} of ${data.ecosystemAppsTotal} explored`}
-            tint="aubergine"
-          />
-        </div>
-      </section>
-
       {data.recentBadges.length > 0 && (
         <section className="mb-12 animate-[fade-up_0.8s_0.6s_ease_both]">
           <div className="flex items-end justify-between mb-4">
