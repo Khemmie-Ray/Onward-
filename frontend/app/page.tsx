@@ -1,7 +1,7 @@
 "use client";
 
-import { ArrowRight, BookOpen, Check, Sparkles, Target } from "lucide-react";
-import { useEffect } from "react";
+import { ArrowRight, BookOpen, Sparkles, Target } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAppKitAccount, useAppKit } from "@reown/appkit/react";
 import Image from "next/image";
@@ -9,17 +9,48 @@ import { FeatureCard } from "@/components/home/FeatureCard";
 import Header from "@/components/shared/Header";
 import Footer from "@/components/shared/Footer";
 
+type Stats = {
+  learners: number;
+  gDistributed: number;
+  modulesDone: number;
+};
+
 export default function Home() {
   const router = useRouter();
   const { isConnected, status } = useAppKitAccount();
   const isHydrating = status === "connecting" || status === "reconnecting";
   const { open } = useAppKit();
 
+  const [stats, setStats] = useState<Stats>({
+    learners: 0,
+    gDistributed: 0,
+    modulesDone: 0,
+  });
+
   useEffect(() => {
     if (!isHydrating && isConnected) {
       router.replace("/overview");
     }
   }, [isHydrating, isConnected, router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/stats");
+        if (!res.ok) return;
+        const data = (await res.json()) as Stats;
+        if (!cancelled) setStats(data);
+      } catch {
+        // Silently fall back to zeros — landing page must still render
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  console.log(stats, "clicked")
 
   return (
     <main className="mx-auto lg:w-[80%] md:w-[80%] w-[90%] h-screen overflow-hidden flex flex-col relative">
@@ -45,8 +76,8 @@ export default function Home() {
 
             <p className="mt-5 text-[18px] leading-[1.65] text-fg-soft">
               A loop, not a course. Bite-sized lessons and daily challenges that
-              pay you in g$ as you learn the GoodDollar ecosystem from the inside
-              out.
+              pay you in g$ as you learn the GoodDollar ecosystem from the
+              inside out.
             </p>
 
             <div className="mt-7 flex items-center gap-5">
@@ -58,33 +89,25 @@ export default function Home() {
                 <ArrowRight size={16} strokeWidth={2.5} />
               </button>
             </div>
+
             <div className="mt-10 flex items-center gap-6">
-              <div className="flex flex-col">
-                <span className="display text-[24px] font-bold leading-none text-indigo">
-                  0
-                </span>
-                <span className="mt-1 text-[11px] font-medium uppercase tracking-[0.1em] text-fg-soft">
-                  Learners
-                </span>
-              </div>
+              <Stat
+                value={stats.learners.toLocaleString()}
+                label="Learners"
+                tone="indigo"
+              />
               <div className="h-8 w-px bg-shadow" />
-              <div className="flex flex-col">
-                <span className="display text-[24px] font-bold leading-none text-terracotta">
-                  0
-                </span>
-                <span className="mt-1 text-[11px] font-medium uppercase tracking-[0.1em] text-fg-soft">
-                  g$ distributed
-                </span>
-              </div>
+              <Stat
+                value={stats.gDistributed.toLocaleString()}
+                label="g$ distributed"
+                tone="terracotta"
+              />
               <div className="h-8 w-px bg-shadow" />
-              <div className="flex flex-col">
-                <span className="display text-[24px] font-bold leading-none text-forest">
-                  0
-                </span>
-                <span className="mt-1 text-[11px] font-medium uppercase tracking-[0.1em] text-fg-soft">
-                  Modules done
-                </span>
-              </div>
+              <Stat
+                value={stats.modulesDone.toLocaleString()}
+                label="Modules done"
+                tone="forest"
+              />
             </div>
           </div>
           <div className="relative flex lg:w-[55%] md:w-[55%] w-full items-center justify-center animate-[fade-up_0.9s_0.4s_ease_both] mb-4">
@@ -127,5 +150,34 @@ export default function Home() {
         <Footer />
       </div>
     </main>
+  );
+}
+
+function Stat({
+  value,
+  label,
+  tone,
+}: {
+  value: string;
+  label: string;
+  tone: "indigo" | "terracotta" | "forest";
+}) {
+  const toneClass =
+    tone === "indigo"
+      ? "text-indigo"
+      : tone === "terracotta"
+        ? "text-terracotta"
+        : "text-forest";
+  return (
+    <div className="flex flex-col">
+      <span
+        className={`display text-[24px] font-bold leading-none tabular-nums ${toneClass}`}
+      >
+        {value}
+      </span>
+      <span className="mt-1 text-[11px] font-medium uppercase tracking-[0.1em] text-fg-soft">
+        {label}
+      </span>
+    </div>
   );
 }
