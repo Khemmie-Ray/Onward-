@@ -9,6 +9,7 @@ import { SpotterCard } from "./SpotterCard";
 import { CompletionScreen } from "./CompletionScreen";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import type { LessonContent } from "@/lib/lessons/lesson-data";
+import { useIdentityContext } from "@/contexts/IdentityContext";
 
 type Answer = {
   cardIndex: number;
@@ -39,6 +40,7 @@ export function LessonRunner({
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [cardAnswered, setCardAnswered] = useState(false);
   const [flipped, setFlipped] = useState(false);
+  const { isVerified } = useIdentityContext(); 
 
   const [completion, setCompletion] = useState<CompletionState | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
@@ -98,6 +100,7 @@ export function LessonRunner({
           card_index: a.cardIndex + 1,
           answer: a.answer,
         })),
+        isVerified,
       };
 
       const res = await authFetch(

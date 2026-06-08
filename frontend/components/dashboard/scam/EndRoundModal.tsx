@@ -140,7 +140,7 @@ export function EndRoundModal({
             ) : (
               txHash && (
                 <a
-                  href={`https://celo-sepolia.blockscout.com/tx/${txHash}`}
+                  href={`https://celoscan.io/tx/${txHash}`}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-3 flex items-center justify-center gap-1 text-[10px] font-semibold text-mustard hover:opacity-80"

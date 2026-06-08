@@ -6,4 +6,4 @@ export const CONTRACT_ADDRESSES = {
   gDollar: process.env.NEXT_PUBLIC_GDOLLAR_ADDRESS! as Address,
 } as const;
 
-export const EXPLORER_BASE = "https://celo-sepolia.blockscout.com";
+export const EXPLORER_BASE = "https://celoscan.io/";

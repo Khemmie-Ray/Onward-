@@ -186,7 +186,7 @@ export function CompletionScreen({
           ) : (
             <div className="flex items-center justify-center gap-3">
               <a
-                href={`https://celo-sepolia.blockscout.com/tx/${badgeTxHash}`}
+                href={`https://celoscan.io/tx/${badgeTxHash}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 font-semibold text-aubergine hover:opacity-80"
@@ -195,7 +195,7 @@ export function CompletionScreen({
               </a>
               <span className="text-fg-faint">·</span>
               <a
-                href={`https://celo-sepolia.blockscout.com/tx/${rewardTxHash}`}
+                href={`https://celoscan.io/tx/${rewardTxHash}`}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1 font-semibold text-aubergine hover:opacity-80"

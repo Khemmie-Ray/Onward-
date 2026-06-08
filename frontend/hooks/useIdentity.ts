@@ -8,11 +8,7 @@ import { IdentitySDK } from "@goodsdks/citizen-sdk";
 
 const GD_ENV = "production" as const;
 
-export type IdentityStatus =
-  | "loading"
-  | "verified"
-  | "not_verified"
-  | "error";
+export type IdentityStatus = "loading" | "verified" | "not_verified" | "error";
 
 export function useIdentity() {
   const { address } = useAppKitAccount();
@@ -27,9 +23,15 @@ export function useIdentity() {
   const isVerifyingRef = useRef(isVerifying);
   isVerifyingRef.current = isVerifying;
 
-  // ─── Status check via direct getWhitelistedRoot ─────────
   const checkVerification = useCallback(async () => {
+    console.log("[useIdentity] checkVerification called", {
+      address,
+      hasPublicClient: !!publicClient,
+      hasWalletClient: !!walletClient,
+    });
+
     if (!address || !publicClient || !walletClient) {
+      console.log("[useIdentity] missing prerequisites → not_verified");
       setStatus("not_verified");
       return;
     }
@@ -37,6 +39,7 @@ export function useIdentity() {
     try {
       if (!isVerifyingRef.current) setStatus("loading");
 
+      console.log("[useIdentity] constructing SDK");
       const sdk = new IdentitySDK({
         account: address as `0x${string}`,
         publicClient,
@@ -44,8 +47,32 @@ export function useIdentity() {
         env: GD_ENV,
       } as any);
 
+      console.log("[useIdentity] calling getWhitelistedRoot");
       const result = await sdk.getWhitelistedRoot(address as `0x${string}`);
-      const isWhitelisted = (result as any)?.isWhitelisted ?? false;
+
+      let isWhitelisted = false;
+
+      if (typeof result === "string") {
+        isWhitelisted =
+          (result as string).toLowerCase() !==
+          "0x0000000000000000000000000000000000000000";
+      } else if (result && typeof result === "object") {
+        const obj = result as any;
+        if ("isWhitelisted" in obj) {
+          isWhitelisted = Boolean(obj.isWhitelisted);
+        } else if ("root" in obj && typeof obj.root === "string") {
+          isWhitelisted =
+            obj.root.toLowerCase() !==
+            "0x0000000000000000000000000000000000000000";
+        }
+      }
+
+      console.log("[useIdentity] result:", {
+        address,
+        result,
+        resultType: typeof result,
+        isWhitelisted,
+      });
 
       if (isWhitelisted) {
         setStatus("verified");
@@ -58,7 +85,6 @@ export function useIdentity() {
       setStatus("error");
     }
   }, [address, publicClient, walletClient]);
-
   // ─── Initial + on-change check ──────────────────────────
   useEffect(() => {
     checkVerification();
@@ -66,12 +92,7 @@ export function useIdentity() {
 
   // ─── FV link generation ─────────────────────────────────
   const generateLink = useCallback(async () => {
-    if (
-      !address ||
-      !publicClient ||
-      !walletClient ||
-      isGeneratingLink
-    ) {
+    if (!address || !publicClient || !walletClient || isGeneratingLink) {
       return;
     }
 
@@ -88,13 +109,11 @@ export function useIdentity() {
       const result = await sdk.generateFVLink(
         false,
         typeof window !== "undefined" ? window.location.href : undefined,
-        celo.id
+        celo.id,
       );
 
       const link =
-        typeof result === "string"
-          ? result
-          : (result as any)?.link ?? null;
+        typeof result === "string" ? result : ((result as any)?.link ?? null);
 
       if (link) {
         setFvLink(link);
