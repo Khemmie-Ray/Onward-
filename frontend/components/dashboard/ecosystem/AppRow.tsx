@@ -1,14 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import {
-  ArrowRight,
-  ChevronDown,
-  Coins,
-  Globe,
-  Sparkles,
-  Users,
-} from "lucide-react";
+import { ChevronDown, Coins, Globe, Sparkles, Users } from "lucide-react";
 import { tintForEcosystemCategory } from "@/lib/themes/tones";
 import { MudclothPattern } from "@/components/home/motifs";
 import type { EcosystemApp } from "@/lib/ecosystem/type";
@@ -23,34 +15,18 @@ export function AppRow({
   onToggle: () => void;
 }) {
   const t = tintForEcosystemCategory(app.category);
-  const isComingSoon = app.status === "coming-soon";
+  const isComingSoon = true;
 
   return (
     <div
-      className={`overflow-hidden rounded-[18px] transition-all ${
-        isComingSoon ? "opacity-65 bg-paper" : t.bg
-      } shadow-[0_6px_20px_rgba(31,58,110,0.06)]`}
+      className={`overflow-hidden rounded-[18px] transition-all opacity-65 bg-paper shadow-[0_6px_20px_rgba(31,58,110,0.06)]`}
     >
       <button
         onClick={onToggle}
         className="relative w-full text-left p-5 flex items-center gap-4 cursor-pointer"
       >
-        {!isComingSoon && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 text-indigo opacity-[0.04]"
-          >
-            <MudclothPattern />
-          </div>
-        )}
         <div className="relative flex items-center gap-4 flex-1">
-          <div
-            className={`flex h-12 w-12 items-center justify-center rounded-[12px] flex-shrink-0 ${
-              isComingSoon
-                ? "bg-canvas-warm text-fg-dim"
-                : `${t.iconBg} ${t.iconColor}`
-            }`}
-          >
+          <div className="flex h-12 w-12 items-center justify-center rounded-[12px] flex-shrink-0 bg-canvas-warm text-fg-dim">
             <Globe size={20} strokeWidth={2.2} />
           </div>
           <div className="flex-1 min-w-0">
@@ -58,16 +34,9 @@ export function AppRow({
               <h3 className="display text-[16px] font-semibold text-indigo truncate">
                 {app.name}
               </h3>
-              {app.isNew && (
-                <span className="text-[9px] font-bold uppercase tracking-[0.1em] bg-terracotta text-paper px-2 py-0.5 rounded-full flex-shrink-0">
-                  New
-                </span>
-              )}
-              {isComingSoon && (
-                <span className="text-[9px] font-bold uppercase tracking-[0.1em] bg-canvas-warm text-fg-dim px-2 py-0.5 rounded-full flex-shrink-0">
-                  Coming soon
-                </span>
-              )}
+              <span className="text-[9px] font-bold uppercase tracking-[0.1em] bg-canvas-warm text-fg-dim px-2 py-0.5 rounded-full flex-shrink-0">
+                Coming soon
+              </span>
             </div>
             <p className="text-[12px] text-fg-soft truncate">{app.tagline}</p>
           </div>
@@ -148,27 +117,11 @@ export function AppRow({
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-[11px] text-fg-soft">
-              {isComingSoon
-                ? "Launching soon — turn on notifications"
-                : "Complete the tutorial to earn the badge and the g$"}
+              Launching soon — turn on notifications
             </div>
-            {isComingSoon ? (
-              <button className="inline-flex items-center gap-2 rounded-full bg-canvas-warm px-5 py-2.5 text-[13px] font-bold text-fg-soft cursor-not-allowed">
-                Notify me <Sparkles size={13} strokeWidth={2.8} />
-              </button>
-            ) : (
-              <Link
-                href={`/ecosystem`}
-                className={`group inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-bold transition-transform hover:-translate-y-0.5 ${t.iconBg} ${t.iconColor} shadow-[0_4px_14px_rgba(0,0,0,0.10)]`}
-              >
-                Start tutorial
-                <ArrowRight
-                  size={13}
-                  strokeWidth={2.8}
-                  className="transition-transform group-hover:translate-x-0.5"
-                />
-              </Link>
-            )}
+            <button className="inline-flex items-center gap-2 rounded-full bg-canvas-warm px-5 py-2.5 text-[13px] font-bold text-fg-soft cursor-not-allowed">
+              Notify me <Sparkles size={13} strokeWidth={2.8} />
+            </button>
           </div>
         </div>
       )}
