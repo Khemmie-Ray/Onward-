@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useAppKitAccount } from "@reown/appkit/react";
 import { usePublicClient, useWalletClient } from "wagmi";
-import { IdentitySDK, useIdentitySDK } from "@goodsdks/identity-sdk";
-import { useClaimSDK } from "./useClaimSDK";
+import { celo } from "wagmi/chains";
+import { IdentitySDK } from "@goodsdks/citizen-sdk";
+
+const GD_ENV = "production" as const;
 
 export type IdentityStatus =
   | "loading"
@@ -14,10 +16,8 @@ export type IdentityStatus =
 
 export function useIdentity() {
   const { address } = useAppKitAccount();
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
-  const identitySDK = useIdentitySDK("production");
-  const { claimSDK } = useClaimSDK();
+  const publicClient = usePublicClient({ chainId: celo.id });
+  const { data: walletClient } = useWalletClient({ chainId: celo.id });
 
   const [status, setStatus] = useState<IdentityStatus>("loading");
   const [fvLink, setFvLink] = useState<string | null>(null);
@@ -27,9 +27,9 @@ export function useIdentity() {
   const isVerifyingRef = useRef(isVerifying);
   isVerifyingRef.current = isVerifying;
 
-  // ─── Verification check ─────────────────────────────────
+  // ─── Status check via direct getWhitelistedRoot ─────────
   const checkVerification = useCallback(async () => {
-    if (!address || !claimSDK) {
+    if (!address || !publicClient || !walletClient) {
       setStatus("not_verified");
       return;
     }
@@ -37,31 +37,39 @@ export function useIdentity() {
     try {
       if (!isVerifyingRef.current) setStatus("loading");
 
-      const walletStatus = await claimSDK.getWalletClaimStatus();
+      const sdk = new IdentitySDK({
+        account: address as `0x${string}`,
+        publicClient,
+        walletClient,
+        env: GD_ENV,
+      } as any);
 
-      if (walletStatus.status === "not_whitelisted") {
-        setStatus("not_verified");
-      } else {
+      const result = await sdk.getWhitelistedRoot(address as `0x${string}`);
+      const isWhitelisted = (result as any)?.isWhitelisted ?? false;
+
+      if (isWhitelisted) {
         setStatus("verified");
-        // If we were polling, stop — they're verified
         setIsVerifying(false);
+      } else {
+        setStatus("not_verified");
       }
     } catch (err) {
       console.error("[useIdentity] check failed", err);
       setStatus("error");
     }
-  }, [address, claimSDK]);
+  }, [address, publicClient, walletClient]);
 
+  // ─── Initial + on-change check ──────────────────────────
   useEffect(() => {
     checkVerification();
   }, [checkVerification]);
 
+  // ─── FV link generation ─────────────────────────────────
   const generateLink = useCallback(async () => {
     if (
       !address ||
       !publicClient ||
       !walletClient ||
-      !identitySDK ||
       isGeneratingLink
     ) {
       return;
@@ -70,29 +78,27 @@ export function useIdentity() {
     try {
       setIsGeneratingLink(true);
 
-      const idSDK = new (IdentitySDK as any)(
+      const sdk = new IdentitySDK({
+        account: address as `0x${string}`,
         publicClient,
         walletClient,
-        "production"
-      );
+        env: GD_ENV,
+      } as any);
 
-      const linkResult = await idSDK.generateFVLink(
+      const result = await sdk.generateFVLink(
         false,
         typeof window !== "undefined" ? window.location.href : undefined,
-        42220
+        celo.id
       );
 
-      let finalLink: string | null = null;
-      if (typeof linkResult === "string") {
-        finalLink = linkResult;
-      } else if (linkResult && (linkResult as any).link) {
-        finalLink = (linkResult as any).link;
-      }
+      const link =
+        typeof result === "string"
+          ? result
+          : (result as any)?.link ?? null;
 
-      if (finalLink) {
-        setFvLink(finalLink);
+      if (link) {
+        setFvLink(link);
       } else {
-        console.error("[useIdentity] generateFVLink returned no link");
         setStatus("error");
       }
     } catch (err) {
@@ -101,21 +107,21 @@ export function useIdentity() {
     } finally {
       setIsGeneratingLink(false);
     }
-  }, [address, publicClient, walletClient, identitySDK, isGeneratingLink]);
+  }, [address, publicClient, walletClient, isGeneratingLink]);
 
+  // Generate link when verification starts
   useEffect(() => {
     if (isVerifying && !fvLink && !isGeneratingLink) {
       generateLink();
     }
   }, [isVerifying, fvLink, isGeneratingLink, generateLink]);
 
+  // Poll for verification during active flow
   useEffect(() => {
     if (!isVerifying || status === "verified") return;
-
     const interval = setInterval(() => {
       checkVerification();
     }, 5000);
-
     return () => clearInterval(interval);
   }, [isVerifying, status, checkVerification]);
 

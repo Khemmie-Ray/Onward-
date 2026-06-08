@@ -2,8 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useClaimSDK } from "./useClaimSDK";
+import { useAppKitAccount } from "@reown/appkit/react";
+import { usePublicClient, useWalletClient } from "wagmi";
+import { celo } from "wagmi/chains";
+import { ClaimSDK, IdentitySDK } from "@goodsdks/citizen-sdk";
 import { useIdentityContext } from "@/contexts/IdentityContext";
+
+const GD_ENV = "production" as const;
 
 export type ClaimState =
   | "idle"
@@ -15,25 +20,40 @@ export type ClaimState =
   | "error";
 
 export function useGoodDollarClaim() {
-  const { claimSDK, isReady, address } = useClaimSDK();
+  const { address } = useAppKitAccount();
+  const publicClient = usePublicClient({ chainId: celo.id });
+  const { data: walletClient } = useWalletClient({ chainId: celo.id });
   const { isVerified } = useIdentityContext();
 
-  const [state, setState] = useState<ClaimState>("idle");
+  const [state, setState] = useState<ClaimState>("not_verified");
   const [entitlement, setEntitlement] = useState<bigint>(0n);
   const [nextClaimTime, setNextClaimTime] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const refetchingRef = useRef(false);
-  const lastFetchedAddressRef = useRef<string | null>(null);
 
-  // ─── Read claim status from SDK ─────────────────────────
+  const buildSDK = useCallback(() => {
+    if (!address || !publicClient || !walletClient) return null;
+    const identitySDK = new IdentitySDK({
+      account: address as `0x${string}`,
+      publicClient,
+      walletClient,
+      env: GD_ENV,
+    } as any);
+    return new ClaimSDK({
+      account: address as `0x${string}`,
+      publicClient,
+      walletClient,
+      identitySDK,
+      env: GD_ENV,
+    } as any);
+  }, [address, publicClient, walletClient]);
+
+  // ─── Read claim entitlement ─────────────────────────────
   const refetch = useCallback(async () => {
     if (refetchingRef.current) return;
 
-    // If SDK isn't ready (no wallet, no identity), settle to a usable state
-    // rather than getting stuck on "checking". The UI uses this state to
-    // show a "verify first" prompt.
-    if (!claimSDK || !address) {
+    if (!address || !isVerified) {
       setState("not_verified");
       setEntitlement(0n);
       setNextClaimTime(null);
@@ -46,25 +66,27 @@ export function useGoodDollarClaim() {
       setState("checking");
       setError(null);
 
-      const walletStatus = await claimSDK.getWalletClaimStatus();
-
-      // Read next claim time — non-fatal if it fails (network blip)
-      let nextTime: Date | null = null;
-      try {
-        const t = await claimSDK.nextClaimTime();
-        nextTime = t.getTime() === 0 ? null : t;
-      } catch {
-        nextTime = null;
+      const sdk = buildSDK();
+      if (!sdk) {
+        setState("error");
+        return;
       }
 
-      setEntitlement(walletStatus.entitlement ?? 0n);
-      setNextClaimTime(nextTime);
+      const result = await sdk.checkEntitlement();
+      const amount =
+        (result as any)?.amount ?? (result as any)?.entitlement ?? 0n;
+      setEntitlement(amount);
 
-      if (walletStatus.status === "not_whitelisted") {
-        setState("not_verified");
-      } else if (walletStatus.status === "already_claimed") {
+      if (amount === 0n) {
+        try {
+          const next = await sdk.nextClaimTime();
+          setNextClaimTime(next.getTime() === 0 ? null : next);
+        } catch {
+          setNextClaimTime(null);
+        }
         setState("claimed_today");
       } else {
+        setNextClaimTime(null);
         setState("available");
       }
     } catch (err) {
@@ -74,38 +96,15 @@ export function useGoodDollarClaim() {
     } finally {
       refetchingRef.current = false;
     }
-  }, [claimSDK, address]);
+  }, [address, isVerified, buildSDK]);
 
-  // ─── Refetch when SDK becomes ready or address changes ──
+  // Refetch when address or verification status changes
   useEffect(() => {
-    if (!isReady || !address) {
-      // SDK not ready yet — make sure state isn't stuck on idle/checking
-      setState("not_verified");
-      return;
-    }
-
-    // Avoid refetching for the same address repeatedly
-    if (lastFetchedAddressRef.current === address) return;
-    lastFetchedAddressRef.current = address;
-
     refetch();
-  }, [isReady, address, refetch]);
-
-  // ─── Refetch when verification flips to true ────────────
-  useEffect(() => {
-    if (isReady && isVerified) {
-      // Force a refetch even if address hasn't changed
-      lastFetchedAddressRef.current = null;
-      refetch();
-    }
-  }, [isVerified, isReady, refetch]);
+  }, [refetch]);
 
   // ─── Claim action ───────────────────────────────────────
   const claim = useCallback(async () => {
-    if (!claimSDK) {
-      toast.error("Wallet not ready");
-      return;
-    }
     if (!isVerified) {
       toast.error("Verify with GoodID first");
       return;
@@ -121,16 +120,23 @@ export function useGoodDollarClaim() {
       setState("claiming");
       setError(null);
 
-      await claimSDK.claim();
+      const sdk = buildSDK();
+      if (!sdk) {
+        toast.dismiss(loadingToast);
+        toast.error("Wallet not ready");
+        setState("error");
+        return;
+      }
+
+      await sdk.claim();
 
       toast.dismiss(loadingToast);
       toast.success("UBI claimed", {
         description: "Your G$ should land in your wallet shortly.",
       });
 
-      // Give the chain a moment to settle before re-reading
+      setEntitlement(0n);
       await new Promise((r) => setTimeout(r, 2000));
-      lastFetchedAddressRef.current = null;
       await refetch();
     } catch (err) {
       toast.dismiss(loadingToast);
@@ -140,7 +146,7 @@ export function useGoodDollarClaim() {
       setState("error");
       toast.error("Couldn't claim UBI", { description: msg });
     }
-  }, [claimSDK, isVerified, entitlement, refetch]);
+  }, [isVerified, entitlement, buildSDK, refetch]);
 
   return {
     state,
