@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { type Address } from "viem";
-import { requireAuth } from "@/lib/auth";
+import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resolveRoundOnchain } from "@/lib/onchain/play";
 
@@ -16,7 +16,7 @@ const FREE_REWARD_G = 5;
 const PREMIUM_BONUS_G = 5;
 
 export async function POST(request: Request) {
-  const auth = await requireAuth(request);
+  const auth = await requireCompletedProfile(request);
   if ("error" in auth) return auth.error;
   const { user } = auth;
 
@@ -76,13 +76,7 @@ export async function POST(request: Request) {
     })
     .eq("id", session.id);
 
-  // ─── Streak + DB credits ────────────────────────────────
-  // For free mode: only credit total_g_earned if user is verified.
-  // Unverified users' rewards accrue to pendingClaim onchain; total_g_earned
-  // gets credited later when they claim via /api/badges/claim-pending.
-  //
-  // For premium mode: the 5 G$ bonus comes from WhackStake (always direct,
-  // no verification gate), so we always credit when passed.
+ 
   if (passed) {
     const userUpdate: { current_level: number; total_g_earned?: number } = {
       current_level: levelAfter,

@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { DbUser } from "@/lib/supabase/types";
+import { NextResponse } from "next/server";
 
 
 export async function getAuthedUser(request: Request): Promise<DbUser | null> {
@@ -51,4 +52,24 @@ export async function requireAuth(
     };
   }
   return { user };
+}
+
+export async function requireCompletedProfile(request: Request) {
+  const auth = await requireAuth(request);
+  if ("error" in auth) return auth;
+  
+  const { user } = auth;
+  const hasName = Boolean(user.display_name && user.display_name.trim().length > 0);
+  const hasAvatar = Boolean(user.avatar_id);
+  
+  if (!hasName || !hasAvatar) {
+    return {
+      error: NextResponse.json(
+        { error: "Complete onboarding first" },
+        { status: 403 }
+      ),
+    };
+  }
+  
+  return auth;
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { type Address } from "viem";
-import { requireAuth } from "@/lib/auth";
+import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { generateRound, type PlayMode } from "@/lib/scam/roundGenerator";
 import { verifyStakePlaced } from "@/lib/onchain/play";
@@ -11,7 +11,7 @@ type StartBody = {
 };
 
 export async function POST(request: Request) {
-  const auth = await requireAuth(request);
+  const auth = await requireCompletedProfile(request);
   if ("error" in auth) return auth.error;
   const { user } = auth;
 

@@ -4,6 +4,7 @@ import "./globals.css";
 import Providers from "@/contexts/Providers";
 import { headers } from "next/headers";
 import { Toaster } from 'sonner';
+import "@/lib/sdk-rpc-patch";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],

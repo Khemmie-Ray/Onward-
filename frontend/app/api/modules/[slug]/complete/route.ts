@@ -1,27 +1,9 @@
 import { NextResponse } from "next/server";
 import type { Address } from "viem";
-import { requireAuth } from "@/lib/auth";
+import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { processCompletion } from "@/lib/onchain/badges";
 import { markStreakDay } from "@/lib/streak";
-
-/**
- * POST /api/modules/[slug]/complete
- *
- * Body shape:
- *   {
- *     answers: { card_index: number, answer: number | "scam" | "real" }[],
- *     isVerified: boolean   // ← NEW: frontend tells us if user is GoodID-verified
- *   }
- *
- * Flow:
- *   1. Auth user
- *   2. Validate prerequisites + answers
- *   3. If passing score, create completion row + call contract
- *   4. Contract handles direct payout (verified) vs accrue (unverified)
- *   5. Mark streak day
- *   6. Return completion details + onchain result
- */
 
 type Body = {
   answers?: Array<{ card_index: number; answer: number | string }>;
@@ -32,7 +14,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
-  const auth = await requireAuth(request);
+  const auth = await requireCompletedProfile(request);
   if ("error" in auth) return auth.error;
   const { user } = auth;
 
