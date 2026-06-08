@@ -8,12 +8,12 @@ import {
   type Address,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { celoSepolia } from "viem/chains";
+import { celo } from "viem/chains";
 import { onwardBadgesAbi } from "@/constants/abis";
 import { CONTRACT_ADDRESSES } from "@/constants/contracts/address";
 
 const BACKEND_PRIVATE_KEY = process.env.BACKEND_SIGNER_PRIVATE_KEY!;
-const RPC_URL = process.env.NEXT_PUBLIC_CELOSEPOLIA_URL!;
+const RPC_URL = process.env.NEXT_PUBLIC_CELO_URL!;
 
 const account = privateKeyToAccount(
   BACKEND_PRIVATE_KEY.startsWith("0x")
@@ -22,13 +22,13 @@ const account = privateKeyToAccount(
 );
 
 export const publicClient = createPublicClient({
-  chain: celoSepolia,
+  chain: celo,
   transport: http(RPC_URL),
 });
 
 export const walletClient = createWalletClient({
   account,
-  chain: celoSepolia,
+  chain: celo,
   transport: http(RPC_URL),
 });
 
