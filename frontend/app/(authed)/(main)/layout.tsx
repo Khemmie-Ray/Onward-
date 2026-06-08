@@ -10,7 +10,7 @@ export default function AuthedLayout({ children }: { children: ReactNode }) {
     <main className="mx-auto lg:w-[80%] md:w-[80%] w-[90%]  h-screen overflow-hidden flex flex-col">
         <Header />
         <Nav />
-        <div className="flex-1 overflow-y-auto no-scrollbar">
+        <div className="flex-1 overflow-y-auto no-scrollbar pb-16 md:pb-0 lg:pb-0">
         {children}
         </div>
     </main>

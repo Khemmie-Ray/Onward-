@@ -12,15 +12,6 @@ import {
 } from "lucide-react";
 import { LoopSigil, MudclothPattern, SunMotif } from "@/components/home/motifs";
 
-/**
- * Celebration screen with streaming transaction state.
- *
- *   - Badge image shows immediately if known (from props), otherwise sigil
- *   - g$ counter tickers up
- *   - Tx hashes start as null (pending) and fill in as parent receives them
- *   - On onchainError, shows a friendly "minting in background" message
- *     instead of breaking the celebration
- */
 export function CompletionScreen({
   moduleTitle,
   moduleSlug: _moduleSlug,
@@ -168,8 +159,6 @@ export function CompletionScreen({
             </div>
           </div>
         )}
-
-        {/* Transaction status row */}
         <div className="w-full mb-6 text-[11px]">
           {onchainError ? (
             <div className="flex items-center justify-center gap-2 rounded-[10px] bg-terracotta-tint px-3 py-2 text-terracotta">
@@ -181,7 +170,7 @@ export function CompletionScreen({
           ) : txPending ? (
             <div className="flex items-center justify-center gap-2 text-fg-soft">
               <Loader2 size={12} strokeWidth={2.5} className="animate-spin" />
-              <span className="font-semibold">Confirming on Celo Sepolia…</span>
+              <span className="font-semibold">Confirming on Celo…</span>
             </div>
           ) : (
             <div className="flex items-center justify-center gap-3">

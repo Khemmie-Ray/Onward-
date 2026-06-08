@@ -24,11 +24,11 @@ export function useIdentity() {
   isVerifyingRef.current = isVerifying;
 
   const checkVerification = useCallback(async () => {
-    console.log("[useIdentity] checkVerification called", {
-      address,
-      hasPublicClient: !!publicClient,
-      hasWalletClient: !!walletClient,
-    });
+    // console.log("[useIdentity] checkVerification called", {
+    //   address,
+    //   hasPublicClient: !!publicClient,
+    //   hasWalletClient: !!walletClient,
+    // });
 
     if (!address || !publicClient || !walletClient) {
       console.log("[useIdentity] missing prerequisites → not_verified");
@@ -39,7 +39,7 @@ export function useIdentity() {
     try {
       if (!isVerifyingRef.current) setStatus("loading");
 
-      console.log("[useIdentity] constructing SDK");
+      // console.log("[useIdentity] constructing SDK");
       const sdk = new IdentitySDK({
         account: address as `0x${string}`,
         publicClient,
@@ -67,12 +67,12 @@ export function useIdentity() {
         }
       }
 
-      console.log("[useIdentity] result:", {
-        address,
-        result,
-        resultType: typeof result,
-        isWhitelisted,
-      });
+      // console.log("[useIdentity] result:", {
+      //   address,
+      //   result,
+      //   resultType: typeof result,
+      //   isWhitelisted,
+      // });
 
       if (isWhitelisted) {
         setStatus("verified");

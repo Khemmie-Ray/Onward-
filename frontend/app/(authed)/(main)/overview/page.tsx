@@ -88,8 +88,6 @@ const Overview = () => {
     maximumFractionDigits: 2,
   });
 
-  console.log(data)
-
   return (
     <>
       <div

@@ -18,8 +18,8 @@ if (!projectId) {
 // Set up metadata
 const metadata = {
   name: 'Onward',
-  description: "Larn to earn platform",
-  url: 'http://localhost:3000', 
+  description: "Learn to earn platform",
+  url: 'https://onward-celo.vercel.app/', 
   icons: ['https://avatars.githubusercontent.com/u/179229932']
 }
 

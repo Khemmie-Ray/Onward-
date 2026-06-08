@@ -9,13 +9,7 @@ import {
   type NavDestination,
 } from "@/lib/nav/destinations";
 
-/**
- * Mobile bottom tab bar. Fixed to the viewport bottom.
- * Hidden on md+ — TopTabs takes over there.
- *
- * REMEMBER: add `pb-24 md:pb-0` to your authed-layout main so the bar
- * doesn't cover the last bit of page content on mobile.
- */
+
 export function MobileTabBar({
   destinations = NAV_DESTINATIONS,
 }: {

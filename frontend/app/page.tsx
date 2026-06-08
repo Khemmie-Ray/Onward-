@@ -50,8 +50,6 @@ export default function Home() {
     };
   }, []);
 
-  console.log(stats, "clicked")
-
   return (
     <main className="mx-auto lg:w-[80%] md:w-[80%] w-[90%] h-screen overflow-hidden flex flex-col relative">
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">

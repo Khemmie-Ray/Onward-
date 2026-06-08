@@ -21,13 +21,13 @@ export function FlipCard({
 
   return (
     <div
-      className="lg:w-[35%] md:w-[35%] w-full mx-auto"
+      className="lg:w-[35%] md:w-[35%] w-full mx-auto p-4"
       // style={{ perspective: "1200px" }}
     >
       <button
         onClick={handleClick}
         aria-label={flipped ? "Show question" : "Reveal answer"}
-        className="relative w-full aspect-4/3 cursor-pointer"
+        className="relative w-full aspect-4/4 cursor-pointer"
         style={{
           transformStyle: "preserve-3d",
           transition: "transform 0.7s cubic-bezier(0.22,1,0.36,1)",

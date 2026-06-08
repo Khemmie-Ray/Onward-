@@ -9,7 +9,7 @@ const IdentityContext = createContext<IdentityContextValue | null>(null);
 
 export function IdentityProvider({ children }: { children: ReactNode }) {
   const identity = useIdentity();
-  console.log("[identity context]", identity);
+  // console.log("[identity context]", identity);
 
   return (
     <IdentityContext.Provider value={identity}>
