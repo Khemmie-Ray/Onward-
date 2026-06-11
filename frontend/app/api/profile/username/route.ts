@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { getAuthedAddress } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isValidAvatarId } from "@/constants/avatars";
 
@@ -11,22 +11,46 @@ type Body = {
 };
 
 export async function POST(request: Request) {
-  const auth = await requireAuth(request);
-  if ("error" in auth) return auth.error;
-  const { user } = auth;
+  // Read wallet directly from SIWE session — no DB row required yet.
+  // This is the legitimate "first time we see this user" event.
+  const walletAddress = await getAuthedAddress();
+  if (!walletAddress) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   const body = (await request.json().catch(() => null)) as Body | null;
   if (!body) {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request body" },
+      { status: 400 }
+    );
   }
 
   const name = body.display_name?.trim();
   const avatarId = body.avatar_id;
 
-  const isFirstTime = !user.display_name;
+  // Look up existing row (may not exist for first-time SIWE users)
+  const { data: existingUser } = await supabaseAdmin
+    .from("users")
+    .select("id, display_name, avatar_id")
+    .eq("wallet_address", walletAddress)
+    .maybeSingle();
+
+  const isFirstTime = !existingUser?.display_name;
+
   if (isFirstTime && !name) {
-    return NextResponse.json({ error: "Display name is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Display name is required" },
+      { status: 400 }
+    );
   }
+  if (isFirstTime && !avatarId) {
+    return NextResponse.json(
+      { error: "Avatar is required" },
+      { status: 400 }
+    );
+  }
+
   if (name !== undefined && name !== null) {
     if (name.length < 2 || name.length > 20) {
       return NextResponse.json(
@@ -42,28 +66,52 @@ export async function POST(request: Request) {
     }
   }
 
-  if (isFirstTime && !avatarId) {
-    return NextResponse.json({ error: "Avatar is required" }, { status: 400 });
-  }
   if (avatarId && !isValidAvatarId(avatarId)) {
-    return NextResponse.json({ error: "Invalid avatar selection" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid avatar selection" },
+      { status: 400 }
+    );
   }
 
-  const update: { display_name?: string; avatar_id?: string } = {};
-  if (name) update.display_name = name;
-  if (avatarId) update.avatar_id = avatarId;
+  // Branch: update existing row OR insert new row
+  if (existingUser) {
+    const update: { display_name?: string; avatar_id?: string } = {};
+    if (name) update.display_name = name;
+    if (avatarId) update.avatar_id = avatarId;
 
-  const { error } = await supabaseAdmin
-    .from("users")
-    .update(update)
-    .eq("id", user.id);
+    const { error } = await supabaseAdmin
+      .from("users")
+      .update(update)
+      .eq("id", existingUser.id);
 
-  if (error) {
-    if (error.code === "23505") {
-      return NextResponse.json({ error: "Name is already taken" }, { status: 409 });
+    if (error) {
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: "Name is already taken" },
+          { status: 409 }
+        );
+      }
+      console.error("[profile/username] update failed:", error);
+      return NextResponse.json({ error: "Failed to save" }, { status: 500 });
     }
-    console.error("[profile/username] update failed:", error);
-    return NextResponse.json({ error: "Failed to save" }, { status: 500 });
+  } else {
+    // First-time SIWE user — create the row
+    const { error } = await supabaseAdmin.from("users").insert({
+      wallet_address: walletAddress,
+      display_name: name,
+      avatar_id: avatarId,
+    });
+
+    if (error) {
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: "Name is already taken" },
+          { status: 409 }
+        );
+      }
+      console.error("[profile/username] insert failed:", error);
+      return NextResponse.json({ error: "Failed to save" }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ ok: true });

@@ -97,7 +97,7 @@ export default function OnboardingUsernamePage() {
         return;
       }
       // Invalidate the status query so AuthGuard picks up the change
-      await queryClient.invalidateQueries({ queryKey: ["me", "status"] });
+      await queryClient.refetchQueries({ queryKey: ["me", "status"] });
       router.replace("/overview");
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "Something went wrong");

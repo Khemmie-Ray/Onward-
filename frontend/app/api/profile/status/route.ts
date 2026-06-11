@@ -1,12 +1,29 @@
 import { NextResponse } from "next/server";
-import { requireAuth } from "@/lib/auth";
+import { getAuthedAddress } from "@/lib/auth";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
-export async function GET(request: Request) {
-  const auth = await requireAuth(request);
-  if ("error" in auth) return auth.error;
-  const { user } = auth;
+export async function GET() {
+  const walletAddress = await getAuthedAddress();
+  if (!walletAddress) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-  const hasName = Boolean(user.display_name && user.display_name.trim().length > 0);
+  const { data: user } = await supabaseAdmin
+    .from("users")
+    .select("display_name, avatar_id")
+    .eq("wallet_address", walletAddress)
+    .maybeSingle();
+
+  if (!user) {
+    return NextResponse.json({
+      hasUsername: false,
+      hasName: false,
+      hasAvatar: false,
+      avatarId: null,
+    });
+  }
+
+  const hasName = Boolean(user.display_name?.trim());
   const hasAvatar = Boolean(user.avatar_id);
 
   return NextResponse.json({
