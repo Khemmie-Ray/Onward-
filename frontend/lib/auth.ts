@@ -1,13 +1,20 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { DbUser } from "@/lib/supabase/types";
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth-option";
 
+export async function getAuthedUser(): Promise<DbUser | null> {
+  const session = await getServerSession(authOptions);
+  console.log("[getAuthedUser] session:", session);
+  
+  if (!session?.address) {
+    console.log("[getAuthedUser] no session.address");
+    return null;
+  }
 
-export async function getAuthedUser(request: Request): Promise<DbUser | null> {
-  const walletAddress = request.headers.get("x-wallet-address");
-  if (!walletAddress) return null;
-
-  const normalized = walletAddress.toLowerCase();
+  const normalized = session.address.toLowerCase();
+  console.log("[getAuthedUser] looking up wallet:", normalized);
 
   const { data: existing } = await supabaseAdmin
     .from("users")
@@ -15,40 +22,35 @@ export async function getAuthedUser(request: Request): Promise<DbUser | null> {
     .eq("wallet_address", normalized)
     .maybeSingle();
 
-  if (existing) {
-    await supabaseAdmin
-      .from("users")
-      .update({ last_active_at: new Date().toISOString() })
-      .eq("id", existing.id);
-    return existing;
-  }
+  console.log("[getAuthedUser] DB result:", existing ? "found" : "not found");
 
-  const { data: created, error } = await supabaseAdmin
+  if (!existing) return null;
+
+  void supabaseAdmin
     .from("users")
-    .insert({
-      wallet_address: normalized,
-    })
-    .select("*")
-    .single();
+    .update({ last_active_at: new Date().toISOString() })
+    .eq("id", existing.id);
 
-  if (error || !created) {
-    console.error("[getAuthedUser] failed to create user:", error);
-    return null;
-  }
+  return existing;
+}
 
-  return created;
+/**
+ * Returns the SIWE-verified wallet address if one is present in the session,
+ * without doing a DB lookup. Used by the onboarding endpoint which needs to
+ * create the user row.
+ */
+export async function getAuthedAddress(): Promise<string | null> {
+  const session = await getServerSession(authOptions);
+  return session?.address ? session.address.toLowerCase() : null;
 }
 
 export async function requireAuth(
-  request: Request
+  _request: Request
 ): Promise<{ user: DbUser } | { error: Response }> {
-  const user = await getAuthedUser(request);
+  const user = await getAuthedUser();
   if (!user) {
     return {
-      error: new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      }),
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     };
   }
   return { user };
@@ -57,11 +59,13 @@ export async function requireAuth(
 export async function requireCompletedProfile(request: Request) {
   const auth = await requireAuth(request);
   if ("error" in auth) return auth;
-  
+
   const { user } = auth;
-  const hasName = Boolean(user.display_name && user.display_name.trim().length > 0);
+  const hasName = Boolean(
+    user.display_name && user.display_name.trim().length > 0
+  );
   const hasAvatar = Boolean(user.avatar_id);
-  
+
   if (!hasName || !hasAvatar) {
     return {
       error: NextResponse.json(
@@ -70,6 +74,6 @@ export async function requireCompletedProfile(request: Request) {
       ),
     };
   }
-  
+
   return auth;
 }
