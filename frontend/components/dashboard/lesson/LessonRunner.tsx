@@ -9,7 +9,6 @@ import { SpotterCard } from "./SpotterCard";
 import { CompletionScreen } from "./CompletionScreen";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import type { LessonContent } from "@/lib/lessons/lesson-data";
-import { useIdentityContext } from "@/contexts/IdentityContext";
 
 type Answer = {
   cardIndex: number;
@@ -40,7 +39,6 @@ export function LessonRunner({
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [cardAnswered, setCardAnswered] = useState(false);
   const [flipped, setFlipped] = useState(false);
-  const { isVerified } = useIdentityContext(); 
 
   const [completion, setCompletion] = useState<CompletionState | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
@@ -52,19 +50,20 @@ export function LessonRunner({
 
   const canAdvance = currentCard.type === "flip" ? flipped : cardAnswered;
 
-  const recordAnswer = (answer: number | "scam" | "real", correct: boolean) => {
+  const recordAnswer = (
+    answer: number | "scam" | "real",
+    correct: boolean
+  ) => {
     setCardAnswered(true);
     setAnswers((prev) => [...prev, { cardIndex, answer, correct }]);
   };
 
   const handleNext = () => {
     if (!canAdvance) return;
-
     if (isLastCard) {
       submitCompletion();
       return;
     }
-
     setCardIndex((i) => i + 1);
     setCardAnswered(false);
     setFlipped(false);
@@ -80,7 +79,7 @@ export function LessonRunner({
 
   const submitCompletion = async () => {
     const gradedLocal = answers.filter(
-      (a) => lesson.cards[a.cardIndex].type !== "flip",
+      (a) => lesson.cards[a.cardIndex].type !== "flip"
     );
     const correctCount = gradedLocal.filter((a) => a.correct).length;
 
@@ -95,17 +94,18 @@ export function LessonRunner({
     });
 
     try {
+      // isVerified is NOT sent from the client anymore.
+      // The backend reads it directly from the GoodDollar Identity contract.
       const payload = {
         answers: answers.map((a) => ({
           card_index: a.cardIndex + 1,
           answer: a.answer,
         })),
-        isVerified,
       };
 
       const res = await authFetch(
         `/api/modules/${lesson.module.slug}/complete`,
-        { method: "POST", body: JSON.stringify(payload) },
+        { method: "POST", body: JSON.stringify(payload) }
       );
 
       const data = await res.json();
@@ -113,7 +113,7 @@ export function LessonRunner({
       if (data.status === "incomplete" && data.passed === false) {
         setCompletion(null);
         setSubmissionError(
-          `You answered ${data.correct} of ${data.total} correctly. You need ${data.threshold} to earn the badge. Try the missed cards again.`,
+          `You answered ${data.correct} of ${data.total} correctly. You need ${data.threshold} to earn the badge. Try the missed cards again.`
         );
         const firstIncorrect = (data.incorrect_cards?.[0] ?? 1) - 1;
         setCardIndex(firstIncorrect);
@@ -123,7 +123,6 @@ export function LessonRunner({
         return;
       }
 
-      // Success — stream in the real tx hashes and badge data
       setCompletion((prev) =>
         prev
           ? {
@@ -132,12 +131,10 @@ export function LessonRunner({
               rewardTxHash: data.onchain?.rewardTxHash ?? null,
               onchainError: data.onchain?.onchainError ?? null,
             }
-          : prev,
+          : prev
       );
     } catch (err) {
       console.error("[submitCompletion]", err);
-      // Don't roll back the celebration — let the user see the win, but flag
-      // the onchain error so they know transactions are pending.
       setCompletion((prev) =>
         prev
           ? {
@@ -145,7 +142,7 @@ export function LessonRunner({
               onchainError:
                 err instanceof Error ? err.message : "Network error",
             }
-          : prev,
+          : prev
       );
     }
   };

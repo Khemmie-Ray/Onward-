@@ -3,16 +3,16 @@ import type { Address } from "viem";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { processCompletion } from "@/lib/onchain/badges";
+import { isVerifiedOnchainSafe } from "@/lib/onchain/identity";
 import { markStreakDay } from "@/lib/streak";
 
 type Body = {
   answers?: Array<{ card_index: number; answer: number | string }>;
-  isVerified?: boolean;
 };
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ slug: string }> },
+  { params }: { params: Promise<{ slug: string }> }
 ) {
   const auth = await requireCompletedProfile(request);
   if ("error" in auth) return auth.error;
@@ -21,9 +21,11 @@ export async function POST(
   const { slug } = await params;
   const body = (await request.json().catch(() => null)) as Body | null;
   const answers = body?.answers ?? [];
-  const isVerified = body?.isVerified === true;
 
-  // ─── Lookup module + cards ──────────────────────────────
+  const isVerified = await isVerifiedOnchainSafe(
+    user.wallet_address as Address
+  );
+
   const { data: module, error: modErr } = await supabaseAdmin
     .from("modules")
     .select("id, slug, prerequisite_slug, reward_g_amount, status")
@@ -52,7 +54,7 @@ export async function POST(
       if ((prereqCount ?? 0) === 0) {
         return NextResponse.json(
           { error: "Complete the previous module first" },
-          { status: 403 },
+          { status: 403 }
         );
       }
     }
@@ -82,20 +84,18 @@ export async function POST(
     .order("order_index", { ascending: true });
 
   if (!cards) {
-    return NextResponse.json({ error: "Module has no cards" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Module has no cards" },
+      { status: 500 }
+    );
   }
 
   let correct = 0;
   let totalGraded = 0;
   const incorrectCards: number[] = [];
 
-  console.log("[grading]", {
-    receivedAnswers: answers,
-    cardsInDb: cards.map((c) => ({ order_index: c.order_index, type: c.type })),
-  });
-
   for (const card of cards) {
-    if (card.type === "flip") continue; // flip cards aren't graded
+    if (card.type === "flip") continue;
     totalGraded++;
 
     const submitted = answers.find((a) => a.card_index === card.order_index);
@@ -155,14 +155,12 @@ export async function POST(
       userWallet: user.wallet_address as Address,
       moduleSlug: slug,
       rewardAmountG: module.reward_g_amount,
-      isVerified,
+      isVerified, // ← server-verified, not from request body
     });
 
     onchainResult = {
       badgeTxHash: result.txHash,
       badgeTokenId: result.badgeTokenId.toString(),
-      // Both ops are in the same tx in the new contract design.
-      // Keep separate field names for frontend compatibility.
       rewardTxHash: result.txHash,
       wasPaidDirect: result.wasPaidDirect,
       wasAccrued: result.wasAccrued,
@@ -186,7 +184,9 @@ export async function POST(
           ? onchainResult.badgeTxHash
           : null,
       badge_token_id:
-        onchainResult.badgeTokenId !== "0" ? onchainResult.badgeTokenId : null,
+        onchainResult.badgeTokenId !== "0"
+          ? onchainResult.badgeTokenId
+          : null,
     })
     .select()
     .single();
@@ -194,12 +194,10 @@ export async function POST(
   if (insertErr) {
     return NextResponse.json(
       { error: insertErr.message, onchain: onchainResult },
-      { status: 500 },
+      { status: 500 }
     );
   }
 
-  // Only credit total_g_earned in DB if it was a direct payout (it's now in the wallet)
-  // Accrued amounts will be credited when they're claimed via /api/badges/claim-pending
   if (onchainResult.wasPaidDirect) {
     await supabaseAdmin
       .from("users")
@@ -210,7 +208,6 @@ export async function POST(
       .eq("id", user.id);
   }
 
-  // ─── Streak ─────────────────────────────────────────────
   await markStreakDay(user.id);
 
   return NextResponse.json({

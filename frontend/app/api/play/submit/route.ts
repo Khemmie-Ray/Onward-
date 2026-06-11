@@ -3,13 +3,13 @@ import { type Address } from "viem";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resolveRoundOnchain } from "@/lib/onchain/play";
+import { isVerifiedOnchainSafe } from "@/lib/onchain/identity";
 
 type SubmitBody = {
   round_id?: string;
   correct_whacks?: number;
   wrong_whacks?: number;
   missed_scams?: number;
-  isVerified?: boolean;
 };
 
 const FREE_REWARD_G = 5;
@@ -25,7 +25,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing round_id" }, { status: 400 });
   }
 
-  const isVerified = body.isVerified === true;
+  const isVerified = await isVerifiedOnchainSafe(
+    user.wallet_address as Address
+  );
 
   const { data: session } = await supabaseAdmin
     .from("game_sessions")
@@ -76,7 +78,6 @@ export async function POST(request: Request) {
     })
     .eq("id", session.id);
 
- 
   if (passed) {
     const userUpdate: { current_level: number; total_g_earned?: number } = {
       current_level: levelAfter,
@@ -87,8 +88,6 @@ export async function POST(request: Request) {
         userUpdate.total_g_earned =
           Number(user.total_g_earned) + rewardAmount;
       }
-      // If unverified, total_g_earned isn't touched here — claim-pending
-      // will credit it when the user releases their pending balance.
 
       const today = new Date();
       today.setUTCHours(0, 0, 0, 0);
@@ -121,7 +120,6 @@ export async function POST(request: Request) {
 
       await recomputeUserStreak(user.id);
     } else {
-      // Premium win: bonus is always direct (from WhackStake)
       userUpdate.total_g_earned =
         Number(user.total_g_earned) + PREMIUM_BONUS_G;
     }
@@ -129,7 +127,6 @@ export async function POST(request: Request) {
     await supabaseAdmin.from("users").update(userUpdate).eq("id", user.id);
   }
 
-  // ─── Onchain resolution ─────────────────────────────────
   let onchain = {
     rewardTxHash: null as string | null,
     stakeResolveTxHash: null as string | null,

@@ -3,6 +3,7 @@ import { formatUnits, type Address } from "viem";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { claimPendingForUser, getPendingBalance } from "@/lib/onchain/badges";
+import { isVerifiedOnchain } from "@/lib/onchain/identity";
 
 export async function POST(request: Request) {
   const auth = await requireCompletedProfile(request);
@@ -11,6 +12,29 @@ export async function POST(request: Request) {
 
   const userWallet = user.wallet_address as Address;
 
+  let verified: boolean;
+  try {
+    verified = await isVerifiedOnchain(userWallet);
+  } catch (err) {
+    console.error("[claim-pending] verification check failed", err);
+    return NextResponse.json(
+      { error: "Couldn't verify your status. Please try again shortly." },
+      { status: 503 }
+    );
+  }
+
+  if (!verified) {
+    return NextResponse.json(
+      {
+        error:
+          "Your wallet isn't verified with GoodID yet. Complete verification to claim your pending G$.",
+        code: "NOT_VERIFIED",
+      },
+      { status: 403 }
+    );
+  }
+
+  // ─── Read pending balance ───────────────────────────────
   let pendingBefore: bigint;
   try {
     pendingBefore = await getPendingBalance(userWallet);
@@ -32,6 +56,7 @@ export async function POST(request: Request) {
     });
   }
 
+  // ─── Sign the release ───────────────────────────────────
   let txHash: string;
   let amount: bigint;
   try {

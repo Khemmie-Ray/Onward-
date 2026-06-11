@@ -1,54 +1,66 @@
-'use client'
+"use client";
 
-import { wagmiAdapter, projectId } from '@/config'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { createAppKit } from '@reown/appkit/react'
-import { celo } from '@reown/appkit/networks'
-import React, { type ReactNode } from 'react'
-import { cookieToInitialState, WagmiProvider, type Config } from 'wagmi'
-import { IdentityProvider } from './IdentityContext'
+import { wagmiAdapter, projectId } from "@/config";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { createAppKit } from "@reown/appkit/react";
+import { celo } from "@reown/appkit/networks";
+import { SessionProvider } from "next-auth/react";
+import React, { type ReactNode } from "react";
+import { cookieToInitialState, WagmiProvider, type Config } from "wagmi";
+import { IdentityProvider } from "./IdentityContext";
+import { siweConfig } from "@/lib/siwe-config";
 
-// Set up queryClient
-const queryClient = new QueryClient()
+const queryClient = new QueryClient();
 
 if (!projectId) {
-  throw new Error('Project ID is not defined')
+  throw new Error("Project ID is not defined");
 }
 
-// Set up metadata
 const metadata = {
-  name: 'Onward',
-  description: "Learn to earn platform",
-  url: 'https://onward-celo.vercel.app/', 
-  icons: ['https://avatars.githubusercontent.com/u/179229932']
-}
+  name: "Onward",
+  description: "Learn-to-earn for the GoodDollar ecosystem",
+  url: "https://onward-celo.vercel.app",
+  icons: ["https://avatars.githubusercontent.com/u/179229932"],
+};
 
-// Create the modal
-const modal = createAppKit({
+createAppKit({
   adapters: [wagmiAdapter],
   projectId,
   networks: [celo],
   defaultNetwork: celo,
-  metadata: metadata,
-  features: {           
-    socials: ["google"],    
-    emailShowWallets: true, 
-    analytics: false 
-  }
-})
+  metadata,
+  siweConfig,
+  features: {
+    socials: ["google"],
+    emailShowWallets: true,
+    analytics: false,
+  },
+});
 
-function Providers({ children, cookies }: { children: ReactNode; cookies: string | null }) {
-  const initialState = cookieToInitialState(wagmiAdapter.wagmiConfig as Config, cookies)
+function Providers({
+  children,
+  cookies,
+}: {
+  children: ReactNode;
+  cookies: string | null;
+}) {
+  const initialState = cookieToInitialState(
+    wagmiAdapter.wagmiConfig as Config,
+    cookies,
+  );
 
   return (
-    <WagmiProvider config={wagmiAdapter.wagmiConfig as Config} initialState={initialState}>
+    <WagmiProvider
+      config={wagmiAdapter.wagmiConfig as Config}
+      initialState={initialState}
+    >
       <QueryClientProvider client={queryClient}>
-        <IdentityProvider>
-        {children}
-        </IdentityProvider>
-        </QueryClientProvider>
+        <SessionProvider>
+          <IdentityProvider>{children}</IdentityProvider>
+        </SessionProvider>
+      </QueryClientProvider>
     </WagmiProvider>
-  )
+  );
 }
 
-export default Providers
+export default Providers;
