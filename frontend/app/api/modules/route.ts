@@ -28,7 +28,7 @@ export async function GET(request: Request) {
       (totalCardsByModule[c.module_id] ?? 0) + 1;
   }
 
-  const user = await getAuthedUser(request);
+  const user = await getAuthedUser();
 
   let completionsByModule: Record<string, true> = {};
   let progressByModule: Record<string, number> = {};

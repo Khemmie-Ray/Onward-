@@ -20,7 +20,7 @@ export async function GET(
     return NextResponse.json({ error: "Module not found" }, { status: 404 });
   }
 
-  const user = await getAuthedUser(request);
+  const user = await getAuthedUser();
 
   if (user && module.prerequisite_slug) {
     const { data: prereq } = await supabaseAdmin
