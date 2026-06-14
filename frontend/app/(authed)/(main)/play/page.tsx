@@ -11,6 +11,7 @@ import { PreRoundBriefing } from "@/components/dashboard/scam/PreRoundBriefing";
 import {
   WhackAScamGame,
   type WhackResult,
+  type DisplayItem,
 } from "@/components/dashboard/scam/WhackAScamGame";
 import { EndRoundModal } from "@/components/dashboard/scam/EndRoundModal";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
@@ -22,6 +23,7 @@ import {
 } from "@/hooks/useWhackState";
 import { useIdentityContext } from "@/contexts/IdentityContext";
 import type { WhackIcon } from "@/lib/scam/whackIcon";
+import { passThresholdText, rewardText, SCORING } from "@/lib/scoring";
 
 type Mode = "free" | "premium";
 type Phase = "tab-select" | "briefing" | "playing" | "ended";
@@ -38,19 +40,13 @@ type RoundPreview = {
     content: Record<string, unknown>;
     teaching: string;
   };
+  exemplar_icon: WhackIcon;
+  display_items: DisplayItem[];
   popup_duration_ms: number;
   total_seconds: number;
   board_progression: number[];
   base_spawn_delay: number;
   spawn_jitter: number;
-  scam_icon: WhackIcon;
-  legit_icon: WhackIcon;
-  _round_payload: {
-    featured_family: string;
-    items: { pattern_id: string; is_scam: boolean }[];
-    popup_duration_ms: number;
-    total_seconds: number;
-  };
 };
 
 type SubmitResponse = {
@@ -59,6 +55,8 @@ type SubmitResponse = {
   reward_g_amount: number;
   level_before: number;
   level_after: number;
+  precision_percent: number;
+  threshold: { minPrecisionPercent: number; minCorrect: number };
   onchain: {
     rewardTxHash: string | null;
     stakeResolveTxHash: string | null;
@@ -110,7 +108,6 @@ export default function PlayPage() {
     try {
       const res = await authFetch("/api/play/start", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode: "free" }),
       });
       if (res.status === 429) {
@@ -137,11 +134,11 @@ export default function PlayPage() {
   const { stakeAmount } = useStakeAmount(isPremiumTab);
   const { balance, refetch: refetchBalance } = useGDollarBalance(
     address as Address | undefined,
-    isPremiumTab,
+    isPremiumTab
   );
   const { allowance, refetch: refetchAllowance } = useStakeAllowance(
     address as Address | undefined,
-    isPremiumTab,
+    isPremiumTab
   );
   const { approve, stake, approveState, stakeState } = useWhackStake();
 
@@ -157,9 +154,7 @@ export default function PlayPage() {
     setPremiumStep("init");
 
     try {
-      const initRes = await authFetch("/api/play/stake-init", {
-        method: "POST",
-      });
+      const initRes = await authFetch("/api/play/stake-init", { method: "POST" });
       if (initRes.status === 429) {
         const d = await initRes.json().catch(() => ({}));
         setPremiumCapMessage({
@@ -186,7 +181,7 @@ export default function PlayPage() {
       }
     } catch (e) {
       setPremiumError(
-        e instanceof Error ? e.message : "Premium round init failed",
+        e instanceof Error ? e.message : "Premium round init failed"
       );
       setPremiumStep("idle");
     }
@@ -223,7 +218,6 @@ export default function PlayPage() {
       try {
         const res = await authFetch("/api/play/start", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ mode: "premium", round_id: pendingUuid }),
         });
         if (!res.ok) throw new Error(`Status ${res.status}`);
@@ -236,7 +230,7 @@ export default function PlayPage() {
         setPremiumError(
           e instanceof Error
             ? e.message
-            : "Stake confirmed but round failed to start",
+            : "Stake confirmed but round failed to start"
         );
         setPremiumStep("idle");
       }
@@ -251,30 +245,8 @@ export default function PlayPage() {
     try {
       const res = await authFetch("/api/play/begin", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          preview_id: preview.preview_id,
-          mode: preview.mode,
-          round_payload: preview._round_payload,
-        }),
+        body: JSON.stringify({ preview_id: preview.preview_id }),
       });
-      if (res.status === 429) {
-        const d = await res.json().catch(() => ({}));
-        if (preview.mode === "free") {
-          setFreeCapMessage({
-            kind: "cap",
-            message: d?.error ?? "Today's free round is done.",
-          });
-        } else {
-          setPremiumCapMessage({
-            kind: "cap",
-            message: d?.error ?? "Daily premium cap reached.",
-          });
-        }
-        setIsBeginning(false);
-        resetToTabSelect();
-        return;
-      }
       if (!res.ok) throw new Error(`Status ${res.status}`);
       const data = (await res.json()) as { round_id: string };
       setRoundId(data.round_id);
@@ -285,7 +257,7 @@ export default function PlayPage() {
         setFreeError(e instanceof Error ? e.message : "Failed to start round");
       } else {
         setPremiumError(
-          e instanceof Error ? e.message : "Failed to start round",
+          e instanceof Error ? e.message : "Failed to start round"
         );
       }
       setIsBeginning(false);
@@ -301,13 +273,10 @@ export default function PlayPage() {
     try {
       const res = await authFetch("/api/play/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           round_id: roundId,
-          correct_whacks: r.correctWhacks,
-          wrong_whacks: r.wrongWhacks,
-          missed_scams: r.missedScams,
-          isVerified, // ← NEW: backend uses this to decide direct vs accrue
+          whacks: r.whacks, // pattern_ids — server grades from its own stored items
+          spawned_scams: r.spawnedScams, // display only, capped server-side
         }),
       });
       if (res.ok) {
@@ -341,7 +310,7 @@ export default function PlayPage() {
             familyLabel={preview.family_label}
             familyDescription={preview.family_description}
             exemplar={preview.exemplar}
-            scamIcon={preview.scam_icon}
+            scamIcon={preview.exemplar_icon}
             onReady={handleStartPlay}
             isStarting={isBeginning}
           />
@@ -354,13 +323,12 @@ export default function PlayPage() {
     return (
       <div className="bg-canvas flex items-center justify-center px-4">
         <WhackAScamGame
+          items={preview.display_items}
           onComplete={handleGameComplete}
           boardProgression={preview.board_progression}
           popupDurationMs={preview.popup_duration_ms}
           baseSpawnDelay={preview.base_spawn_delay}
           spawnJitter={preview.spawn_jitter}
-          scamIcon={preview.scam_icon}
-          legitIcon={preview.legit_icon}
         />
       </div>
     );
@@ -375,6 +343,7 @@ export default function PlayPage() {
         <EndRoundModal
           result={result}
           passed={passed}
+          mode={preview.mode}
           familyLabel={preview.family_label}
           familyDescription={preview.family_description}
           exemplar={preview.exemplar}
@@ -498,20 +467,19 @@ function FreeTabContent({
   return (
     <div>
       <h2 className="display text-[22px] font-bold text-indigo mb-2">
-        Today's free round
+        Today&apos;s free round
       </h2>
       <p className="text-sm text-fg-soft mb-4">
-        60 seconds. One round per UTC day. Pass to earn 5 G$ and add to your
-        streak.
+        60 seconds. One round per UTC day. Pass to earn {rewardText("free")} and add to your streak.
       </p>
       <ul className="mb-5 space-y-2 text-sm text-fg-soft">
         <li className="flex items-start gap-2">
           <span className="text-indigo font-bold mt-0.5">→</span>
-          <span>Pass threshold: 60% accuracy, 7+ correct</span>
+          <span>Pass threshold: {passThresholdText("free")}</span>
         </li>
         <li className="flex items-start gap-2">
           <span className="text-indigo font-bold mt-0.5">→</span>
-          <span>Reward: 5 G$ + streak day</span>
+          <span>Reward: {rewardText("free")} + streak day</span>
         </li>
       </ul>
 
@@ -558,10 +526,6 @@ function PremiumTabContent({
   isVerified: boolean;
   onVerify: () => void;
 }) {
-  // ─── Verification gate (frontend-only) ─────────────────────
-  // Premium requires GoodID verification. We block here before showing
-  // any stake UI, since unverified users can't safely play premium —
-  // their bonus would accrue but never be claimable.
   if (!isVerified) {
     return (
       <div className="text-center py-2">
@@ -621,7 +585,7 @@ function PremiumTabContent({
         Premium round
       </h2>
       <p className="text-sm text-fg-soft mb-4">
-        Stake {stakeDisplay} G$. Pass to get it back + 5 G$ bonus. Fail and your
+        Stake {stakeDisplay} G$. Pass to get it back + {SCORING.premiumBonus} G$ bonus. Fail and your
         stake refills the rewards pool.
       </p>
       <ul className="mb-4 space-y-2 text-sm text-fg-soft">
@@ -631,11 +595,11 @@ function PremiumTabContent({
         </li>
         <li className="flex items-start gap-2">
           <span className="text-mustard font-bold mt-0.5">→</span>
-          <span>Pass threshold: 75% accuracy, 12+ correct</span>
+          <span>Pass threshold: {passThresholdText("premium")}</span>
         </li>
         <li className="flex items-start gap-2">
           <span className="text-mustard font-bold mt-0.5">→</span>
-          <span>Win: {stakeDisplay} G$ refund + 5 G$ bonus</span>
+          <span>Win: {stakeDisplay} G$ refund + {SCORING.premiumBonus} G$ bonus</span>
         </li>
       </ul>
 
