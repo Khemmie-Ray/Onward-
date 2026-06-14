@@ -6,8 +6,14 @@ import { Hole, type HoleState } from "./Hole";
 import type { WhackIcon } from "@/lib/scam/whackIcon";
 
 const ROUND_SECONDS = 60;
-const SCAM_RATIO = 0.6;
 const MAX_HOLES = 6;
+
+export type DisplayItem = {
+  pattern_id: string;
+  icon: WhackIcon;
+  is_scam: boolean;
+  kind: string;
+};
 
 export type WhackResult = {
   score: number;
@@ -15,58 +21,63 @@ export type WhackResult = {
   wrongWhacks: number;
   missedScams: number;
   totalScams: number;
+  whacks: string[];
+  spawnedScams: number;
 };
 
 type Props = {
+  items: DisplayItem[];
   onComplete: (result: WhackResult) => void;
   boardProgression?: number[];
   popupDurationMs?: number;
   baseSpawnDelay?: number;
   spawnJitter?: number;
-  scamIcon: WhackIcon;
-  legitIcon: WhackIcon;
 };
 
 export function WhackAScamGame({
+  items,
   onComplete,
   boardProgression = [6],
   popupDurationMs = 2000,
   baseSpawnDelay = 400,
   spawnJitter = 250,
-  scamIcon,
-  legitIcon,
 }: Props) {
-  // ─── Reactive state ──────────────────────────────────────
   const [secondsLeft, setSecondsLeft] = useState(ROUND_SECONDS);
   const [score, setScore] = useState(0);
   const [holes, setHoles] = useState<(HoleState | null)[]>(() =>
-    Array(MAX_HOLES).fill(null)
+    Array(MAX_HOLES).fill(null),
   );
   const [activeHoleCount, setActiveHoleCount] = useState(
-    boardProgression[0] ?? 6
+    boardProgression[0] ?? 6,
   );
 
-  // ─── Refs ────────────────────────────────────────────────
   const secondsLeftRef = useRef(ROUND_SECONDS);
   const activeHoleCountRef = useRef(boardProgression[0] ?? 6);
   const finishedRef = useRef(false);
   const lastSpawnAtRef = useRef<number[]>(Array(MAX_HOLES).fill(0));
   const onCompleteRef = useRef(onComplete);
   const holesRef = useRef<(HoleState | null)[]>(Array(MAX_HOLES).fill(null));
+  const itemQueueRef = useRef<DisplayItem[]>([]);
+  const itemCursorRef = useRef(0);
 
   const statsRef = useRef({
     correctWhacks: 0,
     wrongWhacks: 0,
     spawnedScams: 0,
     spawnedLegits: 0,
-    whackedIds: new Set<number>(),
+    whackedInstanceIds: new Set<number>(),
+    whacks: [] as string[], // pattern_ids — sent to server
   });
 
   const stageTransitionsRef = useRef<{ atSecond: number; holes: number }[]>(
-    computeStageTransitions(boardProgression)
+    computeStageTransitions(boardProgression),
   );
 
-  // ─── Sync refs with state ───────────────────────────────
+  useEffect(() => {
+    itemQueueRef.current = [...items].sort(() => Math.random() - 0.5);
+    itemCursorRef.current = 0;
+  }, [items]);
+
   useEffect(() => {
     onCompleteRef.current = onComplete;
   }, [onComplete]);
@@ -75,7 +86,6 @@ export function WhackAScamGame({
     holesRef.current = holes;
   }, [holes]);
 
-  // ─── finishGame ─────────────────────────────────────────
   const finishGame = useCallback(() => {
     if (finishedRef.current) return;
     finishedRef.current = true;
@@ -89,10 +99,11 @@ export function WhackAScamGame({
       wrongWhacks: s.wrongWhacks,
       missedScams,
       totalScams: s.spawnedScams,
+      whacks: s.whacks,
+      spawnedScams: s.spawnedScams,
     });
   }, []);
 
-  // ─── Timer ───────────────────────────────────────────────
   useEffect(() => {
     const tick = setInterval(() => {
       secondsLeftRef.current -= 1;
@@ -118,20 +129,28 @@ export function WhackAScamGame({
     let spawnTimeout: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
 
+    const nextItem = (): DisplayItem | null => {
+      const queue = itemQueueRef.current;
+      if (queue.length === 0) return null;
+      const item = queue[itemCursorRef.current % queue.length];
+      itemCursorRef.current++;
+      return item;
+    };
+
     const attemptSpawn = () => {
       if (cancelled || secondsLeftRef.current <= 0) return;
 
       const prev = holesRef.current;
       const activeIndexes = Array.from(
         { length: activeHoleCountRef.current },
-        (_, i) => i
+        (_, i) => i,
       );
       const emptyIndexes = activeIndexes.filter((i) => prev[i] === null);
       if (emptyIndexes.length === 0) return;
 
       const now = performance.now();
       const weights = emptyIndexes.map((i) =>
-        Math.max(1, now - lastSpawnAtRef.current[i])
+        Math.max(1, now - lastSpawnAtRef.current[i]),
       );
       const total = weights.reduce((a, b) => a + b, 0);
       let pick = Math.random() * total;
@@ -144,17 +163,18 @@ export function WhackAScamGame({
         }
       }
 
-      const isScam = Math.random() < SCAM_RATIO;
-      const icon = isScam ? scamIcon : legitIcon;
+      const item = nextItem();
+      if (!item) return;
 
       lastSpawnAtRef.current[holeIdx] = now;
-      if (isScam) statsRef.current.spawnedScams++;
+      if (item.is_scam) statsRef.current.spawnedScams++;
       else statsRef.current.spawnedLegits++;
 
       const newHoleState: HoleState = {
         id: Date.now() + Math.random(),
-        icon,
-        isScam,
+        patternId: item.pattern_id,
+        icon: item.icon,
+        isScam: item.is_scam,
         appearedAt: performance.now(),
         durationMs: popupDurationMs,
       };
@@ -185,14 +205,7 @@ export function WhackAScamGame({
       cancelled = true;
       if (spawnTimeout) clearTimeout(spawnTimeout);
     };
-  }, [
-    boardProgression,
-    popupDurationMs,
-    baseSpawnDelay,
-    spawnJitter,
-    scamIcon,
-    legitIcon,
-  ]);
+  }, [popupDurationMs, baseSpawnDelay, spawnJitter]);
 
   useEffect(() => {
     const cleanup = setInterval(() => {
@@ -212,15 +225,16 @@ export function WhackAScamGame({
     return () => clearInterval(cleanup);
   }, []);
 
-  const handleWhack = useCallback((holeIdx: number, isScam: boolean) => {
+  const handleWhack = useCallback((holeIdx: number) => {
     setHoles((prev) => {
       const hole = prev[holeIdx];
       if (!hole?.icon) return prev;
-      if (statsRef.current.whackedIds.has(hole.id)) return prev;
+      if (statsRef.current.whackedInstanceIds.has(hole.id)) return prev;
 
-      statsRef.current.whackedIds.add(hole.id);
+      statsRef.current.whackedInstanceIds.add(hole.id);
+      statsRef.current.whacks.push(hole.patternId);
 
-      if (isScam) {
+      if (hole.isScam) {
         statsRef.current.correctWhacks++;
         setScore((s) => s + 1);
       } else {
@@ -245,8 +259,8 @@ export function WhackAScamGame({
     activeHoleCount <= 2
       ? "grid-cols-2"
       : activeHoleCount <= 4
-      ? "grid-cols-2"
-      : "grid-cols-3";
+        ? "grid-cols-2"
+        : "grid-cols-3";
 
   return (
     <div className="flex flex-col items-center w-full">
@@ -272,7 +286,7 @@ export function WhackAScamGame({
           <Hole
             key={idx}
             state={holes[idx]}
-            onWhack={(isScam) => handleWhack(idx, isScam)}
+            onWhack={() => handleWhack(idx)}
             size={activeHoleCount === 6 ? 96 : 110}
           />
         ))}
@@ -282,7 +296,7 @@ export function WhackAScamGame({
 }
 
 function computeStageTransitions(
-  progression: number[] | undefined
+  progression: number[] | undefined,
 ): { atSecond: number; holes: number }[] {
   if (!progression || progression.length <= 1) return [];
   if (progression.length === 2) {

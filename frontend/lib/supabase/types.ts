@@ -105,7 +105,7 @@ export type DbGameSession = {
   items: { pattern_id: string; is_scam: boolean }[];
   popup_duration_ms: number;
   total_seconds: number;
-  status: "active" | "submitted" | "expired";
+  status: "pending" | "active" | "submitted" | "expired";
   mode: "free" | "premium";
   started_at: string;
   completed_at: string | null;

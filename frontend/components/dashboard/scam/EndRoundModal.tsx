@@ -6,10 +6,12 @@ import ScenarioCard from "./ScenarioCard";
 import { MudclothPattern } from "@/components/home/motifs";
 import type { Scenario } from "@/lib/scam/patterns";
 import type { WhackResult } from "./WhackAScamGame";
+import { passThresholdText, type PlayMode } from "@/lib/scoring";
 
 export function EndRoundModal({
   result,
   passed,
+  mode,
   familyLabel,
   familyDescription,
   exemplar,
@@ -22,6 +24,7 @@ export function EndRoundModal({
 }: {
   result: WhackResult;
   passed: boolean | null;
+  mode: PlayMode;
   familyLabel: string;
   familyDescription: string;
   exemplar: {
@@ -37,11 +40,10 @@ export function EndRoundModal({
   onPlayAgain: () => void;
 }) {
   const leveledUp = levelAfter > levelBefore;
-  const totalGraded =
-    result.correctWhacks + result.wrongWhacks + result.missedScams;
-  const accuracy =
-    totalGraded > 0
-      ? Math.round((result.correctWhacks / totalGraded) * 100)
+  const totalWhacks = result.correctWhacks + result.wrongWhacks;
+  const precision =
+    totalWhacks > 0
+      ? Math.round((result.correctWhacks / totalWhacks) * 100)
       : 0;
 
   const isWaitingForVerdict = passed === null;
@@ -59,7 +61,6 @@ export function EndRoundModal({
       />
 
       <div className="relative w-full max-w-[500px] animate-[fade-up_0.8s_ease_both]">
-        {/* Pass/Fail headline */}
         <div className="text-center mb-7">
           <div className="mb-4 inline-flex items-center justify-center">
             {isWaitingForVerdict ? (
@@ -135,7 +136,7 @@ export function EndRoundModal({
             {txPending ? (
               <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-paper/70">
                 <Loader2 size={11} strokeWidth={2.5} className="animate-spin" />
-                Confirming on Celo Sepolia…
+                Confirming on Celo…
               </div>
             ) : (
               txHash && (
@@ -155,8 +156,7 @@ export function EndRoundModal({
         {passed === false && (
           <div className="rounded-[18px] bg-terracotta-tint p-5 mb-5 text-center">
             <p className="text-[13px] font-semibold text-terracotta leading-snug">
-              You need at least 60% accuracy and 7+ correct whacks to earn the
-              reward. Try again — you'll get faster.
+              You need {passThresholdText(mode)} to earn the reward. Try again — you&apos;ll get faster.
             </p>
           </div>
         )}
@@ -165,7 +165,7 @@ export function EndRoundModal({
           <div className="flex items-center gap-2 mb-3">
             <Eye size={14} strokeWidth={2.5} className="text-terracotta" />
             <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-terracotta">
-              Today's scam pattern
+              Today&apos;s scam pattern
             </span>
           </div>
           <h2 className="display text-[22px] font-bold tracking-[-0.015em] text-indigo mb-2">
@@ -187,7 +187,7 @@ export function EndRoundModal({
         </div>
 
         <div className="text-center text-[11px] text-fg-soft mb-6">
-          You judged {totalGraded} popups with {accuracy}% accuracy.
+          You judged {totalWhacks} popups with {precision}% precision.
         </div>
 
         <div className="flex gap-3">

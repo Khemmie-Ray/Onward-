@@ -6,9 +6,10 @@ import type { WhackIcon } from "@/lib/scam/whackIcon";
 
 export type HoleState = {
   id: number;
+  patternId: string;
   icon: WhackIcon | null;
   isScam: boolean;
-  appearedAt: number; // performance.now() timestamp
+  appearedAt: number;
   durationMs: number;
 };
 
@@ -18,23 +19,27 @@ export function Hole({
   size = 100,
 }: {
   state: HoleState | null;
-  onWhack: (isScam: boolean) => void;
+  onWhack: () => void;
   size?: number;
 }) {
   const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
+  const [floatNum, setFloatNum] = useState<1 | -1 | null>(null);
   const [whacked, setWhacked] = useState(false);
 
   useEffect(() => {
     setWhacked(false);
     setFeedback(null);
+    setFloatNum(null);
   }, [state?.id]);
 
   const handleClick = () => {
     if (!state?.icon || whacked) return;
     setWhacked(true);
     setFeedback(state.isScam ? "correct" : "wrong");
-    onWhack(state.isScam);
+    setFloatNum(state.isScam ? 1 : -1);
+    onWhack();
     setTimeout(() => setFeedback(null), 400);
+    setTimeout(() => setFloatNum(null), 800);
   };
 
   return (
@@ -72,6 +77,20 @@ export function Hole({
         </button>
       )}
 
+      {floatNum !== null && (
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-0 flex items-start justify-center pt-1 display font-bold text-[26px] animate-[float-up_0.8s_ease_both] ${
+            floatNum > 0 ? "text-mustard" : "text-terracotta"
+          }`}
+          style={{
+            textShadow: "0 2px 8px rgba(0,0,0,0.4)",
+          }}
+        >
+          {floatNum > 0 ? "+1" : "−1"}
+        </div>
+      )}
+
       <style jsx>{`
         @keyframes pop-up {
           0% {
@@ -85,6 +104,20 @@ export function Hole({
           100% {
             transform: translateY(0);
             opacity: 1;
+          }
+        }
+        @keyframes float-up {
+          0% {
+            transform: translateY(0) scale(0.6);
+            opacity: 0;
+          }
+          15% {
+            transform: translateY(-8px) scale(1.2);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(-50px) scale(1);
+            opacity: 0;
           }
         }
       `}</style>
