@@ -4,16 +4,13 @@ import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resolveRoundOnchain } from "@/lib/onchain/play";
 import { isVerifiedOnchainSafe } from "@/lib/onchain/identity";
+import { gradeRound, nextLevel, SCORING, type PlayMode } from "@/lib/scoring";
 
 type SubmitBody = {
   round_id?: string;
-  correct_whacks?: number;
-  wrong_whacks?: number;
-  missed_scams?: number;
+  whacks?: string[];        
+  spawned_scams?: number; 
 };
-
-const FREE_REWARD_G = 5;
-const PREMIUM_BONUS_G = 5;
 
 export async function POST(request: Request) {
   const auth = await requireCompletedProfile(request);
@@ -23,6 +20,9 @@ export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as SubmitBody | null;
   if (!body?.round_id) {
     return NextResponse.json({ error: "Missing round_id" }, { status: 400 });
+  }
+  if (!Array.isArray(body.whacks)) {
+    return NextResponse.json({ error: "Invalid whacks array" }, { status: 400 });
   }
 
   const isVerified = await isVerifiedOnchainSafe(
@@ -41,44 +41,79 @@ export async function POST(request: Request) {
   }
   if (session.status !== "active") {
     return NextResponse.json(
-      { error: "Round already submitted" },
+      { error: "Round not active (already submitted or not begun)" },
       { status: 409 }
     );
   }
 
-  const mode = (session.mode ?? "free") as "free" | "premium";
-  const correctWhacks = Math.max(0, body.correct_whacks ?? 0);
-  const wrongWhacks = Math.max(0, body.wrong_whacks ?? 0);
-  const missedScams = Math.max(0, body.missed_scams ?? 0);
-  const score = Math.max(0, correctWhacks - wrongWhacks);
-  const totalGraded = correctWhacks + wrongWhacks + missedScams;
-  const accuracy = totalGraded > 0 ? correctWhacks / totalGraded : 0;
+  const mode = (session.mode ?? "free") as PlayMode;
 
-  const passed =
-    mode === "premium"
-      ? accuracy >= 0.75 && correctWhacks >= 8
-      : accuracy >= 0.6 && correctWhacks >= 5;
+  if (body.whacks.length > SCORING.maxTotalWhacks) {
+    return NextResponse.json(
+      { error: "Too many whacks submitted" },
+      { status: 400 }
+    );
+  }
+
+  const items = session.items as Array<{ pattern_id: string; is_scam: boolean }>;
+  const patternMap = new Map<string, boolean>();
+  for (const item of items) {
+    patternMap.set(item.pattern_id, item.is_scam);
+  }
+
+  const perPatternCount = new Map<string, number>();
+  for (const pid of body.whacks) {
+    if (!patternMap.has(pid)) {
+      return NextResponse.json(
+        { error: "Invalid pattern_id in whacks" },
+        { status: 400 }
+      );
+    }
+    const c = (perPatternCount.get(pid) ?? 0) + 1;
+    if (c > SCORING.maxPerPatternWhacks) {
+      return NextResponse.json(
+        { error: "Per-pattern whack cap exceeded" },
+        { status: 400 }
+      );
+    }
+    perPatternCount.set(pid, c);
+  }
+
+  let correctWhacks = 0;
+  let wrongWhacks = 0;
+  for (const pid of body.whacks) {
+    if (patternMap.get(pid)) correctWhacks++;
+    else wrongWhacks++;
+  }
+
+  const spawnedScamsReported = Math.max(
+    0,
+    Math.min(SCORING.maxSpawnedScamsReported, body.spawned_scams ?? 0)
+  );
+  const missedScams = Math.max(0, spawnedScamsReported - correctWhacks);
+
+  const grade = gradeRound({ mode, correctWhacks, wrongWhacks });
 
   const levelBefore = user.current_level;
-  const levelAfter = passed ? Math.min(levelBefore + 1, 100) : levelBefore;
-  const rewardAmount = mode === "free" && passed ? FREE_REWARD_G : 0;
+  const levelAfter = nextLevel(levelBefore, grade.passed);
+  const rewardAmount = grade.rewardAmount;
 
   await supabaseAdmin
     .from("game_sessions")
     .update({
       status: "submitted",
       completed_at: new Date().toISOString(),
-      score,
+      score: grade.score,
       correct_whacks: correctWhacks,
       wrong_whacks: wrongWhacks,
       missed_scams: missedScams,
-      passed,
+      passed: grade.passed,
       reward_g_amount: rewardAmount,
       level_after: levelAfter,
     })
     .eq("id", session.id);
 
-  if (passed) {
+  if (grade.passed) {
     const userUpdate: { current_level: number; total_g_earned?: number } = {
       current_level: levelAfter,
     };
@@ -121,7 +156,7 @@ export async function POST(request: Request) {
       await recomputeUserStreak(user.id);
     } else {
       userUpdate.total_g_earned =
-        Number(user.total_g_earned) + PREMIUM_BONUS_G;
+        Number(user.total_g_earned) + SCORING.premiumBonus;
     }
 
     await supabaseAdmin.from("users").update(userUpdate).eq("id", user.id);
@@ -142,7 +177,7 @@ export async function POST(request: Request) {
       userWallet: user.wallet_address as Address,
       roundId: session.id,
       mode,
-      passed,
+      passed: grade.passed,
       rewardAmountG: rewardAmount,
       isVerified,
       levelBefore,
@@ -172,15 +207,16 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     mode,
-    passed,
-    score,
+    passed: grade.passed,
+    score: grade.score,
     correct_whacks: correctWhacks,
     wrong_whacks: wrongWhacks,
     missed_scams: missedScams,
-    reward_g_amount:
-      mode === "premium" && passed ? PREMIUM_BONUS_G : rewardAmount,
+    precision_percent: grade.precisionPercent,
+    reward_g_amount: rewardAmount,
     level_before: levelBefore,
     level_after: levelAfter,
+    threshold: grade.threshold,
     onchain,
   });
 }
