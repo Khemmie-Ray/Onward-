@@ -2,18 +2,26 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ArrowRight, Loader2, Lock, Zap, Trophy } from "lucide-react";
+import { ArrowLeft, Zap } from "lucide-react";
 import { useAppKitAccount } from "@reown/appkit/react";
-import { formatUnits, type Address } from "viem";
+import { type Address } from "viem";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PreRoundBriefing } from "@/components/dashboard/scam/PreRoundBriefing";
-import {
-  WhackAScamGame,
-  type WhackResult,
-  type DisplayItem,
-} from "@/components/dashboard/scam/WhackAScamGame";
-import { EndRoundModal } from "@/components/dashboard/scam/EndRoundModal";
+import { PreRoundBriefing } from "@/components/dashboard/play/PreRoundBriefing";
+import { WhackAScam } from "@/components/dashboard/play/WhackAScamGame";
+import { EndRoundModal } from "@/components/dashboard/play/EndRoundModal";
+import { FreeTabContent } from "@/components/dashboard/play/FreeTabContent";
+import { PremiumTabContent } from "@/components/dashboard/play/PremiumTabContent";
+import type {
+  Mode,
+  FreeStep,
+  PremiumStep,
+  RoundPreview,
+  SubmitResponse,
+  WhackResult,
+  DailyCapMessage,
+} from "@/components/dashboard/play/type";
+
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import {
   useWhackStake,
@@ -22,49 +30,8 @@ import {
   useGDollarBalance,
 } from "@/hooks/useWhackState";
 import { useIdentityContext } from "@/contexts/IdentityContext";
-import type { WhackIcon } from "@/lib/scam/whackIcon";
-import { passThresholdText, rewardText, SCORING } from "@/lib/scoring";
 
-type Mode = "free" | "premium";
 type Phase = "tab-select" | "briefing" | "playing" | "ended";
-type FreeStep = "idle" | "starting";
-type PremiumStep = "idle" | "init" | "approving" | "staking" | "starting";
-
-type RoundPreview = {
-  preview_id: string;
-  mode: Mode;
-  family_label: string;
-  family_description: string;
-  exemplar: {
-    kind: string;
-    content: Record<string, unknown>;
-    teaching: string;
-  };
-  exemplar_icon: WhackIcon;
-  display_items: DisplayItem[];
-  popup_duration_ms: number;
-  total_seconds: number;
-  board_progression: number[];
-  base_spawn_delay: number;
-  spawn_jitter: number;
-};
-
-type SubmitResponse = {
-  mode: Mode;
-  passed: boolean;
-  reward_g_amount: number;
-  level_before: number;
-  level_after: number;
-  precision_percent: number;
-  threshold: { minPrecisionPercent: number; minCorrect: number };
-  onchain: {
-    rewardTxHash: string | null;
-    stakeResolveTxHash: string | null;
-    onchainError: string | null;
-  };
-};
-
-type DailyCapMessage = { kind: "cap"; message: string } | null;
 
 export default function PlayPage() {
   const authFetch = useAuthFetch();
@@ -100,6 +67,7 @@ export default function PlayPage() {
     setPremiumStep("idle");
   }, []);
 
+  // ─── Free round flow ────────────────────────────────────
   const startFreeRound = async () => {
     setFreeError(null);
     setFreeCapMessage(null);
@@ -130,15 +98,16 @@ export default function PlayPage() {
     }
   };
 
+  // ─── Premium round flow ─────────────────────────────────
   const isPremiumTab = activeTab === "premium";
   const { stakeAmount } = useStakeAmount(isPremiumTab);
   const { balance, refetch: refetchBalance } = useGDollarBalance(
     address as Address | undefined,
-    isPremiumTab
+    isPremiumTab,
   );
   const { allowance, refetch: refetchAllowance } = useStakeAllowance(
     address as Address | undefined,
-    isPremiumTab
+    isPremiumTab,
   );
   const { approve, stake, approveState, stakeState } = useWhackStake();
 
@@ -154,7 +123,9 @@ export default function PlayPage() {
     setPremiumStep("init");
 
     try {
-      const initRes = await authFetch("/api/play/stake-init", { method: "POST" });
+      const initRes = await authFetch("/api/play/stake-init", {
+        method: "POST",
+      });
       if (initRes.status === 429) {
         const d = await initRes.json().catch(() => ({}));
         setPremiumCapMessage({
@@ -181,7 +152,7 @@ export default function PlayPage() {
       }
     } catch (e) {
       setPremiumError(
-        e instanceof Error ? e.message : "Premium round init failed"
+        e instanceof Error ? e.message : "Premium round init failed",
       );
       setPremiumStep("idle");
     }
@@ -230,7 +201,7 @@ export default function PlayPage() {
         setPremiumError(
           e instanceof Error
             ? e.message
-            : "Stake confirmed but round failed to start"
+            : "Stake confirmed but round failed to start",
         );
         setPremiumStep("idle");
       }
@@ -257,7 +228,7 @@ export default function PlayPage() {
         setFreeError(e instanceof Error ? e.message : "Failed to start round");
       } else {
         setPremiumError(
-          e instanceof Error ? e.message : "Failed to start round"
+          e instanceof Error ? e.message : "Failed to start round",
         );
       }
       setIsBeginning(false);
@@ -275,8 +246,8 @@ export default function PlayPage() {
         method: "POST",
         body: JSON.stringify({
           round_id: roundId,
-          whacks: r.whacks, // pattern_ids — server grades from its own stored items
-          spawned_scams: r.spawnedScams, // display only, capped server-side
+          whacks: r.whacks,
+          spawned_scams: r.spawnedScams,
         }),
       });
       if (res.ok) {
@@ -288,10 +259,26 @@ export default function PlayPage() {
     }
   };
 
+  const handleAbandon = async () => {
+    if (!roundId) {
+      resetToTabSelect();
+      return;
+    }
+    try {
+      await authFetch("/api/play/abandon", {
+        method: "POST",
+        body: JSON.stringify({ round_id: roundId }),
+      });
+    } catch (e) {
+      console.error("[play abandon failed]", e);
+    }
+    resetToTabSelect();
+  };
+
   if (phase === "briefing" && preview) {
     return (
       <div className="min-h-screen bg-canvas flex flex-col lg:w-[40%] md:w-[40%] w-full mx-auto">
-        <header className="flex items-center justify-between px-6 py-5 w-full ">
+        <header className="flex items-center justify-between px-6 py-5 w-full">
           <button
             onClick={resetToTabSelect}
             aria-label="Back"
@@ -319,12 +306,14 @@ export default function PlayPage() {
     );
   }
 
-  if (phase === "playing" && preview) {
+  if (phase === "playing" && preview && roundId) {
     return (
       <div className="bg-canvas flex items-center justify-center px-4">
-        <WhackAScamGame
+        <WhackAScam
+          roundId={roundId}
           items={preview.display_items}
           onComplete={handleGameComplete}
+          onAbandon={handleAbandon}
           boardProgression={preview.board_progression}
           popupDurationMs={preview.popup_duration_ms}
           baseSpawnDelay={preview.base_spawn_delay}
@@ -425,240 +414,5 @@ export default function PlayPage() {
         </div>
       </div>
     </div>
-  );
-}
-
-function FreeTabContent({
-  capMessage,
-  errorMessage,
-  step,
-  onStart,
-  onSwitchToPremium,
-}: {
-  capMessage: DailyCapMessage;
-  errorMessage: string | null;
-  step: FreeStep;
-  onStart: () => void;
-  onSwitchToPremium: () => void;
-}) {
-  const isLoading = step === "starting";
-
-  if (capMessage) {
-    return (
-      <div className="text-center py-2">
-        <div className="mb-3 inline-flex items-center justify-center w-12 h-12 rounded-full bg-mustard/15">
-          <Trophy size={20} strokeWidth={2.5} className="text-mustard" />
-        </div>
-        <h2 className="display text-[20px] font-bold text-indigo mb-2">
-          Day complete
-        </h2>
-        <p className="text-sm text-fg-soft mb-5">{capMessage.message}</p>
-        <button
-          onClick={onSwitchToPremium}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-mustard text-indigo font-bold text-sm hover:bg-mustard/90 transition"
-        >
-          <Zap size={14} strokeWidth={2.5} />
-          Play Premium instead
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <h2 className="display text-[22px] font-bold text-indigo mb-2">
-        Today&apos;s free round
-      </h2>
-      <p className="text-sm text-fg-soft mb-4">
-        60 seconds. One round per UTC day. Pass to earn {rewardText("free")} and add to your streak.
-      </p>
-      <ul className="mb-5 space-y-2 text-sm text-fg-soft">
-        <li className="flex items-start gap-2">
-          <span className="text-indigo font-bold mt-0.5">→</span>
-          <span>Pass threshold: {passThresholdText("free")}</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-indigo font-bold mt-0.5">→</span>
-          <span>Reward: {rewardText("free")} + streak day</span>
-        </li>
-      </ul>
-
-      {errorMessage && (
-        <div className="mb-4 px-4 py-3 rounded-xl bg-terracotta/10 border border-terracotta/30 text-terracotta text-sm">
-          {errorMessage}
-        </div>
-      )}
-
-      <button
-        onClick={onStart}
-        disabled={isLoading}
-        className="w-full py-4 rounded-xl bg-indigo text-cream font-bold text-base disabled:bg-indigo/50 disabled:cursor-not-allowed hover:bg-indigo/90 transition flex items-center justify-center gap-2"
-      >
-        {isLoading && (
-          <Loader2 size={16} strokeWidth={2.5} className="animate-spin" />
-        )}
-        {isLoading ? "Preparing your round…" : "Play today's round"}
-      </button>
-    </div>
-  );
-}
-
-function PremiumTabContent({
-  capMessage,
-  errorMessage,
-  step,
-  hasEnoughBalance,
-  balance,
-  stakeAmount,
-  needsApproval,
-  onStart,
-  isVerified,
-  onVerify,
-}: {
-  capMessage: DailyCapMessage;
-  errorMessage: string | null;
-  step: PremiumStep;
-  hasEnoughBalance: boolean;
-  balance: bigint;
-  stakeAmount: bigint;
-  needsApproval: boolean;
-  onStart: () => void;
-  isVerified: boolean;
-  onVerify: () => void;
-}) {
-  if (!isVerified) {
-    return (
-      <div className="text-center py-2">
-        <div className="mb-3 inline-flex items-center justify-center w-12 h-12 rounded-full bg-mustard/15">
-          <Lock size={20} strokeWidth={2.5} className="text-mustard" />
-        </div>
-        <h2 className="display text-[20px] font-bold text-indigo mb-2">
-          Verify to play premium
-        </h2>
-        <p className="text-sm text-fg-soft mb-5">
-          Premium rounds require a verified GoodID so your bonus pays
-          directly to your wallet. Free rounds work without it.
-        </p>
-        <button
-          onClick={onVerify}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo text-cream font-bold text-sm hover:bg-indigo/90 transition"
-        >
-          Verify with GoodID
-          <ArrowRight size={14} strokeWidth={2.8} />
-        </button>
-      </div>
-    );
-  }
-
-  if (capMessage) {
-    return (
-      <div className="text-center py-2">
-        <Lock size={20} className="mx-auto text-fg-soft mb-3" />
-        <h2 className="display text-[20px] font-bold text-indigo mb-2">
-          Premium done for today
-        </h2>
-        <p className="text-sm text-fg-soft">{capMessage.message}</p>
-      </div>
-    );
-  }
-
-  const balanceDisplay = formatUnits(balance, 18);
-  const stakeDisplay = formatUnits(stakeAmount, 18);
-  const isWorking = step !== "idle";
-
-  const idleLabel = needsApproval
-    ? `Approve & stake ${stakeDisplay} G$`
-    : `Stake ${stakeDisplay} G$ & play`;
-
-  const workingLabel: Record<Exclude<PremiumStep, "idle">, string> = {
-    init: "Initializing…",
-    approving: "Approving G$ allowance…",
-    staking: "Staking onchain…",
-    starting: "Starting round…",
-  };
-
-  const buttonLabel = step === "idle" ? idleLabel : workingLabel[step];
-
-  return (
-    <div>
-      <h2 className="display text-[22px] font-bold text-indigo mb-1">
-        Premium round
-      </h2>
-      <p className="text-sm text-fg-soft mb-4">
-        Stake {stakeDisplay} G$. Pass to get it back + {SCORING.premiumBonus} G$ bonus. Fail and your
-        stake refills the rewards pool.
-      </p>
-      <ul className="mb-4 space-y-2 text-sm text-fg-soft">
-        <li className="flex items-start gap-2">
-          <span className="text-mustard font-bold mt-0.5">→</span>
-          <span>6 holes, very fast popups, hardest pace</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-mustard font-bold mt-0.5">→</span>
-          <span>Pass threshold: {passThresholdText("premium")}</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-mustard font-bold mt-0.5">→</span>
-          <span>Win: {stakeDisplay} G$ refund + {SCORING.premiumBonus} G$ bonus</span>
-        </li>
-      </ul>
-
-      <div className="mb-4 flex justify-between text-xs text-fg-soft px-1">
-        <span>Your balance</span>
-        <span className="font-bold tabular-nums text-indigo">
-          {parseFloat(balanceDisplay).toLocaleString()} G$
-        </span>
-      </div>
-
-      {step !== "idle" && (
-        <div className="mb-4 px-4 py-3 rounded-xl bg-mustard/10 border border-mustard/30">
-          <div className="flex items-center gap-2 text-sm text-indigo font-semibold">
-            <Loader2 size={14} strokeWidth={2.5} className="animate-spin" />
-            {workingLabel[step]}
-          </div>
-          <div className="mt-2 flex gap-1">
-            <StepDot done={step !== "init"} active={step === "init"} />
-            <StepDot
-              done={step === "staking" || step === "starting"}
-              active={step === "approving"}
-            />
-            <StepDot done={step === "starting"} active={step === "staking"} />
-            <StepDot done={false} active={step === "starting"} />
-          </div>
-        </div>
-      )}
-
-      {errorMessage && (
-        <div className="mb-4 px-4 py-3 rounded-xl bg-terracotta/10 border border-terracotta/30 text-terracotta text-sm">
-          {errorMessage}
-        </div>
-      )}
-
-      {!hasEnoughBalance && !isWorking ? (
-        <div className="text-center">
-          <div className="mb-3 px-4 py-3 rounded-xl bg-terracotta/10 border border-terracotta/30 text-terracotta text-sm">
-            You need at least {stakeDisplay} G$ to play premium.
-          </div>
-        </div>
-      ) : (
-        <button
-          onClick={onStart}
-          disabled={isWorking || !hasEnoughBalance}
-          className="w-full py-4 rounded-xl bg-mustard text-indigo font-bold text-base disabled:bg-mustard/40 disabled:cursor-not-allowed hover:bg-mustard/90 transition"
-        >
-          {buttonLabel}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function StepDot({ done, active }: { done: boolean; active: boolean }) {
-  return (
-    <div
-      className={`flex-1 h-1 rounded-full transition-colors ${
-        done ? "bg-mustard" : active ? "bg-mustard/60" : "bg-mustard/20"
-      }`}
-    />
   );
 }

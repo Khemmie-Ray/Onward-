@@ -33,6 +33,10 @@
 
   --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-sora), ui-sans-serif, system-ui, sans-serif;
+
+  --animate-pop-up: pop-up 0.25s ease both;
+  --animate-float-up: float-up 0.8s ease both;
+  --animate-fade-up: fade-up 0.4s ease both;
 }
 
 @keyframes fade-up {
