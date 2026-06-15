@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { ArrowRight, Eye, Loader2, Trophy, X } from "lucide-react";
-import ScenarioCard from "./ScenarioCard";
+import ScenarioCard from "../scam/ScenarioCard";
 import { MudclothPattern } from "@/components/home/motifs";
 import type { Scenario } from "@/lib/scam/patterns";
-import type { WhackResult } from "./WhackAScamGame";
+import { WhackResult } from "./type";
 import { passThresholdText, type PlayMode } from "@/lib/scoring";
 
 export function EndRoundModal({
@@ -79,8 +79,8 @@ export function EndRoundModal({
             {isWaitingForVerdict
               ? "Calculating result…"
               : didPass
-              ? "Round passed"
-              : "Round didn't pass"}
+                ? "Round passed"
+                : "Round didn't pass"}
           </div>
           <h1 className="display text-[40px] font-bold leading-[1.1] tracking-[-0.025em] text-indigo">
             {result.score} {result.score === 1 ? "point" : "points"}
@@ -156,7 +156,8 @@ export function EndRoundModal({
         {passed === false && (
           <div className="rounded-[18px] bg-terracotta-tint p-5 mb-5 text-center">
             <p className="text-[13px] font-semibold text-terracotta leading-snug">
-              You need {passThresholdText(mode)} to earn the reward. Try again — you&apos;ll get faster.
+              You need {passThresholdText(mode)} to earn the reward. Try again —
+              you&apos;ll get faster.
             </p>
           </div>
         )}
@@ -223,14 +224,14 @@ function StatTile({
     tone === "forest"
       ? "bg-forest-tint"
       : tone === "terracotta"
-      ? "bg-terracotta-tint"
-      : "bg-aubergine-tint";
+        ? "bg-terracotta-tint"
+        : "bg-aubergine-tint";
   const fg =
     tone === "forest"
       ? "text-forest"
       : tone === "terracotta"
-      ? "text-terracotta"
-      : "text-aubergine";
+        ? "text-terracotta"
+        : "text-aubergine";
 
   return (
     <div className={`rounded-[14px] p-3.5 ${bg} text-center`}>

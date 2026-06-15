@@ -1,42 +1,29 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Clock, Trophy } from "lucide-react";
-import { Hole, type HoleState } from "./Hole";
-import type { WhackIcon } from "@/lib/scam/whackIcon";
+import { Hole } from "./Hole";
+import { GameHeader } from "./GameHeader";
+import { AbandonConfirmModal } from "./AbandonConfirmModal";
+import type { DisplayItem, HoleState, WhackResult } from "./type";
 
 const ROUND_SECONDS = 60;
 const MAX_HOLES = 6;
 
-export type DisplayItem = {
-  pattern_id: string;
-  icon: WhackIcon;
-  is_scam: boolean;
-  kind: string;
-};
-
-export type WhackResult = {
-  score: number;
-  correctWhacks: number;
-  wrongWhacks: number;
-  missedScams: number;
-  totalScams: number;
-  whacks: string[];
-  spawnedScams: number;
-};
-
 type Props = {
+  roundId: string;
   items: DisplayItem[];
   onComplete: (result: WhackResult) => void;
+  onAbandon: () => void;
   boardProgression?: number[];
   popupDurationMs?: number;
   baseSpawnDelay?: number;
   spawnJitter?: number;
 };
 
-export function WhackAScamGame({
+export function WhackAScam({
   items,
   onComplete,
+  onAbandon,
   boardProgression = [6],
   popupDurationMs = 2000,
   baseSpawnDelay = 400,
@@ -50,6 +37,7 @@ export function WhackAScamGame({
   const [activeHoleCount, setActiveHoleCount] = useState(
     boardProgression[0] ?? 6,
   );
+  const [showAbandonConfirm, setShowAbandonConfirm] = useState(false);
 
   const secondsLeftRef = useRef(ROUND_SECONDS);
   const activeHoleCountRef = useRef(boardProgression[0] ?? 6);
@@ -66,7 +54,7 @@ export function WhackAScamGame({
     spawnedScams: 0,
     spawnedLegits: 0,
     whackedInstanceIds: new Set<number>(),
-    whacks: [] as string[], // pattern_ids — sent to server
+    whacks: [] as string[],
   });
 
   const stageTransitionsRef = useRef<{ atSecond: number; holes: number }[]>(
@@ -104,6 +92,7 @@ export function WhackAScamGame({
     });
   }, []);
 
+  // ─── Timer ──────────────────────────────────────────────
   useEffect(() => {
     const tick = setInterval(() => {
       secondsLeftRef.current -= 1;
@@ -125,6 +114,7 @@ export function WhackAScamGame({
     return () => clearInterval(tick);
   }, [finishGame]);
 
+  // ─── Spawn loop ─────────────────────────────────────────
   useEffect(() => {
     let spawnTimeout: ReturnType<typeof setTimeout> | null = null;
     let cancelled = false;
@@ -191,7 +181,6 @@ export function WhackAScamGame({
       if (cancelled) return;
       const jitter = Math.random() * spawnJitter;
       const delay = baseSpawnDelay + jitter;
-
       spawnTimeout = setTimeout(() => {
         if (cancelled || secondsLeftRef.current <= 0) return;
         attemptSpawn();
@@ -207,6 +196,7 @@ export function WhackAScamGame({
     };
   }, [popupDurationMs, baseSpawnDelay, spawnJitter]);
 
+  // ─── Cleanup expired holes ──────────────────────────────
   useEffect(() => {
     const cleanup = setInterval(() => {
       const now = performance.now();
@@ -255,6 +245,12 @@ export function WhackAScamGame({
     });
   }, []);
 
+  const handleConfirmAbandon = () => {
+    finishedRef.current = true;
+    setShowAbandonConfirm(false);
+    onAbandon();
+  };
+
   const gridCols =
     activeHoleCount <= 2
       ? "grid-cols-2"
@@ -264,20 +260,11 @@ export function WhackAScamGame({
 
   return (
     <div className="flex flex-col items-center w-full">
-      <div className="w-full flex items-center justify-between mb-6 px-2 max-w-[420px]">
-        <div className="flex items-center gap-2">
-          <Clock size={16} strokeWidth={2.5} className="text-terracotta" />
-          <span className="display text-[24px] font-bold tabular-nums text-indigo">
-            {secondsLeft}s
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Trophy size={16} strokeWidth={2.5} className="text-mustard" />
-          <span className="display text-[24px] font-bold tabular-nums text-indigo">
-            {score}
-          </span>
-        </div>
-      </div>
+      <GameHeader
+        secondsLeft={secondsLeft}
+        score={score}
+        onAbandonClick={() => setShowAbandonConfirm(true)}
+      />
 
       <div
         className={`grid ${gridCols} gap-4 p-6 rounded-[24px] bg-aubergine/95 shadow-[0_12px_32px_rgba(91,46,92,0.30)]`}
@@ -291,6 +278,13 @@ export function WhackAScamGame({
           />
         ))}
       </div>
+
+      {showAbandonConfirm && (
+        <AbandonConfirmModal
+          onCancel={() => setShowAbandonConfirm(false)}
+          onConfirm={handleConfirmAbandon}
+        />
+      )}
     </div>
   );
 }

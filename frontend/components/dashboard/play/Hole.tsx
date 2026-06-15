@@ -2,16 +2,7 @@
 
 import Image from "next/image";
 import { useState, useEffect } from "react";
-import type { WhackIcon } from "@/lib/scam/whackIcon";
-
-export type HoleState = {
-  id: number;
-  patternId: string;
-  icon: WhackIcon | null;
-  isScam: boolean;
-  appearedAt: number;
-  durationMs: number;
-};
+import type { HoleState } from "./type";
 
 export function Hole({
   state,
@@ -49,21 +40,23 @@ export function Hole({
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-[14px] bg-gradient-to-t from-black/40 to-transparent rounded-b-[14px]"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-3.5 bg-linear-to-t from-black/40 to-transparent rounded-b-[14px]"
       />
+
       {feedback && (
         <div
           aria-hidden
-          className={`pointer-events-none absolute inset-0 rounded-[14px] ${
+          className={`pointer-events-none absolute inset-0 rounded-[14px] animate-fade-up ${
             feedback === "correct" ? "bg-forest/60" : "bg-terracotta/60"
-          } animate-[fade-up_0.4s_ease_both]`}
+          }`}
         />
       )}
+
       {state?.icon && !whacked && (
         <button
           onClick={handleClick}
           aria-label={`Whack ${state.icon.label}`}
-          className="absolute inset-0 flex items-end justify-center pb-1 cursor-pointer animate-[pop-up_0.25s_ease_both]"
+          className="absolute inset-0 flex items-end justify-center pb-1 cursor-pointer animate-pop-up"
         >
           <Image
             src={state.icon.src}
@@ -80,47 +73,13 @@ export function Hole({
       {floatNum !== null && (
         <div
           aria-hidden
-          className={`pointer-events-none absolute inset-0 flex items-start justify-center pt-1 display font-bold text-[26px] animate-[float-up_0.8s_ease_both] ${
+          className={`pointer-events-none absolute inset-0 flex items-start justify-center pt-1 display font-bold text-[26px] animate-float-up [text-shadow:0_2px_8px_rgba(0,0,0,0.4)] ${
             floatNum > 0 ? "text-mustard" : "text-terracotta"
           }`}
-          style={{
-            textShadow: "0 2px 8px rgba(0,0,0,0.4)",
-          }}
         >
           {floatNum > 0 ? "+1" : "−1"}
         </div>
       )}
-
-      <style jsx>{`
-        @keyframes pop-up {
-          0% {
-            transform: translateY(60%);
-            opacity: 0;
-          }
-          60% {
-            transform: translateY(-8%);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(0);
-            opacity: 1;
-          }
-        }
-        @keyframes float-up {
-          0% {
-            transform: translateY(0) scale(0.6);
-            opacity: 0;
-          }
-          15% {
-            transform: translateY(-8px) scale(1.2);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(-50px) scale(1);
-            opacity: 0;
-          }
-        }
-      `}</style>
     </div>
   );
 }
