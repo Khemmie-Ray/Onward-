@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { WhackIcon } from "./whackIcon";
-import { iconForPattern } from "./patternIcons";
+import { iconsForRound } from "./patternIcons";
 import type { PlayMode } from "@/lib/scoring";
 
 export type RoundItem = {
@@ -31,8 +31,8 @@ export type GeneratedRound = {
   family_description: string;
   exemplar: PatternRow;
   exemplar_icon: WhackIcon;
-  items: RoundItem[]; // server ground truth (stored in DB)
-  full_patterns: PatternWithIcon[]; // includes display data
+  items: RoundItem[];
+  full_patterns: PatternWithIcon[];
   popup_duration_ms: number;
   total_seconds: number;
   board_progression: number[];
@@ -43,8 +43,6 @@ export type GeneratedRound = {
 export { type PlayMode };
 
 function tierConfig(mode: PlayMode, level: number) {
-  // Bumped totalItems so the game has enough patterns for a full
-  // 60-second round of spawns without running out / cycling too tightly.
   if (mode === "premium") {
     return {
       totalItems: 60,
@@ -55,7 +53,6 @@ function tierConfig(mode: PlayMode, level: number) {
       boardProgression: [6],
     };
   }
-
   if (level < 20) {
     return {
       totalItems: 50,
@@ -99,9 +96,14 @@ async function pickFamily(): Promise<string> {
   return families[Math.floor(Math.random() * families.length)];
 }
 
+/**
+ * Generates a fresh round. The previewId argument is used to derive
+ * the per-round icon pair deterministically.
+ */
 export async function generateRound(
   mode: PlayMode,
-  userLevel: number
+  userLevel: number,
+  previewId: string,
 ): Promise<GeneratedRound> {
   const config = tierConfig(mode, userLevel);
   const family = await pickFamily();
@@ -134,7 +136,7 @@ export async function generateRound(
   if (!scamVariants?.length) throw new Error(`No scam variants for ${family}`);
   if (!legitPool?.length) throw new Error("No legit patterns");
 
-  const sampleN = <T,>(pool: T[], n: number): T[] => {
+  const sampleN = <T>(pool: T[], n: number): T[] => {
     const out: T[] = [];
     for (let i = 0; i < n; i++) {
       out.push(pool[Math.floor(Math.random() * pool.length)]);
@@ -145,13 +147,13 @@ export async function generateRound(
   const chosenScams = sampleN(scamVariants as PatternRow[], numScams);
   const chosenLegits = sampleN(legitPool as PatternRow[], numLegits);
   const sequence = [...chosenScams, ...chosenLegits].sort(
-    () => Math.random() - 0.5
+    () => Math.random() - 0.5,
   );
 
-  // Attach per-pattern icons via deterministic mapping
+  const roundIcons = iconsForRound(previewId);
   const sequenceWithIcons: PatternWithIcon[] = sequence.map((p) => ({
     ...p,
-    icon: iconForPattern(p.id, p.is_scam),
+    icon: p.is_scam ? roundIcons.scam : roundIcons.legit,
   }));
 
   return {
@@ -159,7 +161,7 @@ export async function generateRound(
     family_label: exemplar.family_label,
     family_description: exemplar.family_description,
     exemplar,
-    exemplar_icon: iconForPattern(exemplar.id, true),
+    exemplar_icon: roundIcons.scam,
     items: sequence.map((p) => ({ pattern_id: p.id, is_scam: p.is_scam })),
     full_patterns: sequenceWithIcons,
     popup_duration_ms: config.popupDurationMs,
@@ -171,16 +173,13 @@ export async function generateRound(
 }
 
 export async function rebuildRoundFromSession(session: {
+  id: string;
   featured_family: string;
   items: RoundItem[];
   popup_duration_ms: number;
   total_seconds: number;
   mode: string;
-}): Promise<Omit<GeneratedRound, "board_progression" | "base_spawn_delay" | "spawn_jitter"> & {
-  board_progression: number[];
-  base_spawn_delay: number;
-  spawn_jitter: number;
-}> {
+}): Promise<GeneratedRound> {
   const { data: exemplar } = await supabaseAdmin
     .from("scam_patterns")
     .select("*")
@@ -190,7 +189,7 @@ export async function rebuildRoundFromSession(session: {
 
   if (!exemplar) {
     throw new Error(
-      `Cannot rebuild session: exemplar missing for family ${session.featured_family}`
+      `Cannot rebuild session: exemplar missing for ${session.featured_family}`,
     );
   }
 
@@ -203,16 +202,20 @@ export async function rebuildRoundFromSession(session: {
   if (!patterns) throw new Error("Cannot rebuild session: patterns not found");
 
   const patternMap = new Map(patterns.map((p) => [p.id, p]));
+  const roundIcons = iconsForRound(session.id);
+
   const sequence: PatternWithIcon[] = session.items
     .map((item) => {
       const p = patternMap.get(item.pattern_id);
       if (!p) return null;
-      return { ...(p as PatternRow), icon: iconForPattern(p.id, p.is_scam) };
+      const row = p as PatternRow;
+      return {
+        ...row,
+        icon: row.is_scam ? roundIcons.scam : roundIcons.legit,
+      };
     })
     .filter((x): x is PatternWithIcon => x !== null);
 
-  // Sensible defaults for resumed sessions; the timing-related config
-  // is what the original round used, stored in the session.
   const config =
     session.mode === "premium"
       ? { boardProgression: [6], baseSpawnDelay: 300, spawnJitter: 200 }
@@ -223,7 +226,7 @@ export async function rebuildRoundFromSession(session: {
     family_label: (exemplar as PatternRow).family_label,
     family_description: (exemplar as PatternRow).family_description,
     exemplar: exemplar as PatternRow,
-    exemplar_icon: iconForPattern((exemplar as PatternRow).id, true),
+    exemplar_icon: roundIcons.scam,
     items: session.items,
     full_patterns: sequence,
     popup_duration_ms: session.popup_duration_ms,

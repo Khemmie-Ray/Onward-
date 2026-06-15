@@ -106,6 +106,7 @@ export type DbGameSession = {
   popup_duration_ms: number;
   total_seconds: number;
   status: "pending" | "active" | "submitted" | "expired";
+  last_heartbeat_at: string | null;
   mode: "free" | "premium";
   started_at: string;
   completed_at: string | null;
