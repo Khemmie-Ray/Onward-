@@ -8,8 +8,8 @@ import { gradeRound, nextLevel, SCORING, type PlayMode } from "@/lib/scoring";
 
 type SubmitBody = {
   round_id?: string;
-  whacks?: string[];        
-  spawned_scams?: number; 
+  whacks?: string[];
+  spawned_scams?: number;
 };
 
 export async function POST(request: Request) {
@@ -48,6 +48,7 @@ export async function POST(request: Request) {
 
   const mode = (session.mode ?? "free") as PlayMode;
 
+  // ─── Anti-cheat caps ────────────────────────────────────
   if (body.whacks.length > SCORING.maxTotalWhacks) {
     return NextResponse.json(
       { error: "Too many whacks submitted" },
@@ -92,6 +93,7 @@ export async function POST(request: Request) {
   );
   const missedScams = Math.max(0, spawnedScamsReported - correctWhacks);
 
+  // ─── Centralized grading ────────────────────────────────
   const grade = gradeRound({ mode, correctWhacks, wrongWhacks });
 
   const levelBefore = user.current_level;
@@ -123,37 +125,6 @@ export async function POST(request: Request) {
         userUpdate.total_g_earned =
           Number(user.total_g_earned) + rewardAmount;
       }
-
-      const today = new Date();
-      today.setUTCHours(0, 0, 0, 0);
-      const dayStr = today.toISOString().slice(0, 10);
-
-      const { data: existingDay } = await supabaseAdmin
-        .from("streak_days")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("day", dayStr)
-        .maybeSingle();
-
-      if (existingDay) {
-        await supabaseAdmin
-          .from("streak_days")
-          .update({
-            passed: true,
-            rounds_played: (existingDay.rounds_played ?? 0) + 1,
-          })
-          .eq("user_id", user.id)
-          .eq("day", dayStr);
-      } else {
-        await supabaseAdmin.from("streak_days").insert({
-          user_id: user.id,
-          day: dayStr,
-          passed: true,
-          rounds_played: 1,
-        });
-      }
-
-      await recomputeUserStreak(user.id);
     } else {
       userUpdate.total_g_earned =
         Number(user.total_g_earned) + SCORING.premiumBonus;
@@ -162,6 +133,7 @@ export async function POST(request: Request) {
     await supabaseAdmin.from("users").update(userUpdate).eq("id", user.id);
   }
 
+  // ─── Onchain resolution ─────────────────────────────────
   let onchain = {
     rewardTxHash: null as string | null,
     stakeResolveTxHash: null as string | null,
@@ -219,39 +191,4 @@ export async function POST(request: Request) {
     threshold: grade.threshold,
     onchain,
   });
-}
-
-async function recomputeUserStreak(userId: string) {
-  const { data: days } = await supabaseAdmin
-    .from("streak_days")
-    .select("day, passed")
-    .eq("user_id", userId)
-    .eq("passed", true)
-    .order("day", { ascending: false });
-
-  if (!days || days.length === 0) return;
-
-  let streak = 0;
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-
-  for (const row of days) {
-    const expected = new Date(today);
-    expected.setUTCDate(today.getUTCDate() - streak);
-    if (row.day === expected.toISOString().slice(0, 10)) streak++;
-    else break;
-  }
-
-  const { data: u } = await supabaseAdmin
-    .from("users")
-    .select("longest_streak")
-    .eq("id", userId)
-    .single();
-
-  const longestStreak = Math.max(u?.longest_streak ?? 0, streak);
-
-  await supabaseAdmin
-    .from("users")
-    .update({ current_streak: streak, longest_streak: longestStreak })
-    .eq("id", userId);
 }

@@ -16,7 +16,11 @@ type StartBody = {
   round_id?: string;
 };
 
-function previewResponse(round: GeneratedRound, previewId: string, mode: PlayMode) {
+function previewResponse(
+  round: GeneratedRound,
+  previewId: string,
+  mode: PlayMode,
+) {
   return NextResponse.json({
     preview_id: previewId,
     mode,
@@ -29,7 +33,6 @@ function previewResponse(round: GeneratedRound, previewId: string, mode: PlayMod
       teaching: round.exemplar.teaching,
     },
     exemplar_icon: round.exemplar_icon,
-  
     display_items: round.full_patterns.map((p) => ({
       pattern_id: p.id,
       icon: p.icon,
@@ -61,13 +64,13 @@ export async function POST(request: Request) {
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("mode", "free")
-      .eq("status", "submitted")
+      .in("status", ["active", "submitted", "expired"])
       .gte("started_at", todayStart.toISOString());
 
     if ((count ?? 0) >= 1) {
       return NextResponse.json(
         { error: "Already played your free round today. Come back tomorrow." },
-        { status: 429 }
+        { status: 429 },
       );
     }
   }
@@ -76,7 +79,7 @@ export async function POST(request: Request) {
     if (!body?.round_id) {
       return NextResponse.json(
         { error: "round_id required for premium mode" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -85,24 +88,24 @@ export async function POST(request: Request) {
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("mode", "premium")
-      .eq("status", "submitted")
+      .in("status", ["active", "submitted", "expired"])
       .gte("started_at", todayStart.toISOString());
 
     if ((count ?? 0) >= 5) {
       return NextResponse.json(
         { error: "Daily premium cap reached" },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     const stakeOk = await verifyStakePlaced(
       body.round_id,
-      user.wallet_address as Address
+      user.wallet_address as Address,
     );
     if (!stakeOk) {
       return NextResponse.json(
         { error: "Stake not found onchain. Did the transaction confirm?" },
-        { status: 400 }
+        { status: 400 },
       );
     }
   }
@@ -119,36 +122,35 @@ export async function POST(request: Request) {
   if (existingPending) {
     try {
       const rebuilt = await rebuildRoundFromSession({
+        id: existingPending.id,
         featured_family: existingPending.featured_family,
         items: existingPending.items as RoundItem[],
         popup_duration_ms: existingPending.popup_duration_ms,
         total_seconds: existingPending.total_seconds,
         mode: existingPending.mode,
       });
-      return previewResponse(rebuilt as GeneratedRound, existingPending.id, mode);
+      return previewResponse(rebuilt, existingPending.id, mode);
     } catch (err) {
       console.error("[/api/play/start] rebuild pending failed:", err);
     }
   }
 
-  let round: GeneratedRound;
-  try {
-    round = await generateRound(mode, user.current_level);
-  } catch (err) {
-    console.error("[generateRound failed]", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Failed to generate round" },
-      { status: 500 }
-    );
-  }
-
   const previewId =
     mode === "premium" && body?.round_id ? body.round_id : crypto.randomUUID();
 
-  // ─── Store ground truth immediately as PENDING ───────────
-  // The session.items column holds the authoritative is_scam classifications.
-  // The client never gets to influence this — start route is the only place
-  // it's written.
+  let round: GeneratedRound;
+  try {
+    round = await generateRound(mode, user.current_level, previewId);
+  } catch (err) {
+    console.error("[generateRound failed]", err);
+    return NextResponse.json(
+      {
+        error: err instanceof Error ? err.message : "Failed to generate round",
+      },
+      { status: 500 },
+    );
+  }
+
   const { error: insertErr } = await supabaseAdmin
     .from("game_sessions")
     .insert({
@@ -165,7 +167,6 @@ export async function POST(request: Request) {
 
   if (insertErr) {
     if (insertErr.code === "23505") {
-      // Duplicate preview_id (premium retry, same UUID) — try to read existing
       const { data: existing } = await supabaseAdmin
         .from("game_sessions")
         .select("*")
@@ -173,17 +174,21 @@ export async function POST(request: Request) {
         .single();
       if (existing) {
         const rebuilt = await rebuildRoundFromSession({
+          id: existing.id,
           featured_family: existing.featured_family,
           items: existing.items as RoundItem[],
           popup_duration_ms: existing.popup_duration_ms,
           total_seconds: existing.total_seconds,
           mode: existing.mode,
         });
-        return previewResponse(rebuilt as GeneratedRound, existing.id, mode);
+        return previewResponse(rebuilt, existing.id, mode);
       }
     }
     console.error("[/api/play/start] insert failed:", insertErr);
-    return NextResponse.json({ error: "Failed to create session" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create session" },
+      { status: 500 },
+    );
   }
 
   return previewResponse(round, previewId, mode);
