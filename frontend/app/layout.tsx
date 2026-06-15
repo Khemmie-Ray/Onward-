@@ -23,6 +23,10 @@ export const metadata: Metadata = {
   title: "Onward — Learn the loop. Earn the g$.",
   description:
     "A loop, not a course. Bite-sized lessons and daily challenges that pay you in g$ as you learn the GoodDollar ecosystem from the inside out.",
+     other: {
+    "talentapp:project_verification":
+      "8fd7803b77a854f4cabb8744cfa08d668520a571b5501608cdc82835e62bd0c413947dcf8fdf6c9e6548f9e873875269edf4e9ee2dbfdd2bb7b0f87820cf19bb",
+  }
 };
 
 export default async function RootLayout({
