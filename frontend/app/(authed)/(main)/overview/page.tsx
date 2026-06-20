@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowRight, BookOpen, Flame, Globe, Target } from "lucide-react";
+import { ArrowRight, Flame } from "lucide-react";
 import { useAppKitAccount } from "@reown/appkit/react";
 import { formatUnits, type Address } from "viem";
 
-import { LoopSigil, SunMotif, MudclothPattern } from "@/components/home/motifs";
+import { LoopSigil, SunMotif } from "@/components/home/motifs";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import { useGDollarBalance } from "@/hooks/useWhackState";
 import type { DashboardData } from "@/lib/data/dashboard";
@@ -14,10 +14,8 @@ import StatCardHero from "@/components/dashboard/StatCardHero";
 import NextActionCard from "@/components/dashboard/NextActionCard";
 import EmptyStateCard from "@/components/dashboard/EmptyStateCard";
 import KeepGoingCard from "@/components/dashboard/KeepGoingCard";
-import WorkspaceCard from "@/components/dashboard/WorkspaceCard";
 import RecentBadge from "@/components/dashboard/RecentBadge";
 import { VerificationBanner } from "@/components/identity/VerificationBanner";
-import { PendingClaimCard } from "@/components/dashboard/PendingClaimCard";
 import { UBIClaimCard } from "@/components/dashboard/UBIClaimCard";
 
 const Overview = () => {
@@ -58,7 +56,7 @@ const Overview = () => {
       <div className="min-h-[400px] flex items-center justify-center">
         <div className="text-center">
           <div className="text-[12px] font-bold uppercase tracking-[0.16em] text-terracotta mb-2">
-            Couldn't load dashboard
+            Couldn&apos;t load dashboard
           </div>
           <p className="text-[13px] text-fg-soft">{error}</p>
         </div>
@@ -101,7 +99,7 @@ const Overview = () => {
             <SunMotif size={14} className="text-mustard" />
             Day {data.currentStreak} of your loop
           </div>
-          <h1 className="display text-[40px] md:text-[48px] font-semibold leading-[1.1] tracking-[-0.025em] text-indigo">
+          <h1 className="display text-[40px] md:text-[48px] font-semibold leading-[1.1] tracking-tight text-indigo">
             Welcome back,{" "}
             <span className="text-terracotta">{data.displayName}</span>.
           </h1>
@@ -123,55 +121,67 @@ const Overview = () => {
           </span>
         </div>
       </section>
-      <section className="grid md:grid-cols-3 gap-4 mb-4 animate-[fade-up_0.8s_0.18s_ease_both]">
-        <StatCardHero
-          label="Streak"
-          value={String(data.currentStreak)}
-          unit="days"
-          sub={`Longest yet: ${data.longestStreak}`}
-          tone="terracotta"
-        />
-        <StatCardHero
-          label="G$ in wallet"
-          value={walletBalanceDisplay}
-          unit="g$"
-          sub={
-            data.totalGEarned > 0
-              ? `Lifetime earned: ${data.totalGEarned.toLocaleString()}`
-              : "No earnings yet"
-          }
-          tone="mustard"
-        />
-        <StatCardHero
-          label="Modules"
-          value={String(data.modulesCompleted)}
-          unit={`of ${data.modulesTotal}`}
-          sub={
-            data.currentModule
-              ? `${data.currentModule.title} in progress`
-              : data.modulesCompleted > 0
-                ? `${data.modulesTotal - data.modulesCompleted} remaining`
-                : "Pick your next module"
-          }
-          tone="forest"
-        />
-      </section>
-      <section className="mb-4 animate-[fade-up_0.8s_0.25s_ease_both]">
-        <UBIClaimCard />
-        <PendingClaimCard />
-      </section>
-      <section className="mb-4 animate-[fade-up_0.8s_0.32s_ease_both]">
-        {data.currentModule ? (
-          <NextActionCard module={data.currentModule} />
-        ) : data.modulesCompleted > 0 ? (
-          <KeepGoingCard
-            modulesCompleted={data.modulesCompleted}
-            modulesTotal={data.modulesTotal}
+      <main className="flex flex-col lg:flex-row md:flex-row justify-between  mb-8">
+        <section
+          className="flex flex-wrap justify-between gap-y-4 w-full lg:w-[48%] md:w-[48%] animate-[fade-up_0.8s_0.18s_ease_both]"
+        >
+          <StatCardHero
+            label="Streak"
+            value={String(data.currentStreak)}
+            unit="days"
+            sub={`Longest yet: ${data.longestStreak}`}
+            tone="terracotta"
           />
-        ) : (
-          <EmptyStateCard />
-        )}
-      </section>
+          <StatCardHero
+            label="G$ in wallet"
+            value={walletBalanceDisplay}
+            unit="g$"
+            sub="Current balance"
+            tone="mustard"
+          />
+          <StatCardHero
+            label="G$ earned"
+            value={data.totalGEarned.toLocaleString()}
+            unit="g$"
+            sub={
+              data.totalGEarned > 0
+                ? "Lifetime earnings from Onward"
+                : "Earn G$ by passing rounds and modules"
+            }
+            tone="indigo"
+          />
+          <StatCardHero
+            label="Modules"
+            value={String(data.modulesCompleted)}
+            unit={`of ${data.modulesTotal}`}
+            sub={
+              data.currentModule
+                ? `${data.currentModule.title} in progress`
+                : data.modulesCompleted > 0
+                  ? `${data.modulesTotal - data.modulesCompleted} remaining`
+                  : "Pick your next module"
+            }
+            tone="forest"
+          />
+        </section>
+
+
+        <section className="flex flex-col gap-4 w-full lg:w-[48%] animate-[fade-up_0.8s_0.25s_ease_both]">
+          <UBIClaimCard />
+          {data.currentModule ? (
+            <NextActionCard module={data.currentModule} />
+          ) : data.modulesCompleted > 0 ? (
+            <KeepGoingCard
+              modulesCompleted={data.modulesCompleted}
+              modulesTotal={data.modulesTotal}
+            />
+          ) : (
+            <EmptyStateCard />
+          )}
+        </section>
+      </main>
+
+      {/* Recently earned badges */}
       {data.recentBadges.length > 0 && (
         <section className="mb-12 animate-[fade-up_0.8s_0.6s_ease_both]">
           <div className="flex items-end justify-between mb-4">
@@ -191,10 +201,13 @@ const Overview = () => {
               View all <ArrowRight size={12} strokeWidth={2.8} />
             </Link>
           </div>
-          <div className="flex justify-between items-center lg:flex-row md:flex-row flex-wrap flex-col mb-10">
+          <div className="flex flex-wrap justify-between gap-y-3 mb-10">
             {data.recentBadges.map((badge) => (
-              <div className="lg:w-[32%] md:w-[32%] w-full mb-3">
-                <RecentBadge key={badge.moduleSlug} badge={badge} />
+              <div
+                key={badge.moduleSlug}
+                className="lg:w-[32%] md:w-[32%] w-full"
+              >
+                <RecentBadge badge={badge} />
               </div>
             ))}
           </div>

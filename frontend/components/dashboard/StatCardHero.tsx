@@ -1,7 +1,9 @@
+"use client";
+
 import React from "react";
-import { Flame } from "lucide-react";
+import { Flame, Coins } from "lucide-react";
 import { TONE_MAP, type Tone } from "@/lib/themes/tones";
-import { SunMotif, LeafMotif, MudclothPattern } from "@/components/home/motifs";
+import { SunMotif, LeafMotif } from "@/components/home/motifs";
 
 interface StatCardHeroProps {
   label: string;
@@ -9,6 +11,21 @@ interface StatCardHeroProps {
   unit: string;
   sub: string;
   tone: Tone;
+}
+
+function iconForTone(tone: Tone) {
+  switch (tone) {
+    case "mustard":
+      return <SunMotif size={28} />;
+    case "terracotta":
+      return <Flame size={26} strokeWidth={2} />;
+    case "forest":
+      return <LeafMotif size={26} />;
+    case "indigo":
+      return <Coins size={26} strokeWidth={2} />;
+    default:
+      return null;
+  }
 }
 
 const StatCardHero = ({
@@ -19,40 +36,28 @@ const StatCardHero = ({
   tone: toneName,
 }: StatCardHeroProps) => {
   const t = TONE_MAP[toneName];
+
   return (
     <div
-      className={`relative overflow-hidden rounded-[20px] p-6 ${t.bg} ${t.shadow}`}
+      className={`rounded-[20px] p-5 sm:p-6 w-full md:w-[47%] ${t.bg} ${t.shadow}`}
     >
-      <div
-        aria-hidden
-        className={`pointer-events-none absolute inset-0 ${t.fg} opacity-[0.08]`}
-      >
-        <MudclothPattern />
-      </div>
-      <div
-        aria-hidden
-        className={`pointer-events-none absolute right-4 top-4 ${t.fg} opacity-40`}
-      >
-        {toneName === "mustard" && <SunMotif size={36} />}
-        {toneName === "terracotta" && <Flame size={32} strokeWidth={2} />}
-        {toneName === "forest" && <LeafMotif size={32} />}
-      </div>
-      <div className="relative">
-        <div
-          className={`mb-3 text-[10px] font-bold uppercase tracking-[0.14em] ${t.subFg}`}
+      <div className="flex items-center justify-between mb-3">
+        <span
+          className={`text-[10px] font-bold uppercase tracking-[0.14em] ${t.subFg}`}
         >
           {label}
-        </div>
-        <div className="mb-1.5 flex items-baseline gap-2">
-          <span
-            className={`display text-[52px] font-bold leading-none tabular-nums ${t.fg}`}
-          >
-            {value}
-          </span>
-          <span className={`text-[14px] font-medium ${t.subFg}`}>{unit}</span>
-        </div>
-        <div className={`text-[11px] font-medium ${t.subSubFg}`}>{sub}</div>
+        </span>
+        <div className={`${t.fg} opacity-50`}>{iconForTone(toneName)}</div>
       </div>
+      <div className="mb-1.5 flex items-baseline gap-2">
+        <span
+          className={`display text-[44px] sm:text-[52px] font-bold leading-none tabular-nums ${t.fg}`}
+        >
+          {value}
+        </span>
+        <span className={`text-[14px] font-medium ${t.subFg}`}>{unit}</span>
+      </div>
+      <div className={`text-[11px] font-medium ${t.subSubFg}`}>{sub}</div>
     </div>
   );
 };

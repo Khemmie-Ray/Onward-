@@ -125,14 +125,14 @@ const Header = () => {
             </div>
 
             <div className="hidden md:flex justify-self-center">
-              <Link
+              {!isConnected && <Link
                 href="/leaderboard"
                 className={`${navPillBase} text-indigo ${
                   isLeaderboardActive ? navPillActive : navPillInactive
                 }`}
               >
                 Leaderboard
-              </Link>
+              </Link>}
             </div>
 
             <div className="justify-self-end">
@@ -175,7 +175,7 @@ const Header = () => {
               className="bg-paper rounded-2xl shadow-[0_12px_32px_rgba(31,58,110,0.12)] border border-fg-soft/10 p-4 flex flex-col gap-3"
               style={{ animation: "fade-up 0.3s ease both" }}
             >
-              <Link
+              {!isConnected && <Link
                 href="/leaderboard"
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={`flex items-center justify-between py-3 px-4 rounded-xl font-semibold border border-fg-soft/25 transition ${
@@ -192,7 +192,7 @@ const Header = () => {
                     className="text-mustard"
                   />
                 )}
-              </Link>
+              </Link>}
 
               {showControl && (
                 <div className="pt-3 border-t border-fg-soft/10">
