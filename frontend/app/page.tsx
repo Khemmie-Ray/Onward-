@@ -51,12 +51,12 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="mx-auto lg:w-[80%] md:w-[80%] w-[90%] h-screen overflow-hidden flex flex-col relative">
+    <main className="mx-auto w-[90%] h-screen overflow-hidden flex flex-col relative mt-10">
+      <Header />
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute right-[10%] top-[8%] h-[200px] w-[200px] rounded-full opacity-60 blur-[80px] bg-[radial-gradient(circle,rgba(230,180,72,0.45)_0%,transparent_70%)]" />
         <div className="absolute left-[8%] bottom-[5%] h-[200px] w-[200px] rounded-full opacity-50 blur-[80px] bg-[radial-gradient(circle,rgba(199,93,63,0.35)_0%,transparent_70%)]" />
       </div>
-      <Header />
       <div className="flex-1 overflow-y-auto no-scrollbar relative z-10">
         <div className="flex justify-between lg:flex-row md:flex-row flex-col items-center">
           <div className="stagger lg:w-[40%] md:w-[40%] w-full mb-8">

@@ -74,6 +74,19 @@
   50% { transform: rotate(2deg) scale(1.03); }
 }
 
+@keyframes hole-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(216, 178, 84, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 18px rgba(216, 178, 84, 0);
+  }
+}
+ 
+@theme {
+  --animate-hole-pulse: hole-pulse 2.5s ease-in-out infinite;
+}
+
 .stagger > * { animation: fade-up 0.8s ease both; }
 .stagger > *:nth-child(1) { animation-delay: 0.05s; }
 .stagger > *:nth-child(2) { animation-delay: 0.18s; }

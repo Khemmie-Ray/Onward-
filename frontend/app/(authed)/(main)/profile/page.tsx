@@ -12,6 +12,8 @@ import LifetimeStat from "@/components/dashboard/profile/LifetimeStat";
 import EmptyBadgeState from "@/components/dashboard/profile/EmptyBadgeState";
 import { PendingClaimCard } from "@/components/dashboard/PendingClaimCard";
 import { usePendingClaim } from "@/hooks/usePendingClaim";
+import { LeaderboardWidget } from "@/components/dashboard/leaderboard/LeaderboardWidget";
+
 
 const Profile = () => {
   const authFetch = useAuthFetch();
@@ -145,6 +147,9 @@ const Profile = () => {
             <BadgeCard key={badge.moduleSlug} badge={badge} />
           ))}
         </div>
+      </section>
+      <section>
+        <LeaderboardWidget />
       </section>
     </>
   );
