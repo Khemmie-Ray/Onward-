@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import {
   AlertCircle,
   ArrowRight,
@@ -22,6 +21,7 @@ export function CompletionScreen({
   badgeTxHash,
   rewardTxHash,
   onchainError,
+  onNext,
 }: {
   moduleTitle: string;
   moduleSlug: string;
@@ -32,6 +32,7 @@ export function CompletionScreen({
   badgeTxHash?: string | null;
   rewardTxHash?: string | null;
   onchainError?: string | null;
+  onNext: () => void;
 }) {
   const [displayedReward, setDisplayedReward] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -68,65 +69,68 @@ export function CompletionScreen({
   const txPending = !badgeReady || !rewardReady;
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden">
+    <div className="relative rounded-[24px] bg-canvas px-6 py-10 flex flex-col items-center text-center overflow-hidden min-h-[500px] shadow-[0_2px_8px_rgba(31,58,110,0.05)]">
+      {/* Ambient glows scoped to the panel */}
       <div
         aria-hidden
-        className="pointer-events-none absolute top-[10%] left-[15%] h-[400px] w-[400px] rounded-full opacity-50 blur-[100px] bg-[radial-gradient(circle,rgba(230,180,72,0.6)_0%,transparent_70%)]"
+        className="pointer-events-none absolute top-[8%] left-[10%] h-[280px] w-[280px] rounded-full opacity-50 blur-[80px] bg-[radial-gradient(circle,rgba(230,180,72,0.6)_0%,transparent_70%)]"
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute bottom-[10%] right-[15%] h-[400px] w-[400px] rounded-full opacity-40 blur-[100px] bg-[radial-gradient(circle,rgba(199,93,63,0.5)_0%,transparent_70%)]"
+        className="pointer-events-none absolute bottom-[8%] right-[10%] h-[280px] w-[280px] rounded-full opacity-40 blur-[80px] bg-[radial-gradient(circle,rgba(199,93,63,0.5)_0%,transparent_70%)]"
       />
 
-      <div className="relative w-full max-w-[480px] flex flex-col items-center text-center animate-[fade-up_0.8s_ease_both]">
-        <div className="relative mb-7">
+      <div className="relative w-full max-w-[440px] flex flex-col items-center animate-[fade-up_0.8s_ease_both]">
+        {/* Badge image + rotating sun */}
+        <div className="relative mb-6">
           <div
             aria-hidden
             className="absolute inset-0 flex items-center justify-center text-mustard"
             style={{ animation: "spin 20s linear infinite" }}
           >
-            <SunMotif size={220} rays={12} />
+            <SunMotif size={180} rays={12} />
           </div>
           <div className="relative bg-paper rounded-full p-3 shadow-[0_20px_50px_rgba(31,58,110,0.15)]">
             {resolvedImageUrl ? (
-              <div className="relative w-[140px] h-[140px] rounded-full overflow-hidden">
+              <div className="relative w-[120px] h-[120px] rounded-full overflow-hidden">
                 <Image
                   src={resolvedImageUrl}
                   alt={`${moduleTitle} badge`}
                   fill
-                  sizes="140px"
+                  sizes="120px"
                   className="object-cover"
                   onLoad={() => setImageLoaded(true)}
                   priority
                 />
                 {!imageLoaded && (
                   <div className="absolute inset-0 flex items-center justify-center bg-paper">
-                    <LoopSigil size={64} color="var(--color-indigo)" />
+                    <LoopSigil size={56} color="var(--color-indigo)" />
                   </div>
                 )}
               </div>
             ) : (
-              <div className="w-[140px] h-[140px] flex items-center justify-center">
-                <LoopSigil size={64} color="var(--color-indigo)" />
+              <div className="w-[120px] h-[120px] flex items-center justify-center">
+                <LoopSigil size={56} color="var(--color-indigo)" />
               </div>
             )}
           </div>
         </div>
 
-        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-forest mb-3">
+        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-forest mb-2">
           Badge earned
         </div>
 
-        <h1 className="display text-[40px] md:text-[48px] font-bold leading-[1.05] tracking-[-0.025em] text-indigo mb-2">
+        <h1 className="display text-[28px] md:text-[34px] font-bold leading-[1.05] tracking-[-0.025em] text-indigo mb-2">
           {moduleTitle}
         </h1>
 
-        <p className="text-[14px] text-fg-soft mb-8 max-w-[360px]">
+        <p className="text-[13px] text-fg-soft mb-6 max-w-[320px]">
           A soulbound badge is on its way to your wallet. Yours forever,
           onchain, on Celo.
         </p>
 
-        <div className="relative w-full bg-aubergine rounded-[20px] p-6 mb-3 overflow-hidden shadow-[0_12px_32px_rgba(91,46,92,0.25)]">
+        {/* G$ reward counter */}
+        <div className="relative w-full bg-aubergine rounded-[18px] p-5 mb-3 overflow-hidden shadow-[0_8px_24px_rgba(91,46,92,0.20)]">
           <div
             aria-hidden
             className="pointer-events-none absolute inset-0 text-paper opacity-[0.06]"
@@ -135,31 +139,32 @@ export function CompletionScreen({
           </div>
           <div className="relative flex items-center justify-between">
             <div className="text-left">
-              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-mustard mb-1">
+              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-mustard mb-0.5">
                 Reward
               </div>
-              <div className="text-[13px] text-paper/80">
+              <div className="text-[12px] text-paper/80">
                 Sent to your wallet
               </div>
             </div>
             <div className="flex items-baseline gap-1.5">
-              <Coins size={20} strokeWidth={2.5} className="text-mustard" />
-              <span className="display text-[42px] font-bold leading-none tabular-nums text-mustard">
+              <Coins size={18} strokeWidth={2.5} className="text-mustard" />
+              <span className="display text-[36px] font-bold leading-none tabular-nums text-mustard">
                 +{displayedReward}
               </span>
-              <span className="text-[14px] font-bold text-mustard">g$</span>
+              <span className="text-[13px] font-bold text-mustard">g$</span>
             </div>
           </div>
         </div>
 
         {perfect && (
-          <div className="w-full bg-forest-tint rounded-[14px] p-3 mb-3 animate-[fade-up_0.8s_0.3s_ease_both]">
-            <div className="text-[12px] font-bold text-forest text-center">
+          <div className="w-full bg-forest-tint rounded-[12px] p-2.5 mb-3 animate-[fade-up_0.8s_0.3s_ease_both]">
+            <div className="text-[11px] font-bold text-forest text-center">
               ⚡ Perfect score · {correctCount} of {totalQuestions} on first try
             </div>
           </div>
         )}
-        <div className="w-full mb-6 text-[11px]">
+
+        <div className="w-full mb-5 text-[11px]">
           {onchainError ? (
             <div className="flex items-center justify-center gap-2 rounded-[10px] bg-terracotta-tint px-3 py-2 text-terracotta">
               <AlertCircle size={12} strokeWidth={2.5} />
@@ -195,13 +200,13 @@ export function CompletionScreen({
           )}
         </div>
 
-        <Link
-          href="/modules"
-          className="inline-flex items-center gap-2 rounded-full bg-terracotta px-7 py-3.5 text-[14px] font-bold text-paper shadow-[0_6px_20px_rgba(199,93,63,0.35)] transition-transform hover:-translate-y-0.5 animate-[fade-up_0.8s_0.5s_ease_both]"
+        <button
+          onClick={onNext}
+          className="inline-flex items-center gap-2 rounded-full bg-terracotta px-6 py-3 text-[14px] font-bold text-paper shadow-[0_6px_20px_rgba(199,93,63,0.35)] transition-transform hover:-translate-y-0.5 animate-[fade-up_0.8s_0.5s_ease_both]"
         >
-          Back to modules
-          <ArrowRight size={16} strokeWidth={2.8} />
-        </Link>
+          Choose your next
+          <ArrowRight size={15} strokeWidth={2.8} />
+        </button>
       </div>
     </div>
   );

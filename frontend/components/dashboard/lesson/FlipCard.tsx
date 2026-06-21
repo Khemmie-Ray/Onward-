@@ -21,7 +21,7 @@ export function FlipCard({
 
   return (
     <div
-      className="lg:w-[35%] md:w-[35%] w-full mx-auto p-4"
+      className="lg:w-[60%] md:w-[60%] w-full mx-auto p-4"
       // style={{ perspective: "1200px" }}
     >
       <button

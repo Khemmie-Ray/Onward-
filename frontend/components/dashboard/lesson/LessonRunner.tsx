@@ -1,14 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
-import { ArrowLeft, ArrowRight, X } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { FlipCard } from "./FlipCard";
 import { ChoiceCard } from "./ChoiceCard";
 import { SpotterCard } from "./SpotterCard";
 import { CompletionScreen } from "./CompletionScreen";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import type { LessonContent } from "@/lib/lessons/lesson-data";
+import { useIdentityContext } from "@/contexts/IdentityContext";
 
 type Answer = {
   cardIndex: number;
@@ -29,11 +29,14 @@ type CompletionState = {
 export function LessonRunner({
   lesson,
   badgeImageUrl,
+  onChooseNext,
 }: {
   lesson: LessonContent;
   badgeImageUrl?: string | null;
+  onChooseNext: () => void;
 }) {
   const authFetch = useAuthFetch();
+  const { isVerified } = useIdentityContext();
 
   const [cardIndex, setCardIndex] = useState(0);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -50,10 +53,7 @@ export function LessonRunner({
 
   const canAdvance = currentCard.type === "flip" ? flipped : cardAnswered;
 
-  const recordAnswer = (
-    answer: number | "scam" | "real",
-    correct: boolean
-  ) => {
+  const recordAnswer = (answer: number | "scam" | "real", correct: boolean) => {
     setCardAnswered(true);
     setAnswers((prev) => [...prev, { cardIndex, answer, correct }]);
   };
@@ -79,7 +79,7 @@ export function LessonRunner({
 
   const submitCompletion = async () => {
     const gradedLocal = answers.filter(
-      (a) => lesson.cards[a.cardIndex].type !== "flip"
+      (a) => lesson.cards[a.cardIndex].type !== "flip",
     );
     const correctCount = gradedLocal.filter((a) => a.correct).length;
 
@@ -94,26 +94,26 @@ export function LessonRunner({
     });
 
     try {
-      // isVerified is NOT sent from the client anymore.
-      // The backend reads it directly from the GoodDollar Identity contract.
       const payload = {
         answers: answers.map((a) => ({
           card_index: a.cardIndex + 1,
           answer: a.answer,
         })),
+        isVerified,
       };
 
       const res = await authFetch(
         `/api/modules/${lesson.module.slug}/complete`,
-        { method: "POST", body: JSON.stringify(payload) }
+        { method: "POST", body: JSON.stringify(payload) },
       );
 
       const data = await res.json();
 
+      // Failed the threshold — roll back to first wrong card, show error
       if (data.status === "incomplete" && data.passed === false) {
         setCompletion(null);
         setSubmissionError(
-          `You answered ${data.correct} of ${data.total} correctly. You need ${data.threshold} to earn the badge. Try the missed cards again.`
+          `You answered ${data.correct} of ${data.total} correctly. You need ${data.threshold} to earn the badge. Try the missed cards again.`,
         );
         const firstIncorrect = (data.incorrect_cards?.[0] ?? 1) - 1;
         setCardIndex(firstIncorrect);
@@ -123,6 +123,7 @@ export function LessonRunner({
         return;
       }
 
+      // Success — stream in the real tx hashes
       setCompletion((prev) =>
         prev
           ? {
@@ -131,7 +132,7 @@ export function LessonRunner({
               rewardTxHash: data.onchain?.rewardTxHash ?? null,
               onchainError: data.onchain?.onchainError ?? null,
             }
-          : prev
+          : prev,
       );
     } catch (err) {
       console.error("[submitCompletion]", err);
@@ -142,7 +143,7 @@ export function LessonRunner({
               onchainError:
                 err instanceof Error ? err.message : "Network error",
             }
-          : prev
+          : prev,
       );
     }
   };
@@ -159,23 +160,22 @@ export function LessonRunner({
         badgeTxHash={completion.badgeTxHash}
         rewardTxHash={completion.rewardTxHash}
         onchainError={completion.onchainError}
+        onNext={onChooseNext}
       />
     );
   }
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col">
-      <header className="flex items-center justify-between px-6 py-5 relative">
-        <Link
-          href="/modules"
-          aria-label="Exit lesson"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-paper text-fg-soft shadow-[0_4px_12px_rgba(31,58,110,0.06)] transition-colors hover:bg-canvas-warm hover:text-indigo"
-        >
-          <ArrowLeft size={18} strokeWidth={2.5} />
-        </Link>
-
+    <div className="flex flex-col gap-4 rounded-[24px] bg-paper/50 p-6 min-h-[500px]">
+      <div className="flex flex-col items-center gap-3 pt-1">
+        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-fg-soft">
+          {lesson.module.category}
+        </div>
+        <div className="display text-[20px] font-semibold text-indigo text-center">
+          {lesson.module.title}
+        </div>
         <div
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 mt-1"
           aria-label={`Card ${cardIndex + 1} of ${totalCards}`}
         >
           {lesson.cards.map((_, i) => {
@@ -195,25 +195,16 @@ export function LessonRunner({
             );
           })}
         </div>
-
-        <Link
-          href="/modules"
-          aria-label="Exit lesson"
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-paper text-fg-soft shadow-[0_4px_12px_rgba(31,58,110,0.06)] transition-colors hover:bg-canvas-warm hover:text-indigo"
-        >
-          <X size={18} strokeWidth={2.5} />
-        </Link>
-      </header>
+      </div>
 
       {submissionError && (
-        <div className="mx-auto max-w-[480px] mt-2 mb-4 rounded-[14px] bg-terracotta-tint p-4 text-center animate-[fade-up_0.4s_ease_both]">
+        <div className="mx-auto max-w-[480px] rounded-[14px] bg-terracotta-tint p-4 text-center animate-fade-up">
           <div className="text-[12px] font-bold text-terracotta">
             {submissionError}
           </div>
         </div>
       )}
-
-      <div className="flex items-center justify-center px-6 py-4">
+      <div className="flex-1 flex items-center justify-center py-4">
         {currentCard.type === "flip" && (
           <FlipCard data={currentCard} onFlip={setFlipped} />
         )}
@@ -230,15 +221,14 @@ export function LessonRunner({
           />
         )}
       </div>
-
-      <footer className="px-6 py-6 flex items-center justify-between gap-4">
+      <div className="flex items-center justify-between gap-4 pt-2">
         <button
           onClick={handleBack}
           disabled={isFirstCard}
           className={`inline-flex items-center gap-1.5 rounded-full px-5 py-3 text-[13px] font-semibold transition-all ${
             isFirstCard
               ? "opacity-30 cursor-not-allowed text-fg-soft"
-              : "text-indigo hover:bg-paper"
+              : "text-indigo hover:bg-canvas-warm"
           }`}
         >
           <ArrowLeft size={14} strokeWidth={2.5} />
@@ -261,7 +251,7 @@ export function LessonRunner({
             className="transition-transform group-hover:translate-x-0.5"
           />
         </button>
-      </footer>
+      </div>
     </div>
   );
 }
