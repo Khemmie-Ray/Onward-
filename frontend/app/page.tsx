@@ -2,12 +2,12 @@
 
 import { ArrowRight, BookOpen, Sparkles, Target } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { useAppKitAccount, useAppKit } from "@reown/appkit/react";
+import { useAppKit } from "@reown/appkit/react";
 import Image from "next/image";
 import { FeatureCard } from "@/components/home/FeatureCard";
 import Header from "@/components/shared/Header";
 import Footer from "@/components/shared/Footer";
+import { PublicGuard } from "@/components/auth/PublicGuard";
 
 type Stats = {
   learners: number;
@@ -16,9 +16,6 @@ type Stats = {
 };
 
 export default function Home() {
-  const router = useRouter();
-  const { isConnected, status } = useAppKitAccount();
-  const isHydrating = status === "connecting" || status === "reconnecting";
   const { open } = useAppKit();
 
   const [stats, setStats] = useState<Stats>({
@@ -27,11 +24,6 @@ export default function Home() {
     modulesDone: 0,
   });
 
-  useEffect(() => {
-    if (!isHydrating && isConnected) {
-      router.replace("/overview");
-    }
-  }, [isHydrating, isConnected, router]);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,7 +43,8 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="mx-auto w-[90%] h-screen overflow-hidden flex flex-col relative mt-10">
+    <PublicGuard>
+    <main className="mx-auto w-[90%] flex flex-col relative mt-10">
       <Header />
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
         <div className="absolute right-[10%] top-[8%] h-[200px] w-[200px] rounded-full opacity-60 blur-[80px] bg-[radial-gradient(circle,rgba(230,180,72,0.45)_0%,transparent_70%)]" />
@@ -148,6 +141,7 @@ export default function Home() {
         <Footer />
       </div>
     </main>
+    </PublicGuard>
   );
 }
 

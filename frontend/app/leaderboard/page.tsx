@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Header from "@/components/shared/Header";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { PublicGuard } from "@/components/auth/PublicGuard";
 
 import { StatsCard } from "@/components/dashboard/leaderboard/StatCard";
 import { PlayerGrid } from "@/components/dashboard/leaderboard/PlayerGrid";
@@ -88,6 +89,7 @@ export default function Leaderboard() {
   };
 
   return (
+    <PublicGuard>
     <div className="flex flex-col bg-canvas mx-auto w-[90%] mt-10">
         <Header />
       <div className="pb-12">
@@ -119,5 +121,6 @@ export default function Leaderboard() {
         )}
       </div>
     </div>
+    </PublicGuard>
   );
 }
