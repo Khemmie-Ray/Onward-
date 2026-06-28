@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { processCompletion } from "@/lib/onchain/badges";
 import { isVerifiedOnchainSafe } from "@/lib/onchain/identity";
 import { markStreakDay } from "@/lib/streak";
+import { isModuleLocked } from "@/lib/modules/lock-check";
 
 type Body = {
   answers?: Array<{ card_index: number; answer: number | string }>;
@@ -12,7 +13,7 @@ type Body = {
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ slug: string }> },
 ) {
   const auth = await requireCompletedProfile(request);
   if ("error" in auth) return auth.error;
@@ -23,12 +24,12 @@ export async function POST(
   const answers = body?.answers ?? [];
 
   const isVerified = await isVerifiedOnchainSafe(
-    user.wallet_address as Address
+    user.wallet_address as Address,
   );
 
   const { data: module, error: modErr } = await supabaseAdmin
     .from("modules")
-    .select("id, slug, prerequisite_slug, reward_g_amount, status")
+    .select("id, slug, category, order_in_category, reward_g_amount, status")
     .eq("slug", slug)
     .single();
 
@@ -36,28 +37,18 @@ export async function POST(
     return NextResponse.json({ error: "Module not found" }, { status: 404 });
   }
 
-  // ─── Prerequisite gate ──────────────────────────────────
-  if (module.prerequisite_slug) {
-    const { data: prereqModule } = await supabaseAdmin
-      .from("modules")
-      .select("id")
-      .eq("slug", module.prerequisite_slug)
-      .single();
+  // ─── Category + order based lock check ─────────────────
+  const locked = await isModuleLocked(
+    user.id,
+    module.category,
+    module.order_in_category,
+  );
 
-    if (prereqModule) {
-      const { count: prereqCount } = await supabaseAdmin
-        .from("module_completions")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("module_id", prereqModule.id);
-
-      if ((prereqCount ?? 0) === 0) {
-        return NextResponse.json(
-          { error: "Complete the previous module first" },
-          { status: 403 }
-        );
-      }
-    }
+  if (locked) {
+    return NextResponse.json(
+      { error: `Complete the earlier ${module.category} modules first` },
+      { status: 403 },
+    );
   }
 
   // ─── Idempotency: if already completed, return existing ─
@@ -84,10 +75,7 @@ export async function POST(
     .order("order_index", { ascending: true });
 
   if (!cards) {
-    return NextResponse.json(
-      { error: "Module has no cards" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Module has no cards" }, { status: 500 });
   }
 
   let correct = 0;
@@ -155,7 +143,7 @@ export async function POST(
       userWallet: user.wallet_address as Address,
       moduleSlug: slug,
       rewardAmountG: module.reward_g_amount,
-      isVerified, // ← server-verified, not from request body
+      isVerified,
     });
 
     onchainResult = {
@@ -184,9 +172,7 @@ export async function POST(
           ? onchainResult.badgeTxHash
           : null,
       badge_token_id:
-        onchainResult.badgeTokenId !== "0"
-          ? onchainResult.badgeTokenId
-          : null,
+        onchainResult.badgeTokenId !== "0" ? onchainResult.badgeTokenId : null,
     })
     .select()
     .single();
@@ -194,7 +180,7 @@ export async function POST(
   if (insertErr) {
     return NextResponse.json(
       { error: insertErr.message, onchain: onchainResult },
-      { status: 500 }
+      { status: 500 },
     );
   }
 

@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getAuthedUser } from "@/lib/auth";
 import type { ModuleWithProgress } from "@/lib/supabase/types";
+import { isModuleLockedInList } from "@/lib/modules/lock-check";
 
-export async function GET(request: Request) {
+export async function GET() {
   const { data: modules, error: modulesError } = await supabaseAdmin
     .from("modules")
     .select("*")
@@ -55,13 +56,11 @@ export async function GET(request: Request) {
 
   const withProgress: ModuleWithProgress[] = (modules ?? []).map((m) => {
     const totalCards = totalCardsByModule[m.id] ?? 5;
-
-    const isLocked =
-      m.prerequisite_slug != null &&
-      !(modules ?? []).some(
-        (prereq) =>
-          prereq.slug === m.prerequisite_slug && completionsByModule[prereq.id],
-      );
+    const isLocked = isModuleLockedInList(
+      m,
+      modules ?? [],
+      completionsByModule,
+    );
 
     let status_for_user: ModuleWithProgress["status_for_user"];
     let progress: ModuleWithProgress["progress"] | undefined;

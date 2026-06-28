@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { requireAuth } from "@/lib/auth";
+import { isModuleLocked } from "@/lib/modules/lock-check";
 
 export async function POST(
   request: Request,
-  context: { params: Promise<{ slug: string }> }
+  context: { params: Promise<{ slug: string }> },
 ) {
   const auth = await requireAuth(request);
   if ("error" in auth) return auth.error;
@@ -14,7 +15,7 @@ export async function POST(
 
   const { data: module } = await supabaseAdmin
     .from("modules")
-    .select("id, slug, prerequisite_slug")
+    .select("id, slug, category, order_in_category")
     .eq("slug", slug)
     .eq("status", "live")
     .maybeSingle();
@@ -23,28 +24,17 @@ export async function POST(
     return NextResponse.json({ error: "Module not found" }, { status: 404 });
   }
 
-  if (module.prerequisite_slug) {
-    const { data: prereq } = await supabaseAdmin
-      .from("modules")
-      .select("id")
-      .eq("slug", module.prerequisite_slug)
-      .maybeSingle();
+  const locked = await isModuleLocked(
+    user.id,
+    module.category,
+    module.order_in_category,
+  );
 
-    if (prereq) {
-      const { data: prereqDone } = await supabaseAdmin
-        .from("module_completions")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("module_id", prereq.id)
-        .maybeSingle();
-
-      if (!prereqDone) {
-        return NextResponse.json(
-          { error: "Prerequisite not completed" },
-          { status: 403 }
-        );
-      }
-    }
+  if (locked) {
+    return NextResponse.json(
+      { error: `Complete the earlier ${module.category} modules first` },
+      { status: 403 },
+    );
   }
 
   const { data: existingCompletion } = await supabaseAdmin
@@ -82,7 +72,10 @@ export async function POST(
     .insert({ user_id: user.id, module_id: module.id, current_card: 1 });
 
   if (insertError) {
-    return NextResponse.json({ error: "Failed to start module" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to start module" },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({ status: "active", current_card: 1 });

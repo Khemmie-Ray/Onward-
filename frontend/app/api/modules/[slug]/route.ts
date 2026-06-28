@@ -2,10 +2,11 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getAuthedUser } from "@/lib/auth";
 import type { ModuleDetail } from "@/lib/supabase/types";
+import { isModuleLocked } from "@/lib/modules/lock-check";
 
 export async function GET(
   request: Request,
-  context: { params: Promise<{ slug: string }> }
+  context: { params: Promise<{ slug: string }> },
 ) {
   const { slug } = await context.params;
 
@@ -22,31 +23,23 @@ export async function GET(
 
   const user = await getAuthedUser();
 
-  if (user && module.prerequisite_slug) {
-    const { data: prereq } = await supabaseAdmin
-      .from("modules")
-      .select("id")
-      .eq("slug", module.prerequisite_slug)
-      .maybeSingle();
+  // Category + order based lock check
+  if (user) {
+    const locked = await isModuleLocked(
+      user.id,
+      module.category,
+      module.order_in_category,
+    );
 
-    if (prereq) {
-      const { data: prereqDone } = await supabaseAdmin
-        .from("module_completions")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("module_id", prereq.id)
-        .maybeSingle();
-
-      if (!prereqDone) {
-        return NextResponse.json({
-          module: { ...module, cards: [] },
-          user_state: {
-            status: "locked",
-            current_card: 0,
-            locked_reason: `Complete "${module.prerequisite_slug}" first`,
-          },
-        });
-      }
+    if (locked) {
+      return NextResponse.json({
+        module: { ...module, cards: [] },
+        user_state: {
+          status: "locked",
+          current_card: 0,
+          locked_reason: `Complete the earlier ${module.category} modules first`,
+        },
+      });
     }
   }
 
