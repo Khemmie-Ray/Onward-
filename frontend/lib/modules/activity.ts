@@ -1,49 +1,33 @@
-
 export type DayActivity = {
-  date: string; // ISO date YYYY-MM-DD (local)
+  date: string;
   count: number;
 };
 
-const MOCK_USER_START_DAYS_AGO = 14;
-
-function toIsoDateLocal(d: Date): string {
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+export function buildActivityLookup(activity: DayActivity[]): Set<string> {
+  return new Set(activity.map((a) => a.date));
 }
 
-export function getMockActivity(days = 90): DayActivity[] {
-  const result: DayActivity[] = [];
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-
-    let count = 0;
-
-    if (i < MOCK_USER_START_DAYS_AGO) {
-      const r = Math.random();
-      if (r < 0.05) {
-        count = Math.floor(Math.random() * 3) + 3;
-      } else if (r < 0.32) {
-        count = Math.floor(Math.random() * 3) + 1;
-      }
-    }
-
-    result.push({ date: toIsoDateLocal(d), count });
-  }
-
-  return result;
+export function activityLevel(date: string, activity: DayActivity[]): number {
+  return activity.find((a) => a.date === date)?.count ?? 0;
 }
 
-export function calculateStreak(days: DayActivity[]): number {
+export function calculateStreak(activity: DayActivity[]): number {
+  if (activity.length === 0) return 0;
+
+  const activeDates = new Set(
+    activity.filter((a) => a.count > 0).map((a) => a.date),
+  );
+
   let streak = 0;
-  for (let i = days.length - 1; i >= 0; i--) {
-    if (days[i].count > 0) streak++;
-    else break;
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+
+  while (true) {
+    const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    if (!activeDates.has(iso)) break;
+    streak++;
+    d.setDate(d.getDate() - 1);
   }
+
   return streak;
 }

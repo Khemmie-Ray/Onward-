@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { ModuleWithProgress, DbUser } from "@/lib/supabase/types";
+import { isModuleLockedInList } from "@/lib/modules/lock-check";
 
 export async function loadModulesForUser(
   user: DbUser | null
@@ -44,12 +45,11 @@ export async function loadModulesForUser(
 
   return (modules ?? []).map((m) => {
     const totalCards = cardCounts[m.id] ?? 5;
-    const isLocked =
-      m.prerequisite_slug != null &&
-      !(modules ?? []).some(
-        (prereq) =>
-          prereq.slug === m.prerequisite_slug && completionsByModule[prereq.id]
-      );
+    const isLocked = isModuleLockedInList(
+      m,
+      modules ?? [],
+      completionsByModule
+    );
 
     let status_for_user: ModuleWithProgress["status_for_user"];
     let progress: ModuleWithProgress["progress"] | undefined;

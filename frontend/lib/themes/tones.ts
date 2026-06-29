@@ -106,14 +106,14 @@ export type ModuleCategory =
   | "Identity"
   | "Economics"
   | "Safety"
-  | "Ecosystem";
+  | "Utility";
 
 export const CATEGORY_TINT: Record<ModuleCategory, Tint> = {
   Foundations: "mustard",
   Identity: "forest",
   Economics: "aubergine",
   Safety: "terracotta",
-  Ecosystem: "forest",
+  Utility: "forest",
 };
 
 export function tintForCategory(category: ModuleCategory): TintStyles {

@@ -23,7 +23,7 @@ export type SpotterCardContent = {
 
 export type CardContent = FlipCardContent | ChoiceCardContent | SpotterCardContent;
 export type CardType = "flip" | "choice" | "spotter";
-export type ModuleCategory = "Foundations" | "Identity" | "Economics" | "Safety";
+export type ModuleCategory = "Foundations" | "Identity" | "Economics" | "Safety" | "Utility";
 export type ModuleStatus = "draft" | "live" | "deprecated";
 
 export type DbUser = {
