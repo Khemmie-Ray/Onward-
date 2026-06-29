@@ -2,6 +2,7 @@
 
 import { BookOpen, Check, Coins, Lock } from "lucide-react";
 import type { ModulePreview } from "@/lib/modules/types";
+import { tintForCategory, type ModuleCategory } from "@/lib/themes/tones";
 
 export function ModuleListItem({
   module,
@@ -16,21 +17,15 @@ export function ModuleListItem({
   const isComplete = module.status === "complete";
   const isActive = module.status === "active";
 
-  const cardClass = isLocked
-    ? "bg-white/60 opacity-60 cursor-not-allowed mb-3"
-    : isComplete
-      ? "bg-mustard-tint shadow-lg cursor-pointer transition-transform duration-200 hover:-translate-y-1 mb-3"
-      : isActive
-        ? "bg-paper cursor-pointer shadow-lg transition-transform duration-200 hover:-translate-y-1 mb-3"
-        : "bg-forest-tint cursor-pointer shadow-lg transition-transform duration-200 hover:-translate-y-1 mb-3";
+  const t = tintForCategory(module.category as ModuleCategory);
 
-  const iconClass = isLocked
+  const cardClass = isLocked
+    ? `${t.bg} opacity-50 cursor-not-allowed mb-3`
+    : `${t.bg} shadow-lg cursor-pointer transition-transform duration-200 hover:-translate-y-1 mb-3`;
+
+  const iconWrapperClass = isLocked
     ? "bg-canvas-warm text-fg-dim"
-    : isComplete
-      ? "bg-mustard text-indigo"
-      : isActive
-        ? "bg-forest text-paper"
-        : "bg-indigo text-paper";
+    : `${t.iconBg} ${t.iconColor}`;
 
   const hasLearnPoints = module.whatYouWillLearn.length > 0;
   const showExpansion = !isLocked && selected && hasLearnPoints;
@@ -43,7 +38,7 @@ export function ModuleListItem({
     >
       <div className="flex items-center p-4 gap-3">
         <div
-          className={`flex p-3 items-center justify-center rounded-[10px] ${iconClass}`}
+          className={`flex p-3 items-center justify-center rounded-[10px] ${iconWrapperClass}`}
         >
           {isComplete ? (
             <Check size={18} strokeWidth={3} />
@@ -53,11 +48,13 @@ export function ModuleListItem({
             <BookOpen size={16} strokeWidth={2.2} />
           )}
         </div>
-        <div className="">
-          <div className="text-[14px] font-semibold text-indigo truncate">
+        <div className="flex-1 min-w-0">
+          <div className={`text-[14px] font-semibold ${t.textColor} truncate`}>
             {module.title}
           </div>
-          <div className="flex items-center gap-1.5 text-[12px] font-medium text-indigo/70 mt-0.5">
+          <div
+            className={`flex items-center gap-1.5 text-[12px] font-medium ${t.textColor}/70 mt-0.5`}
+          >
             <span>{module.minutes} min</span>
             <span>·</span>
             <span className="inline-flex items-center gap-0.5">
@@ -67,19 +64,30 @@ export function ModuleListItem({
             {isActive && (
               <>
                 <span>·</span>
-                <span className="font-bold text-terracotta uppercase tracking-wide">
+                <span
+                  className={`font-bold uppercase tracking-wide ${t.accent}`}
+                >
                   In progress
+                </span>
+              </>
+            )}
+            {isComplete && (
+              <>
+                <span>·</span>
+                <span
+                  className={`font-bold uppercase tracking-wide ${t.accent}`}
+                >
+                  Done
                 </span>
               </>
             )}
           </div>
         </div>
       </div>
+
       <div
         className={`transition-all duration-300 ease-out ${
-          showExpansion
-            ? "max-h-50 overflow-y-auto"
-            : "max-h-0 overflow-hidden"
+          showExpansion ? "max-h-50 overflow-y-auto" : "max-h-0 overflow-hidden"
         }`}
       >
         <div className="px-3 pb-3">

@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import type { ModulePreview } from "@/lib/modules/types";
 import type { ModuleWithProgress } from "@/lib/supabase/types";
-import { getMockActivity } from "@/lib/modules/activity";
+import type { DayActivity } from "@/lib/modules/activity";
 import { ModulesPanel } from "@/components/dashboard/modules/ModulesPanel";
 import { LessonPanel } from "@/components/dashboard/lesson/LessonPanel";
 
@@ -52,7 +52,17 @@ export default function ModulesPage() {
     },
   });
 
-  const activity = useMemo(() => getMockActivity(90), []);
+  const { data: activityData } = useQuery({
+    queryKey: ["modules", "activity"],
+    queryFn: async () => {
+      const res = await authFetch("/api/modules/activity");
+      if (!res.ok) return { activity: [] };
+      return res.json() as Promise<{ activity: DayActivity[] }>;
+    },
+    staleTime: 60_000,
+  });
+
+  const activity = activityData?.activity ?? [];
 
   if (isLoading || !data) {
     return (
