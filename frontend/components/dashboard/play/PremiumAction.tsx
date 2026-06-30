@@ -2,50 +2,49 @@
 
 import { ArrowRight, Loader2, Lock } from "lucide-react";
 import { formatUnits } from "viem";
-import { passThresholdText, SCORING } from "@/lib/scoring";
 import type { DailyCapMessage, PremiumStep } from "./type";
 
-export function PremiumTabContent({
+export function PremiumAction({
+  step,
   capMessage,
   errorMessage,
-  step,
   hasEnoughBalance,
   balance,
   stakeAmount,
   needsApproval,
-  onStart,
   isVerified,
+  onStart,
   onVerify,
 }: {
+  step: PremiumStep;
   capMessage: DailyCapMessage;
   errorMessage: string | null;
-  step: PremiumStep;
   hasEnoughBalance: boolean;
   balance: bigint;
   stakeAmount: bigint;
   needsApproval: boolean;
-  onStart: () => void;
   isVerified: boolean;
+  onStart: () => void;
   onVerify: () => void;
 }) {
   if (!isVerified) {
     return (
-      <div className="text-center py-2">
-        <div className="mb-3 inline-flex items-center justify-center w-12 h-12 rounded-full bg-mustard/15">
-          <Lock size={20} strokeWidth={2.5} className="text-mustard" />
+      <div className="text-center w-full">
+        <div className="mb-4 inline-flex items-center justify-center w-14 h-14 rounded-full bg-mustard/15">
+          <Lock size={24} strokeWidth={2.5} className="text-mustard" />
         </div>
-        <h2 className="display text-[20px] font-bold text-indigo mb-2">
+        <h2 className="display text-[22px] font-bold text-indigo mb-2">
           Verify to play premium
         </h2>
-        <p className="text-sm text-fg-soft mb-5">
-          Premium rounds require a verified GoodID so your bonus pays
-          directly to your wallet. Free rounds work without it.
+        <p className="text-sm text-fg-soft mb-6 max-w-70 mx-auto">
+          Premium rounds need a verified GoodID so your bonus and points pay
+          directly to your wallet.
         </p>
         <button
           onClick={onVerify}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-indigo text-cream font-bold text-sm hover:bg-indigo/90 transition"
+          className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-indigo text-cream font-bold text-sm hover:bg-indigo/90 transition w-full lg:w-[50%] md:w-[50%]"
         >
-          Verify with GoodID
+          Verify to play
           <ArrowRight size={14} strokeWidth={2.8} />
         </button>
       </div>
@@ -54,12 +53,14 @@ export function PremiumTabContent({
 
   if (capMessage) {
     return (
-      <div className="text-center py-2">
-        <Lock size={20} className="mx-auto text-fg-soft mb-3" />
-        <h2 className="display text-[20px] font-bold text-indigo mb-2">
+      <div className="text-center w-full">
+        <Lock size={24} className="mx-auto text-fg-soft mb-4" />
+        <h2 className="display text-[22px] font-bold text-indigo mb-2">
           Premium done for today
         </h2>
-        <p className="text-sm text-fg-soft">{capMessage.message}</p>
+        <p className="text-sm text-fg-soft max-w-70 mx-auto">
+          {capMessage.message}
+        </p>
       </div>
     );
   }
@@ -82,32 +83,15 @@ export function PremiumTabContent({
   const buttonLabel = step === "idle" ? idleLabel : workingLabel[step];
 
   return (
-    <div>
-      <h2 className="display text-[22px] font-bold text-indigo mb-1">
+    <div className="w-full">
+      <h2 className="display text-[20px] font-bold text-indigo mb-2 text-center">
         Premium round
       </h2>
-      <p className="text-sm text-fg-soft mb-4">
-        Stake {stakeDisplay} G$. Pass to get it back + {SCORING.premiumBonus}{" "}
-        G$ bonus. Fail or quit and your stake refills the rewards pool.
+      <p className="text-[13px] text-fg-soft text-center max-w-65 mx-auto mb-4 leading-relaxed">
+        Faster popups, harder pace. Higher stakes, higher rewards.
       </p>
-      <ul className="mb-4 space-y-2 text-sm text-fg-soft">
-        <li className="flex items-start gap-2">
-          <span className="text-mustard font-bold mt-0.5">→</span>
-          <span>6 holes, very fast popups, hardest pace</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-mustard font-bold mt-0.5">→</span>
-          <span>Pass threshold: {passThresholdText("premium")}</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-mustard font-bold mt-0.5">→</span>
-          <span>
-            Win: {stakeDisplay} G$ refund + {SCORING.premiumBonus} G$ bonus
-          </span>
-        </li>
-      </ul>
 
-      <div className="mb-4 flex justify-between text-xs text-fg-soft px-1">
+      <div className="w-full mb-4 flex justify-between text-xs text-fg-soft px-1">
         <span>Your balance</span>
         <span className="font-bold tabular-nums text-indigo">
           {parseFloat(balanceDisplay).toLocaleString()} G$
@@ -115,7 +99,7 @@ export function PremiumTabContent({
       </div>
 
       {step !== "idle" && (
-        <div className="mb-4 px-4 py-3 rounded-xl bg-mustard/10 border border-mustard/30">
+        <div className="w-full mb-4 px-4 py-3 rounded-xl bg-mustard/10 border border-mustard/30">
           <div className="flex items-center gap-2 text-sm text-indigo font-semibold">
             <Loader2 size={14} strokeWidth={2.5} className="animate-spin" />
             {workingLabel[step]}
@@ -133,14 +117,14 @@ export function PremiumTabContent({
       )}
 
       {errorMessage && (
-        <div className="mb-4 px-4 py-3 rounded-xl bg-terracotta/10 border border-terracotta/30 text-terracotta text-sm">
+        <div className="w-full mb-4 px-4 py-3 rounded-xl bg-terracotta/10 border border-terracotta/30 text-terracotta text-sm text-center">
           {errorMessage}
         </div>
       )}
 
       {!hasEnoughBalance && !isWorking ? (
-        <div className="text-center">
-          <div className="mb-3 px-4 py-3 rounded-xl bg-terracotta/10 border border-terracotta/30 text-terracotta text-sm">
+        <div className="w-full text-center">
+          <div className="px-4 py-3 rounded-xl bg-terracotta/10 border border-terracotta/30 text-terracotta text-sm">
             You need at least {stakeDisplay} G$ to play premium.
           </div>
         </div>

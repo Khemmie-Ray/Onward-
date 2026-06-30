@@ -26,7 +26,7 @@ export type WhackResult = {
   wrongWhacks: number;
   missedScams: number;
   totalScams: number;
-  whacks: string[]; 
+  whacks: string[];
   spawnedScams: number;
 };
 
@@ -65,10 +65,19 @@ export type SubmitResponse = {
   level_before: number;
   level_after: number;
   precision_percent: number;
+  points_awarded?: number;
+  new_points_balance?: number | null;
   threshold: { minPrecisionPercent: number; minCorrect: number };
   onchain: {
     rewardTxHash: string | null;
     stakeResolveTxHash: string | null;
     onchainError: string | null;
   };
+};
+
+export type PlayStats = {
+  current_streak: number;
+  lifetime_points_from_play: number;
+  scams_whacked_today: number; 
+  weekly_rank: number | null;
 };

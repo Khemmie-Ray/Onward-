@@ -18,7 +18,7 @@ function isOnboardingPath(pathname: string): boolean {
   return pathname.startsWith("/onboarding");
 }
 
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (pathname.startsWith(AUTH_API_PREFIX)) return NextResponse.next();

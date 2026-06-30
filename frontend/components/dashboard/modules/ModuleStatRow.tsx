@@ -6,12 +6,12 @@ export function ModuleStatRow({
   modulesCompleted,
   modulesTotal,
   activityStreak,
-  gEarned,
+  pointsEarned,
 }: {
   modulesCompleted: number;
   modulesTotal: number;
   activityStreak: number;
-  gEarned: number;
+  pointsEarned: number;
 }) {
   const stats = [
     {
@@ -27,8 +27,8 @@ export function ModuleStatRow({
       iconClass: "bg-terracotta text-paper",
     },
     {
-      label: "Earned",
-      value: `${gEarned} g$`,
+      label: "Points",
+      value: pointsEarned.toLocaleString(),
       icon: <Coins size={13} strokeWidth={2.5} />,
       iconClass: "bg-mustard text-indigo",
     },

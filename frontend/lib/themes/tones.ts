@@ -134,3 +134,5 @@ export function tintForEcosystemCategory(
 ): TintStyles {
   return TINT_MAP[ECOSYSTEM_CATEGORY_TINT[category]];
 }
+
+export const MODULE_CATEGORIES = Object.keys(CATEGORY_TINT) as ModuleCategory[];

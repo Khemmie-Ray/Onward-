@@ -1,21 +1,8 @@
-/**
- * Single source of truth for all Whack-a-Scam scoring rules.
- *
- * Both the backend (grading in /api/play/submit) and the frontend
- * (displaying thresholds in tabs, end-round modal, etc.) import from
- * here. Changing a reward amount or threshold happens in exactly one
- * place.
- *
- * Grading uses PRECISION (correct / total_whacks), not accuracy-with-misses.
- * Missed scams don't affect pass/fail — only the precision of your whacks
- * does. Missed counts are still reported for display.
- */
-
 export type PlayMode = "free" | "premium";
 
 export const SCORING = {
-  freeReward: 5,
-  premiumBonus: 5,
+  freeReward: 0,
+  premiumBonus: 50,
 
   free: {
     minPrecision: 0.6,
@@ -26,7 +13,6 @@ export const SCORING = {
     minCorrect: 12,
   },
 
-  // Anti-cheat caps applied at submit time
   maxTotalWhacks: 200,
   maxPerPatternWhacks: 20,
   maxSpawnedScamsReported: 100,
@@ -94,6 +80,6 @@ export function passThresholdText(mode: PlayMode): string {
 }
 
 export function rewardText(mode: PlayMode): string {
-  const amount = mode === "premium" ? SCORING.premiumBonus : SCORING.freeReward;
-  return `${amount} G$`;
+  const points = mode === "premium" ? 50 : 25;
+  return `${points} points`;
 }

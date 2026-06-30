@@ -16,6 +16,8 @@ export function EndRoundModal({
   familyDescription,
   exemplar,
   rewardAmount,
+  pointsAwarded,
+  newPointsBalance,
   levelBefore,
   levelAfter,
   txPending,
@@ -33,6 +35,8 @@ export function EndRoundModal({
     teaching: string;
   };
   rewardAmount: number;
+  pointsAwarded: number;
+  newPointsBalance: number | null;
   levelBefore: number;
   levelAfter: number;
   txPending: boolean;
@@ -48,164 +52,184 @@ export function EndRoundModal({
 
   const isWaitingForVerdict = passed === null;
   const didPass = passed === true;
+  const hasGReward = rewardAmount > 0;
+  const hasPointsReward = pointsAwarded > 0;
 
   return (
-    <div className="min-h-screen bg-canvas flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute top-[10%] left-[15%] h-[400px] w-[400px] rounded-full opacity-50 blur-[100px] bg-[radial-gradient(circle,rgba(230,180,72,0.6)_0%,transparent_70%)]"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute bottom-[10%] right-[15%] h-[400px] w-[400px] rounded-full opacity-40 blur-[100px] bg-[radial-gradient(circle,rgba(199,93,63,0.5)_0%,transparent_70%)]"
-      />
-
-      <div className="relative w-full max-w-[500px] animate-[fade-up_0.8s_ease_both]">
-        <div className="text-center mb-7">
-          <div className="mb-4 inline-flex items-center justify-center">
-            {isWaitingForVerdict ? (
-              <Loader2
-                size={56}
-                strokeWidth={1.8}
-                className="text-indigo animate-spin"
-              />
-            ) : didPass ? (
-              <Trophy size={56} strokeWidth={1.8} className="text-mustard" />
-            ) : (
-              <X size={56} strokeWidth={1.8} className="text-terracotta" />
-            )}
-          </div>
-          <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-fg-soft mb-2">
-            {isWaitingForVerdict
-              ? "Calculating result…"
-              : didPass
-                ? "Round passed"
-                : "Round didn't pass"}
-          </div>
-          <h1 className="display text-[40px] font-bold leading-[1.1] tracking-[-0.025em] text-indigo">
-            {result.score} {result.score === 1 ? "point" : "points"}
-          </h1>
+    <div className="w-full">
+      <div className="text-center mb-5">
+        <div className="mb-3 inline-flex items-center justify-center">
+          {isWaitingForVerdict ? (
+            <Loader2
+              size={44}
+              strokeWidth={1.8}
+              className="text-indigo animate-spin"
+            />
+          ) : didPass ? (
+            <Trophy size={44} strokeWidth={1.8} className="text-mustard" />
+          ) : (
+            <X size={44} strokeWidth={1.8} className="text-terracotta" />
+          )}
         </div>
-
-        <div className="grid grid-cols-3 gap-2 mb-5">
-          <StatTile
-            label="Correct"
-            value={result.correctWhacks}
-            tone="forest"
-          />
-          <StatTile
-            label="Wrong"
-            value={result.wrongWhacks}
-            tone="terracotta"
-          />
-          <StatTile
-            label="Missed"
-            value={result.missedScams}
-            tone="aubergine"
-          />
+        <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-fg-soft mb-2">
+          {isWaitingForVerdict
+            ? "Calculating result…"
+            : didPass
+              ? "Round passed"
+              : "Round didn't pass"}
         </div>
+        <h1 className="display text-[32px] font-bold leading-[1.1] tracking-[-0.025em] text-indigo">
+          {result.score} {result.score === 1 ? "point" : "points"}
+        </h1>
+      </div>
 
-        {didPass && (
-          <div className="relative w-full bg-aubergine rounded-[18px] p-5 mb-5 overflow-hidden shadow-[0_8px_24px_rgba(91,46,92,0.20)]">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-0 text-paper opacity-[0.06]"
-            >
-              <MudclothPattern />
-            </div>
-            <div className="relative flex items-center justify-between gap-3">
-              <div>
-                <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-mustard mb-0.5">
-                  Reward
+      {/* Stat tiles */}
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <StatTile label="Correct" value={result.correctWhacks} tone="forest" />
+        <StatTile label="Wrong" value={result.wrongWhacks} tone="terracotta" />
+        <StatTile label="Missed" value={result.missedScams} tone="aubergine" />
+      </div>
+
+      {/* Reward block - shows when passed with any reward */}
+      {didPass && (hasPointsReward || hasGReward || leveledUp) && (
+        <div className="relative w-full bg-aubergine rounded-[16px] p-4 mb-4 overflow-hidden shadow-[0_4px_16px_rgba(91,46,92,0.15)]">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 text-paper opacity-[0.06]"
+          >
+            <MudclothPattern />
+          </div>
+          <div className="relative">
+            <div className="flex items-center justify-between gap-3">
+              {hasPointsReward && (
+                <div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-mustard mb-0.5">
+                    Points earned
+                  </div>
+                  <div className="display text-[22px] font-bold text-mustard tabular-nums">
+                    +{pointsAwarded}
+                  </div>
                 </div>
-                <div className="display text-[24px] font-bold text-mustard tabular-nums">
-                  +{rewardAmount} g$
-                </div>
-              </div>
+              )}
               {leveledUp && (
                 <div className="text-right">
                   <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-mustard mb-0.5">
                     Level up
                   </div>
-                  <div className="display text-[20px] font-bold text-paper tabular-nums">
+                  <div className="display text-[18px] font-bold text-paper tabular-nums">
                     {levelBefore} → {levelAfter}
                   </div>
                 </div>
               )}
             </div>
-            {txPending ? (
-              <div className="mt-3 flex items-center justify-center gap-2 text-[10px] text-paper/70">
-                <Loader2 size={11} strokeWidth={2.5} className="animate-spin" />
-                Confirming on Celo…
+
+            {newPointsBalance != null && hasPointsReward && (
+              <div className="border-t border-paper/15 pt-3 mt-3 flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-paper/70">
+                  Your balance
+                </span>
+                <span className="display text-[18px] font-bold text-paper tabular-nums">
+                  {newPointsBalance.toLocaleString()}
+                </span>
               </div>
-            ) : (
-              txHash && (
-                <a
-                  href={`https://celoscan.io/tx/${txHash}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-3 flex items-center justify-center gap-1 text-[10px] font-semibold text-mustard hover:opacity-80"
-                >
-                  View reward tx →
-                </a>
-              )
+            )}
+
+            {/* Only show G$ if it was actually distributed (interim, for premium) */}
+            {hasGReward && (
+              <div className="border-t border-paper/15 pt-3 mt-3 flex items-center justify-between">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-mustard">
+                  Bonus G$ paid
+                </span>
+                <span className="display text-[18px] font-bold text-mustard tabular-nums">
+                  +{rewardAmount} G$
+                </span>
+              </div>
             )}
           </div>
-        )}
 
-        {passed === false && (
-          <div className="rounded-[18px] bg-terracotta-tint p-5 mb-5 text-center">
-            <p className="text-[13px] font-semibold text-terracotta leading-snug">
-              You need {passThresholdText(mode)} to earn the reward. Try again —
-              you&apos;ll get faster.
-            </p>
-          </div>
-        )}
+          {hasGReward && txPending ? (
+            <div className="relative mt-3 flex items-center justify-center gap-2 text-[10px] text-paper/70">
+              <Loader2 size={11} strokeWidth={2.5} className="animate-spin" />
+              Confirming on Celo…
+            </div>
+          ) : (
+            hasGReward &&
+            txHash && (
+              <a
+                href={`https://celoscan.io/tx/${txHash}`}
+                target="_blank"
+                rel="noreferrer"
+                className="relative mt-3 flex items-center justify-center gap-1 text-[10px] font-semibold text-mustard hover:opacity-80"
+              >
+                View reward tx →
+              </a>
+            )
+          )}
+        </div>
+      )}
 
-        <div className="rounded-[20px] bg-paper p-6 mb-6 shadow-[0_8px_24px_rgba(31,58,110,0.08)]">
-          <div className="flex items-center gap-2 mb-3">
-            <Eye size={14} strokeWidth={2.5} className="text-terracotta" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-terracotta">
-              Today&apos;s scam pattern
-            </span>
-          </div>
-          <h2 className="display text-[22px] font-bold tracking-[-0.015em] text-indigo mb-2">
-            {familyLabel}
-          </h2>
-          <p className="text-[13px] text-fg-soft leading-[1.55] mb-5">
-            {familyDescription}
+      {/* Points → G$ note (when points-only, no immediate G$) */}
+      {didPass && hasPointsReward && !hasGReward && (
+        <div className="rounded-[12px] bg-mustard/10 border border-mustard/30 p-3 mb-4">
+          <p className="text-[11px] text-indigo/80 leading-snug text-center">
+            Your points will convert to G$ when claims open.
           </p>
+        </div>
+      )}
 
-          <div className="flex justify-center mb-4">
-            <ScenarioCard scenario={exemplar as unknown as Scenario} />
-          </div>
+      {passed === false && (
+        <div className="rounded-[14px] bg-terracotta-tint p-4 mb-4 text-center">
+          <p className="text-[12px] font-semibold text-terracotta leading-snug">
+            You need {passThresholdText(mode)} to earn the reward. Try again —
+            you&apos;ll get faster.
+          </p>
+        </div>
+      )}
 
-          <div className="rounded-[12px] bg-indigo p-3.5">
-            <p className="text-[12px] leading-[1.5] text-paper">
-              {exemplar.teaching}
-            </p>
-          </div>
+      {/* Scam pattern teaching */}
+      <div className="rounded-[16px] bg-canvas-warm p-4 mb-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Eye size={12} strokeWidth={2.5} className="text-terracotta" />
+          <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-terracotta">
+            Today&apos;s scam pattern
+          </span>
+        </div>
+        <h2 className="display text-[18px] font-bold tracking-[-0.015em] text-indigo mb-2">
+          {familyLabel}
+        </h2>
+        <p className="text-[12px] text-fg-soft leading-[1.55] mb-4">
+          {familyDescription}
+        </p>
+
+        <div className="flex justify-center mb-3">
+          <ScenarioCard scenario={exemplar as unknown as Scenario} />
         </div>
 
-        <div className="text-center text-[11px] text-fg-soft mb-6">
-          You judged {totalWhacks} popups with {precision}% precision.
+        <div className="rounded-[10px] bg-indigo p-3">
+          <p className="text-[11px] leading-[1.5] text-paper">
+            {exemplar.teaching}
+          </p>
         </div>
+      </div>
 
-        <div className="flex gap-3">
-          <button
-            onClick={onPlayAgain}
-            className="flex-1 rounded-full bg-terracotta py-3.5 text-[13px] font-bold text-paper shadow-[0_6px_20px_rgba(199,93,63,0.30)] transition-transform hover:-translate-y-0.5"
-          >
-            Play again
-          </button>
-          <Link
-            href="/overview"
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-paper py-3.5 text-[13px] font-bold text-indigo shadow-[0_4px_12px_rgba(31,58,110,0.06)] transition-transform hover:-translate-y-0.5"
-          >
-            Back
-            <ArrowRight size={13} strokeWidth={2.8} />
-          </Link>
-        </div>
+      <div className="text-center text-[10px] text-fg-soft mb-4">
+        You judged {totalWhacks} popups with {precision}% precision.
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={onPlayAgain}
+          className="flex-1 rounded-full bg-terracotta py-3 text-[12px] font-bold text-paper shadow-[0_4px_14px_rgba(199,93,63,0.25)] transition-transform hover:-translate-y-0.5"
+        >
+          Play again
+        </button>
+        <Link
+          href="/overview"
+          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-canvas-warm py-3 text-[12px] font-bold text-indigo transition-transform hover:-translate-y-0.5"
+        >
+          Back
+          <ArrowRight size={12} strokeWidth={2.8} />
+        </Link>
       </div>
     </div>
   );
@@ -234,12 +258,12 @@ function StatTile({
         : "text-aubergine";
 
   return (
-    <div className={`rounded-[14px] p-3.5 ${bg} text-center`}>
-      <div className={`display text-[26px] font-bold tabular-nums ${fg}`}>
+    <div className={`rounded-[12px] p-3 ${bg} text-center`}>
+      <div className={`display text-[22px] font-bold tabular-nums ${fg}`}>
         {value}
       </div>
       <div
-        className={`text-[9px] font-bold uppercase tracking-[0.12em] ${fg} opacity-80 mt-0.5`}
+        className={`text-[8px] font-bold uppercase tracking-[0.12em] ${fg} opacity-80 mt-0.5`}
       >
         {label}
       </div>

@@ -1,18 +1,13 @@
 "use client";
 
+import { useQuery } from "@tanstack/react-query";
 import type { ModulePreview } from "@/lib/modules/types";
-import type { ModuleCategory } from "@/lib/themes/tones";
+import { MODULE_CATEGORIES } from "@/lib/themes/tones";
 import { type DayActivity, calculateStreak } from "@/lib/modules/activity";
+import { useAuthFetch } from "@/hooks/useAuthFetch";
 import { ActivityCalendar } from "./ActivityCalendar";
 import { ModuleStatRow } from "./ModuleStatRow";
 import { ModuleListItem } from "./ModuleListItem";
-
-const CATEGORIES: ModuleCategory[] = [
-  "Foundations",
-  "Identity",
-  "Economics",
-  "Safety",
-];
 
 export function ModulesPanel({
   modules,
@@ -25,10 +20,21 @@ export function ModulesPanel({
   onSelect: (slug: string) => void;
   activity: DayActivity[];
 }) {
+  const authFetch = useAuthFetch();
+
+  const { data: pointsData } = useQuery({
+    queryKey: ["modules", "points"],
+    queryFn: async () => {
+      const res = await authFetch("/api/modules/points");
+      if (!res.ok) return { points_from_modules: 0 };
+      return res.json() as Promise<{ points_from_modules: number }>;
+    },
+    staleTime: 30_000,
+  });
+
+  const pointsFromModules = pointsData?.points_from_modules ?? 0;
+
   const completed = modules.filter((m) => m.status === "complete").length;
-  const gEarned = modules
-    .filter((m) => m.status === "complete")
-    .reduce((sum, m) => sum + m.reward, 0);
   const streak = calculateStreak(activity);
 
   return (
@@ -37,7 +43,7 @@ export function ModulesPanel({
         modulesCompleted={completed}
         modulesTotal={modules.length}
         activityStreak={streak}
-        gEarned={gEarned}
+        pointsEarned={pointsFromModules}
       />
 
       <ActivityCalendar activity={activity} />
@@ -46,7 +52,7 @@ export function ModulesPanel({
         <span className="text-aubergine">inside out</span>.
       </h1>
       <div className="flex flex-col max-h-[400px] overflow-y-auto mt-5">
-        {CATEGORIES.map((category) => {
+        {MODULE_CATEGORIES.map((category) => {
           const inCategory = modules.filter((m) => m.category === category);
           if (inCategory.length === 0) return null;
           return (

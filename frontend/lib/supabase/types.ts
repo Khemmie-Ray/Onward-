@@ -21,10 +21,40 @@ export type SpotterCardContent = {
   teaching: string;
 };
 
-export type CardContent = FlipCardContent | ChoiceCardContent | SpotterCardContent;
+export type CardContent =
+  | FlipCardContent
+  | ChoiceCardContent
+  | SpotterCardContent;
 export type CardType = "flip" | "choice" | "spotter";
-export type ModuleCategory = "Foundations" | "Identity" | "Economics" | "Safety" | "Utility";
+export type ModuleCategory =
+  | "Foundations"
+  | "Identity"
+  | "Economics"
+  | "Safety"
+  | "Utility";
 export type ModuleStatus = "draft" | "live" | "deprecated";
+
+export type PointSource =
+  | "free_round_pass"
+  | "module_complete"
+  | "daily_login"
+  | "referral"
+  | "leaderboard_weekly"
+  | "streak_milestone"
+  | "contest_win"
+  | "claim_redemption"
+  | "manual_adjustment";
+
+export type ClaimStatus = "pending" | "submitted" | "confirmed" | "failed";
+
+export type SpendCategory =
+  | "power_up"
+  | "cosmetic"
+  | "streak_repair"
+  | "raffle"
+  | "contest_entry"
+  | "premium_stake"
+  | "module_retake";
 
 export type DbUser = {
   id: string;
@@ -140,6 +170,47 @@ export type DbLeaderboardPayout = {
   paid_at: string;
 };
 
+export type DbUserPoints = {
+  user_id: string;
+  balance: number;
+  lifetime_earned: number;
+  lifetime_claimed: number;
+  updated_at: string;
+};
+
+export type DbPointTransaction = {
+  id: string;
+  user_id: string;
+  delta: number;
+  source: PointSource;
+  reference_id: string;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type DbPointClaim = {
+  id: string;
+  user_id: string;
+  points_claimed: number;
+  g_amount: number;
+  tx_hash: string | null;
+  status: ClaimStatus;
+  error_message: string | null;
+  created_at: string;
+  confirmed_at: string | null;
+};
+
+export type DbSpendEvent = {
+  id: string;
+  user_id: string;
+  g_amount: number;
+  category: SpendCategory;
+  reference_id: string | null;
+  metadata: Record<string, unknown> | null;
+  tx_hash: string | null;
+  created_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -215,9 +286,60 @@ export type Database = {
         Update: Partial<DbLeaderboardPayout>;
         Relationships: [];
       };
+      user_points: {
+        Row: DbUserPoints;
+        Insert: Partial<DbUserPoints> & { user_id: string };
+        Update: Partial<DbUserPoints>;
+        Relationships: [];
+      };
+      point_transactions: {
+        Row: DbPointTransaction;
+        Insert: Partial<DbPointTransaction> & {
+          user_id: string;
+          delta: number;
+          source: PointSource;
+          reference_id: string;
+        };
+        Update: Partial<DbPointTransaction>;
+        Relationships: [];
+      };
+      point_claims: {
+        Row: DbPointClaim;
+        Insert: Partial<DbPointClaim> & {
+          user_id: string;
+          points_claimed: number;
+          g_amount: number;
+        };
+        Update: Partial<DbPointClaim>;
+        Relationships: [];
+      };
+      spend_events: {
+        Row: DbSpendEvent;
+        Insert: Partial<DbSpendEvent> & {
+          user_id: string;
+          g_amount: number;
+          category: SpendCategory;
+        };
+        Update: Partial<DbSpendEvent>;
+        Relationships: [];
+      };
     };
     Views: {};
-    Functions: {};
+    Functions: {
+      award_points: {
+        Args: {
+          p_user_id: string;
+          p_delta: number;
+          p_source: PointSource;
+          p_reference_id: string;
+          p_metadata?: Record<string, unknown> | null;
+        };
+        Returns: {
+          new_balance: number;
+          was_new: boolean;
+        }[];
+      };
+    };
     Enums: {};
     CompositeTypes: {};
   };

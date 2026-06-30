@@ -46,9 +46,10 @@ export async function resolveRoundOnchain(args: {
   };
 
   // ─── Free mode reward distribution ────────────────────────
-  if (mode === "free" && passed) {
+  // Skipped entirely when rewardAmountG is 0 (points-only mode).
+  if (mode === "free" && passed && rewardAmountG > 0) {
     const claimId = keccak256(
-      toBytes(`${userWallet.toLowerCase()}:round:${roundId}`)
+      toBytes(`${userWallet.toLowerCase()}:round:${roundId}`),
     );
 
     const alreadyClaimed = (await publicClient.readContract({
@@ -78,7 +79,9 @@ export async function resolveRoundOnchain(args: {
     }
   }
 
-  // ─── Premium mode stake resolution ────────────────────────
+  // ─── Premium mode stake resolution (always runs) ──────────
+  // Stake resolve must run regardless of bonus amount to release the
+  // user's stake (refund on pass, forfeit on fail).
   if (mode === "premium") {
     const roundIdHash = keccak256(toBytes(roundId));
 
@@ -146,7 +149,7 @@ export async function resolveRoundOnchain(args: {
 
 export async function verifyStakePlaced(
   roundId: string,
-  userWallet: Address
+  userWallet: Address,
 ): Promise<boolean> {
   const roundIdHash = keccak256(toBytes(roundId));
   const stake = (await publicClient.readContract({
