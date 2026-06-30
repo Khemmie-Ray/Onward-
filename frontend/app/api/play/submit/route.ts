@@ -5,12 +5,17 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resolveRoundOnchain } from "@/lib/onchain/play";
 import { isVerifiedOnchainSafe } from "@/lib/onchain/identity";
 import { gradeRound, nextLevel, SCORING, type PlayMode } from "@/lib/scoring";
+import { awardPoints } from "@/lib/server/point";
 
 type SubmitBody = {
   round_id?: string;
   whacks?: string[];
   spawned_scams?: number;
 };
+
+const POINTS_PER_ROUND = {
+  free: 25,
+} as const;
 
 export async function POST(request: Request) {
   const auth = await requireCompletedProfile(request);
@@ -22,11 +27,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing round_id" }, { status: 400 });
   }
   if (!Array.isArray(body.whacks)) {
-    return NextResponse.json({ error: "Invalid whacks array" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid whacks array" },
+      { status: 400 },
+    );
   }
 
   const isVerified = await isVerifiedOnchainSafe(
-    user.wallet_address as Address
+    user.wallet_address as Address,
   );
 
   const { data: session } = await supabaseAdmin
@@ -42,21 +50,23 @@ export async function POST(request: Request) {
   if (session.status !== "active") {
     return NextResponse.json(
       { error: "Round not active (already submitted or not begun)" },
-      { status: 409 }
+      { status: 409 },
     );
   }
 
   const mode = (session.mode ?? "free") as PlayMode;
 
-  // ─── Anti-cheat caps ────────────────────────────────────
   if (body.whacks.length > SCORING.maxTotalWhacks) {
     return NextResponse.json(
       { error: "Too many whacks submitted" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  const items = session.items as Array<{ pattern_id: string; is_scam: boolean }>;
+  const items = session.items as Array<{
+    pattern_id: string;
+    is_scam: boolean;
+  }>;
   const patternMap = new Map<string, boolean>();
   for (const item of items) {
     patternMap.set(item.pattern_id, item.is_scam);
@@ -67,14 +77,14 @@ export async function POST(request: Request) {
     if (!patternMap.has(pid)) {
       return NextResponse.json(
         { error: "Invalid pattern_id in whacks" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const c = (perPatternCount.get(pid) ?? 0) + 1;
     if (c > SCORING.maxPerPatternWhacks) {
       return NextResponse.json(
         { error: "Per-pattern whack cap exceeded" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     perPatternCount.set(pid, c);
@@ -89,11 +99,10 @@ export async function POST(request: Request) {
 
   const spawnedScamsReported = Math.max(
     0,
-    Math.min(SCORING.maxSpawnedScamsReported, body.spawned_scams ?? 0)
+    Math.min(SCORING.maxSpawnedScamsReported, body.spawned_scams ?? 0),
   );
   const missedScams = Math.max(0, spawnedScamsReported - correctWhacks);
 
-  // ─── Centralized grading ────────────────────────────────
   const grade = gradeRound({ mode, correctWhacks, wrongWhacks });
 
   const levelBefore = user.current_level;
@@ -122,8 +131,7 @@ export async function POST(request: Request) {
 
     if (mode === "free") {
       if (isVerified) {
-        userUpdate.total_g_earned =
-          Number(user.total_g_earned) + rewardAmount;
+        userUpdate.total_g_earned = Number(user.total_g_earned) + rewardAmount;
       }
     } else {
       userUpdate.total_g_earned =
@@ -131,6 +139,29 @@ export async function POST(request: Request) {
     }
 
     await supabaseAdmin.from("users").update(userUpdate).eq("id", user.id);
+  }
+
+  let pointsAwarded = 0;
+  let newPointsBalance: number | null = null;
+  if (grade.passed && mode === "free") {
+    const pointsDelta = POINTS_PER_ROUND.free;
+    try {
+      const result = await awardPoints({
+        userId: user.id,
+        delta: pointsDelta,
+        source: "free_round_pass",
+        referenceId: session.id,
+        metadata: {
+          score: grade.score,
+          correctWhacks,
+          wrongWhacks,
+        },
+      });
+      pointsAwarded = pointsDelta;
+      newPointsBalance = result.newBalance;
+    } catch (err) {
+      console.error("[submit route points award failed]", err);
+    }
   }
 
   // ─── Onchain resolution ─────────────────────────────────
@@ -186,6 +217,8 @@ export async function POST(request: Request) {
     missed_scams: missedScams,
     precision_percent: grade.precisionPercent,
     reward_g_amount: rewardAmount,
+    points_awarded: pointsAwarded,
+    new_points_balance: newPointsBalance,
     level_before: levelBefore,
     level_after: levelAfter,
     threshold: grade.threshold,
