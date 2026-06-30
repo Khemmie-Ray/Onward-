@@ -1,3 +1,5 @@
+import { ModuleCategory } from "../supabase/types";
+
 export const TONE_MAP = {
   terracotta: {
     bg: "bg-terracotta",
@@ -101,13 +103,6 @@ export function tint<T extends Tint>(name: T): (typeof TINT_MAP)[T] {
   return TINT_MAP[name];
 }
 
-export type ModuleCategory =
-  | "Foundations"
-  | "Identity"
-  | "Economics"
-  | "Safety"
-  | "Utility";
-
 export const CATEGORY_TINT: Record<ModuleCategory, Tint> = {
   Foundations: "mustard",
   Identity: "forest",
@@ -134,3 +129,5 @@ export function tintForEcosystemCategory(
 ): TintStyles {
   return TINT_MAP[ECOSYSTEM_CATEGORY_TINT[category]];
 }
+
+export const MODULE_CATEGORIES = Object.keys(CATEGORY_TINT) as ModuleCategory[];
