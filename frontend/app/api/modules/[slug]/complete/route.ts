@@ -6,10 +6,13 @@ import { processCompletion } from "@/lib/onchain/badges";
 import { isVerifiedOnchainSafe } from "@/lib/onchain/identity";
 import { markStreakDay } from "@/lib/streak";
 import { isModuleLocked } from "@/lib/modules/lock-check";
+import { awardPoints } from "@/lib/server/point";
 
 type Body = {
   answers?: Array<{ card_index: number; answer: number | string }>;
 };
+
+const POINTS_PER_MODULE = 100;
 
 export async function POST(
   request: Request,
@@ -121,7 +124,7 @@ export async function POST(
     });
   }
 
-  // ─── Onchain call (mint + distribute|accrue atomically) ─
+  // ─── Onchain call (mint badge, distribute G$ if reward > 0) ─
   let onchainResult: {
     badgeTxHash: string;
     badgeTokenId: string;
@@ -194,6 +197,28 @@ export async function POST(
       .eq("id", user.id);
   }
 
+  // ─── Award points for module completion ─────────────────
+  let pointsAwarded = 0;
+  let newPointsBalance: number | null = null;
+  try {
+    const pointsResult = await awardPoints({
+      userId: user.id,
+      delta: POINTS_PER_MODULE,
+      source: "module_complete",
+      referenceId: slug,
+      metadata: {
+        module_id: module.id,
+        quiz_score: correct,
+        total_graded: totalGraded,
+      },
+    });
+    pointsAwarded = POINTS_PER_MODULE;
+    newPointsBalance = pointsResult.newBalance;
+  } catch (err) {
+    console.error("[complete route points award failed]", err);
+    // Don't fail the request — completion still valid, points recoverable later
+  }
+
   await markStreakDay(user.id);
 
   return NextResponse.json({
@@ -202,6 +227,8 @@ export async function POST(
     correct,
     total: totalGraded,
     reward_g_amount: module.reward_g_amount,
+    points_awarded: pointsAwarded,
+    new_points_balance: newPointsBalance,
     completion,
     onchain: onchainResult,
   });
