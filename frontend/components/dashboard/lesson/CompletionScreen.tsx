@@ -151,7 +151,7 @@ export function CompletionScreen({
               <span className="display text-[36px] font-bold leading-none tabular-nums text-mustard">
                 +{displayedReward}
               </span>
-              <span className="text-[13px] font-bold text-mustard">g$</span>
+              <span className="text-[13px] font-bold text-mustard">points</span>
             </div>
           </div>
         </div>
