@@ -19,7 +19,8 @@ if (!projectId) {
 const metadata = {
   name: "Onward",
   description: "Learn-to-earn for the GoodDollar ecosystem",
-  url: "https://onward-celo.vercel.app",
+  // url: "http://localhost:3000",
+  url: "https://onwardlearn.app",
   icons: ["https://avatars.githubusercontent.com/u/179229932"],
 };
 
