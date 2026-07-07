@@ -68,6 +68,8 @@ export type DbUser = {
   longest_streak: number;
   total_g_earned: number;
   current_level: number;
+  referral_code: string | null;
+  referred_by_user_id: string | null;
 };
 
 export type DbModule = {

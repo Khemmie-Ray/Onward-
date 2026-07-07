@@ -1,23 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Award, Coins, Flame, Trophy } from "lucide-react";
+import { Coins, Flame, Trophy, Sparkles } from "lucide-react";
 import { formatUnits } from "viem";
 import { LoopSigil } from "@/components/home/motifs";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
-import { BadgeCard } from "@/components/dashboard/profile/BadgeCard";
 import ProfileHeader from "@/components/dashboard/profile/ProfileHeader";
 import type { ProfileData } from "@/lib/data/profile";
 import LifetimeStat from "@/components/dashboard/profile/LifetimeStat";
-import EmptyBadgeState from "@/components/dashboard/profile/EmptyBadgeState";
-import { PendingClaimCard } from "@/components/dashboard/PendingClaimCard";
 import { usePendingClaim } from "@/hooks/usePendingClaim";
-import { LeaderboardWidget } from "@/components/dashboard/leaderboard/LeaderboardWidget";
+import { ReferralCard } from "@/components/dashboard/profile/ReferralCard";
+import { ClaimCard } from "@/components/dashboard/profile/ClaimCard";
+import { OnchainBadgeCollection } from "@/components/dashboard/profile/OnchainBadgeCollection";
 
+type PointsData = {
+  balance: number;
+  lifetime_earned: number;
+  lifetime_claimed: number;
+};
 
 const Profile = () => {
   const authFetch = useAuthFetch();
   const [data, setData] = useState<ProfileData | null>(null);
+  const [points, setPoints] = useState<PointsData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { pendingBalance } = usePendingClaim();
@@ -26,10 +31,19 @@ const Profile = () => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await authFetch("/api/profile");
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const json = (await res.json()) as ProfileData;
-        if (!cancelled) setData(json);
+        const [profileRes, pointsRes] = await Promise.all([
+          authFetch("/api/profile"),
+          authFetch("/api/points/balance"),
+        ]);
+
+        if (!profileRes.ok) throw new Error(`Status ${profileRes.status}`);
+        const profileJson = (await profileRes.json()) as ProfileData;
+        if (!cancelled) setData(profileJson);
+
+        if (pointsRes.ok) {
+          const pointsJson = (await pointsRes.json()) as PointsData;
+          if (!cancelled) setPoints(pointsJson);
+        }
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : "Failed to load");
@@ -43,10 +57,10 @@ const Profile = () => {
 
   if (error) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
+      <div className="min-h-100 flex items-center justify-center">
         <div className="text-center">
           <div className="text-[12px] font-bold uppercase tracking-[0.16em] text-terracotta mb-2">
-            Couldn't load profile
+            Couldn&apos;t load profile
           </div>
           <p className="text-[13px] text-fg-soft">{error}</p>
         </div>
@@ -56,7 +70,7 @@ const Profile = () => {
 
   if (!data) {
     return (
-      <div className="min-h-[400px] flex items-center justify-center">
+      <div className="min-h-100 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3 animate-[fade-up_0.5s_ease_both]">
           <div className="animate-[spin_2s_linear_infinite]">
             <LoopSigil size={32} color="var(--color-indigo)" />
@@ -69,18 +83,19 @@ const Profile = () => {
     );
   }
 
-  const earnedBadges = data.badges.filter((b) => b.earned);
+  const pointsBalance = points?.balance ?? 0;
 
-  const pendingG = pendingBalance > 0n
-    ? parseFloat(formatUnits(pendingBalance, 18))
-    : 0;
-  const lifetimeEarned = data.totalGEarned + pendingG;
+  const pendingG =
+    pendingBalance > 0n ? parseFloat(formatUnits(pendingBalance, 18)) : 0;
+  const gEarnedTotal = data.totalGEarned + pendingG;
+
+  const gClaimed = points?.lifetime_claimed ?? 0;
 
   return (
     <>
       <div
         aria-hidden
-        className="pointer-events-none absolute right-[10%] top-[8%] h-[400px] w-[400px] rounded-full opacity-50 blur-[80px] bg-[radial-gradient(circle,rgba(199,93,63,0.30)_0%,transparent_70%)]"
+        className="pointer-events-none absolute right-[10%] top-[8%] h-100 w-100 rounded-full opacity-50 blur-[80px] bg-[radial-gradient(circle,rgba(199,93,63,0.30)_0%,transparent_70%)]"
       />
       <ProfileHeader
         displayName={data.displayName}
@@ -88,68 +103,57 @@ const Profile = () => {
         walletAddress={data.walletAddress}
         daysOnOnward={data.daysOnOnward}
       />
-
-      <section className="mb-6 animate-[fade-up_0.8s_0.10s_ease_both]">
-        <PendingClaimCard />
+      <section className="flex justify-between lg:flex-row md:flex-row flex-col gap-3 mb-10 animate-[fade-up_0.8s_0.18s_ease_both]">
+        <div className="flex flex-wrap gap-5 lg:w-[52%] md:w-[52%] w-full">
+          <LifetimeStat
+            label="Points balance"
+            value={pointsBalance.toLocaleString()}
+            tone="mustard"
+            icon={<Sparkles size={28} strokeWidth={2} />}
+            sub="unclaimed"
+          />
+          <LifetimeStat
+            label="g$ claimed"
+            value={gClaimed.toLocaleString(undefined, {
+              maximumFractionDigits: 2,
+            })}
+            tone="forest"
+            icon={<Coins size={28} strokeWidth={2} />}
+            sub="from point conversion"
+          />
+          <LifetimeStat
+            label="Level"
+            value={String(data.currentLevel)}
+            tone="aubergine"
+            icon={<Trophy size={28} strokeWidth={2} />}
+          />
+          <LifetimeStat
+            label="Longest streak"
+            value={`${data.longestStreak}d`}
+            tone="terracotta"
+            icon={<Flame size={28} strokeWidth={2} />}
+          />
+        </div>
+        <div className="w-full lg:w-[45%] md:w-[45%]">
+          <ReferralCard />
+        </div>
       </section>
 
-      <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-10 animate-[fade-up_0.8s_0.18s_ease_both]">
-        <LifetimeStat
-          label="g$ earned"
-          value={lifetimeEarned.toLocaleString(undefined, {
-            maximumFractionDigits: 2,
-          })}
-          tone="mustard"
-          icon={<Coins size={28} strokeWidth={2} />}
-          sub={
-            pendingG > 0
-              ? `${data.totalGEarned} claimed · ${pendingG.toLocaleString()} pending`
-              : undefined
-          }
-        />
-        <LifetimeStat
-          label="Badges"
-          value={`${data.modulesCompleted}/${data.modulesTotal}`}
-          tone="forest"
-          icon={<Award size={28} strokeWidth={2} />}
-        />
-        <LifetimeStat
-          label="Level"
-          value={String(data.currentLevel)}
-          tone="aubergine"
-          icon={<Trophy size={28} strokeWidth={2} />}
-        />
-        <LifetimeStat
-          label="Longest streak"
-          value={`${data.longestStreak}d`}
-          tone="terracotta"
-          icon={<Flame size={28} strokeWidth={2} />}
-        />
+      <section></section>
+      <section className="mb-6 animate-[fade-up_0.8s_0.24s_ease_both]">
+        <ClaimCard />
       </section>
-
       <section className="mb-10 animate-[fade-up_0.8s_0.32s_ease_both]">
-        <div className="flex items-end justify-between mb-1">
+        <div className="mb-1">
           <h2 className="display text-[22px] font-semibold tracking-[-0.015em] text-indigo">
             Badge collection
           </h2>
-          <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-fg-soft">
-            {earnedBadges.length} of {data.modulesTotal}
-          </div>
         </div>
         <p className="text-[12.5px] text-fg-soft mb-5">
-          Each badge is a soulbound NFT on Celo. Yours forever.
+          Each badge is a soulbound NFT on Celo, pulled live from your wallet.
+          Yours forever.
         </p>
-
-        {earnedBadges.length === 0 && <EmptyBadgeState />}
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {data.badges.map((badge) => (
-            <BadgeCard key={badge.moduleSlug} badge={badge} />
-          ))}
-        </div>
-      </section>
-      <section>
-        <LeaderboardWidget />
+        <OnchainBadgeCollection />
       </section>
     </>
   );
