@@ -61,6 +61,26 @@ export const siweConfig = createSIWEConfig({
     }
   },
 
+  onSignIn: () => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      const isPublic = path === "/" || path === "/leaderboard";
+      if (isPublic) {
+        window.location.assign("/overview");
+      }
+    }
+  },
+
+  onSignOut: () => {
+    if (typeof window !== "undefined") {
+      const path = window.location.pathname;
+      const isPublic = path === "/" || path === "/leaderboard";
+      if (!isPublic) {
+        window.location.assign("/");
+      }
+    }
+  },
+
   signOutOnNetworkChange: false,
   signOutOnAccountChange: true,
   signOutOnDisconnect: true,

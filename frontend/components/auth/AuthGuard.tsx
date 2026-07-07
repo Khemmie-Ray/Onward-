@@ -15,16 +15,25 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const { data: session, status: sessionStatus } = useSession();
   const authFetch = useAuthFetch();
   const lastRedirectRef = useRef<string | null>(null);
+  const [hydrationTimedOut, setHydrationTimedOut] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => setHydrationTimedOut(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  const isWalletHydrating =
-    walletStatus === "connecting" || walletStatus === "reconnecting";
   const isSessionLoading = sessionStatus === "loading";
   const isAuthenticated =
     sessionStatus === "authenticated" && !!session?.address;
+
+  const isWalletHydrating =
+    !isAuthenticated &&
+    !hydrationTimedOut &&
+    (walletStatus === "connecting" || walletStatus === "reconnecting");
 
   const { data, isLoading: isProfileLoading } = useQuery({
     queryKey: ["me", "status", session?.address ?? "anon"],
