@@ -20,14 +20,9 @@ const LifetimeStat = ({
   const t = TONE_MAP[toneName];
   return (
     <div
-      className={`relative overflow-hidden rounded-[16px] p-5 ${t.bg} ${t.shadow}`}
+      className={`relative rounded-[16px] lg:w-[48%] md:w-[48%] w-full p-5 ${t.bg} ${t.shadow}`}
     >
-      <div
-        aria-hidden
-        className={`pointer-events-none absolute inset-0 ${t.fg} opacity-[0.06]`}
-      >
-        <MudclothPattern />
-      </div>
+   
       <div
         aria-hidden
         className={`pointer-events-none absolute right-3 top-3 ${t.fg} opacity-30`}
