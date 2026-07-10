@@ -1,9 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft } from "lucide-react";
-import { useAppKitAccount } from "@reown/appkit/react";
+import { useConnection } from "wagmi";
 import { type Address } from "viem";
 
 import { PreRoundBriefing } from "@/components/dashboard/play/PreRoundBriefing";
@@ -34,7 +32,7 @@ type Phase = "tab-select" | "briefing" | "playing" | "ended";
 
 export default function PlayPage() {
   const authFetch = useAuthFetch();
-  const { address } = useAppKitAccount();
+  const { address } = useConnection();
   const { isVerified, startVerifying } = useIdentityContext();
 
   const [activeTab, setActiveTab] = useState<Mode>("free");
@@ -276,88 +274,88 @@ export default function PlayPage() {
   const txPending = passed === true && !submitData?.onchain?.rewardTxHash;
 
   return (
-      <div className="px-4 py-2 w-full bg-canvas">
-        <div className="flex justify-between lg:flex-row md:flex-row flex-col gap-6">
-          <aside className="order-2 lg:order-1 lg:w-[48%] md:w-[48%} w-full">
-            <PlayLeftPanel
+    <div className="px-4 py-2 w-full bg-canvas">
+      <div className="flex justify-between lg:flex-row md:flex-row flex-col gap-6">
+        <aside className="order-2 lg:order-1 lg:w-[48%] md:w-[48%] w-full">
+          <PlayLeftPanel
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
+            stakeAmount={stakeAmount}
+          />
+        </aside>
+
+        <main className="order-1 lg:order-2 lg:w-[48%] md:w-[48%] w-full">
+          {phase === "tab-select" && (
+            <PlayStage
               activeTab={activeTab}
-              onTabChange={setActiveTab}
+              freeStep={freeStep}
+              freeCapMessage={freeCapMessage}
+              freeError={freeError}
+              onStartFree={startFreeRound}
+              onSwitchToPremium={() => setActiveTab("premium")}
+              premiumStep={premiumStep}
+              premiumCapMessage={premiumCapMessage}
+              premiumError={premiumError}
+              hasEnoughBalance={hasEnoughBalance}
+              balance={balance}
               stakeAmount={stakeAmount}
+              needsApproval={needsApproval}
+              isVerified={isVerified}
+              onStartPremium={startPremiumRound}
+              onVerify={startVerifying}
             />
-          </aside>
+          )}
 
-          <main className="order-1 lg:order-2 lg:w-[48%] md:w-[48%} w-full">
-            {phase === "tab-select" && (
-              <PlayStage
-                activeTab={activeTab}
-                freeStep={freeStep}
-                freeCapMessage={freeCapMessage}
-                freeError={freeError}
-                onStartFree={startFreeRound}
-                onSwitchToPremium={() => setActiveTab("premium")}
-                premiumStep={premiumStep}
-                premiumCapMessage={premiumCapMessage}
-                premiumError={premiumError}
-                hasEnoughBalance={hasEnoughBalance}
-                balance={balance}
-                stakeAmount={stakeAmount}
-                needsApproval={needsApproval}
-                isVerified={isVerified}
-                onStartPremium={startPremiumRound}
-                onVerify={startVerifying}
+          {phase === "briefing" && preview && (
+            <div className="rounded-[16px] bg-paper p-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)] py-10">
+              <PreRoundBriefing
+                familyLabel={preview.family_label}
+                familyDescription={preview.family_description}
+                exemplar={preview.exemplar}
+                scamIcon={preview.exemplar_icon}
+                onReady={handleStartPlay}
+                isStarting={isBeginning}
               />
-            )}
+            </div>
+          )}
 
-            {phase === "briefing" && preview && (
-              <div className="rounded-[16px] bg-paper p-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)] py-10">
-                <PreRoundBriefing
-                  familyLabel={preview.family_label}
-                  familyDescription={preview.family_description}
-                  exemplar={preview.exemplar}
-                  scamIcon={preview.exemplar_icon}
-                  onReady={handleStartPlay}
-                  isStarting={isBeginning}
-                />
-              </div>
-            )}
+          {phase === "playing" && preview && roundId && (
+            <div className="rounded-[16px] bg-paper p-4 shadow-[0_2px_8px_rgba(31,58,110,0.05)] py-10 flex items-center justify-center">
+              <WhackAScam
+                roundId={roundId}
+                items={preview.display_items}
+                onComplete={handleGameComplete}
+                onAbandon={handleAbandon}
+                boardProgression={preview.board_progression}
+                popupDurationMs={preview.popup_duration_ms}
+                baseSpawnDelay={preview.base_spawn_delay}
+                spawnJitter={preview.spawn_jitter}
+              />
+            </div>
+          )}
 
-            {phase === "playing" && preview && roundId && (
-              <div className="rounded-[16px] bg-paper p-4 shadow-[0_2px_8px_rgba(31,58,110,0.05)] py-10 flex items-center justify-center">
-                <WhackAScam
-                  roundId={roundId}
-                  items={preview.display_items}
-                  onComplete={handleGameComplete}
-                  onAbandon={handleAbandon}
-                  boardProgression={preview.board_progression}
-                  popupDurationMs={preview.popup_duration_ms}
-                  baseSpawnDelay={preview.base_spawn_delay}
-                  spawnJitter={preview.spawn_jitter}
-                />
-              </div>
-            )}
-
-            {phase === "ended" && preview && result && (
-              <div className="rounded-[16px] bg-paper p-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)] py-10">
-                <EndRoundModal
-                  result={result}
-                  passed={passed}
-                  mode={preview.mode}
-                  familyLabel={preview.family_label}
-                  familyDescription={preview.family_description}
-                  exemplar={preview.exemplar}
-                  rewardAmount={submitData?.reward_g_amount ?? 0}
-                  pointsAwarded={submitData?.points_awarded ?? 0}
-                  newPointsBalance={submitData?.new_points_balance ?? null}
-                  levelBefore={submitData?.level_before ?? 0}
-                  levelAfter={submitData?.level_after ?? 0}
-                  txPending={txPending}
-                  txHash={submitData?.onchain?.rewardTxHash ?? null}
-                  onPlayAgain={resetToTabSelect}
-                />
-              </div>
-            )}
-          </main>
-        </div>
+          {phase === "ended" && preview && result && (
+            <div className="rounded-[16px] bg-paper p-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)] py-10">
+              <EndRoundModal
+                result={result}
+                passed={passed}
+                mode={preview.mode}
+                familyLabel={preview.family_label}
+                familyDescription={preview.family_description}
+                exemplar={preview.exemplar}
+                rewardAmount={submitData?.reward_g_amount ?? 0}
+                pointsAwarded={submitData?.points_awarded ?? 0}
+                newPointsBalance={submitData?.new_points_balance ?? null}
+                levelBefore={submitData?.level_before ?? 0}
+                levelAfter={submitData?.level_after ?? 0}
+                txPending={txPending}
+                txHash={submitData?.onchain?.rewardTxHash ?? null}
+                onPlayAgain={resetToTabSelect}
+              />
+            </div>
+          )}
+        </main>
       </div>
+    </div>
   );
 }
