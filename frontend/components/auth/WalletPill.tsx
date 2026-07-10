@@ -8,8 +8,10 @@ import {
   LogOut,
   User as UserIcon,
   Check,
+  KeyRound,
 } from "lucide-react";
 import { UserAvatar } from "../shared/UserAvatar";
+import { useWeb3Auth } from "@web3auth/modal/react";
 
 export function WalletPill({
   address,
@@ -23,6 +25,7 @@ export function WalletPill({
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { web3Auth } = useWeb3Auth();
 
   useEffect(() => {
     if (!open) return;
@@ -44,6 +47,28 @@ export function WalletPill({
       setCopied(false);
       setOpen(false);
     }, 1200);
+  };
+
+  const handleExport = async () => {
+    setOpen(false);
+    try {
+      // Opens Web3Auth's wallet services UI where the user can reveal/export
+      // their private key (must be enabled in the dashboard key-export settings).
+      const walletServices = web3Auth?.getPlugin?.("WALLET_SERVICES_PLUGIN");
+      // Some SDK versions expose showWalletUI / showCheckout on the plugin.
+      // Fall back to the wallet connect page if not available.
+      // @ts-expect-error plugin shape varies by SDK version
+      if (walletServices?.showWalletUI) {
+        // @ts-expect-error see above
+        await walletServices.showWalletUI();
+      } else {
+        console.warn(
+          "[export] wallet services UI not available on this SDK version",
+        );
+      }
+    } catch (e) {
+      console.error("[export wallet failed]", e);
+    }
   };
 
   return (
@@ -86,6 +111,13 @@ export function WalletPill({
             <UserIcon size={14} strokeWidth={2.5} />
             Profile
           </Link>
+          <button
+            onClick={handleExport}
+            className="w-full flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-medium text-indigo hover:bg-canvas-warm"
+          >
+            <KeyRound size={14} strokeWidth={2.5} />
+            Wallet &amp; keys
+          </button>
           <div className="h-px bg-shadow my-1" />
           <button
             onClick={() => {
