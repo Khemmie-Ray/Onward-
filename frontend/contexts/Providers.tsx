@@ -1,66 +1,28 @@
 "use client";
 
-import { wagmiAdapter, projectId } from "@/config";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { createAppKit } from "@reown/appkit/react";
-import { celo } from "@reown/appkit/networks";
-import { SessionProvider } from "next-auth/react";
 import React, { type ReactNode } from "react";
-import { cookieToInitialState, WagmiProvider, type Config } from "wagmi";
+import { Web3AuthProvider } from "@web3auth/modal/react";
+import { WagmiProvider } from "@web3auth/modal/react/wagmi";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { SessionProvider } from "next-auth/react";
+import web3AuthContextConfig from "@/config/web3authContext";
 import { IdentityProvider } from "./IdentityContext";
-import { siweConfig } from "@/lib/siwe-config";
+import { SiweGate } from "./SiweGate";
 
 const queryClient = new QueryClient();
 
-if (!projectId) {
-  throw new Error("Project ID is not defined");
-}
-
-const metadata = {
-  name: "Onward",
-  description: "Learn-to-earn for the GoodDollar ecosystem",
-  // url: "http://localhost:3000",
-  url: "https://onwardlearn.app",
-  icons: ["https://avatars.githubusercontent.com/u/179229932"],
-};
-
-createAppKit({
-  adapters: [wagmiAdapter],
-  projectId,
-  networks: [celo],
-  defaultNetwork: celo,
-  metadata,
-  siweConfig,
-  features: {
-    socials: ["google"],
-    emailShowWallets: true,
-    analytics: false,
-  },
-});
-
-function Providers({
-  children,
-  cookies,
-}: {
-  children: ReactNode;
-  cookies: string | null;
-}) {
-  const initialState = cookieToInitialState(
-    wagmiAdapter.wagmiConfig as Config,
-    cookies,
-  );
-
+function Providers({ children }: { children: ReactNode }) {
   return (
-    <WagmiProvider
-      config={wagmiAdapter.wagmiConfig as Config}
-      initialState={initialState}
-    >
+    <Web3AuthProvider config={web3AuthContextConfig}>
       <QueryClientProvider client={queryClient}>
-        <SessionProvider>
-          <IdentityProvider>{children}</IdentityProvider>
-        </SessionProvider>
+        <WagmiProvider>
+          <SessionProvider>
+            <SiweGate />
+            <IdentityProvider>{children}</IdentityProvider>
+          </SessionProvider>
+        </WagmiProvider>
       </QueryClientProvider>
-    </WagmiProvider>
+    </Web3AuthProvider>
   );
 }
 
