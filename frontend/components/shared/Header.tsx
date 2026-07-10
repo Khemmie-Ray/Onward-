@@ -1,19 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import {
-  useAppKit,
-  useAppKitAccount,
-  useDisconnect,
-} from "@reown/appkit/react";
+import { useConnection } from "wagmi";
 import { Squash as Hamburger } from "hamburger-react";
 import { ArrowRight } from "lucide-react";
 import { LoopSigil } from "@/components/home/motifs";
 import { WalletPill } from "../auth/WalletPill";
+import { LoginModal } from "../auth/LoginModal";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
+import { useOnwardLogout } from "@/hooks/useOnwardLogout";
 
 type ProfileStatus = {
   hasUsername: boolean;
@@ -23,15 +21,16 @@ type ProfileStatus = {
 const INITIAL_HEADER_HEIGHT = 96;
 
 const Header = () => {
-  const { open } = useAppKit();
-  const { isConnected, address, status } = useAppKitAccount();
-  const { disconnect } = useDisconnect();
-  const router = useRouter();
+  const { address, isConnected, isConnecting, isReconnecting } =
+    useConnection();
+  console.log(isConnected);
+  const logout = useOnwardLogout();
   const pathname = usePathname();
   const authFetch = useAuthFetch();
 
   const [mounted, setMounted] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(INITIAL_HEADER_HEIGHT);
 
   const headerRef = useRef<HTMLElement | null>(null);
@@ -66,7 +65,7 @@ const Header = () => {
     };
   }, [isMobileMenuOpen]);
 
-  const isHydrating = status === "connecting" || status === "reconnecting";
+  const isHydrating = isConnecting || isReconnecting;
   const showControl = mounted && !isHydrating;
   const isLeaderboardActive = pathname === "/leaderboard";
 
@@ -85,13 +84,12 @@ const Header = () => {
 
   const handleDisconnect = async () => {
     setIsMobileMenuOpen(false);
-    await disconnect();
-    router.push("/");
+    await logout();
   };
 
   const handleConnectClick = () => {
     setIsMobileMenuOpen(false);
-    open();
+    setLoginOpen(true);
   };
 
   const navPillBase =
@@ -125,14 +123,16 @@ const Header = () => {
             </div>
 
             <div className="hidden md:flex justify-self-center">
-              {!isConnected && <Link
-                href="/leaderboard"
-                className={`${navPillBase} text-indigo ${
-                  isLeaderboardActive ? navPillActive : navPillInactive
-                }`}
-              >
-                Leaderboard
-              </Link>}
+              {!isConnected && (
+                <Link
+                  href="/leaderboard"
+                  className={`${navPillBase} text-indigo ${
+                    isLeaderboardActive ? navPillActive : navPillInactive
+                  }`}
+                >
+                  Leaderboard
+                </Link>
+              )}
             </div>
 
             <div className="justify-self-end">
@@ -146,10 +146,10 @@ const Header = () => {
                     />
                   ) : (
                     <button
-                      onClick={() => open()}
-                      className="rounded-xl px-5 py-2.5 font-semibold text-paper transition-transform hover:-translate-y-0.5 active:translate-y-0 bg-terracotta shadow-lg"
+                      onClick={handleConnectClick}
+                      className="rounded-xl px-8 py-2.5 font-semibold text-paper transition-transform hover:-translate-y-0.5 active:translate-y-0 bg-terracotta shadow-lg"
                     >
-                      Connect wallet
+                      Sign in
                     </button>
                   ))}
               </div>
@@ -175,24 +175,26 @@ const Header = () => {
               className="bg-paper rounded-2xl shadow-[0_12px_32px_rgba(31,58,110,0.12)] border border-fg-soft/10 p-4 flex flex-col gap-3"
               style={{ animation: "fade-up 0.3s ease both" }}
             >
-              {!isConnected && <Link
-                href="/leaderboard"
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`flex items-center justify-between py-3 px-4 rounded-xl font-semibold border border-fg-soft/25 transition ${
-                  isLeaderboardActive
-                    ? "bg-mustard/30 text-indigo"
-                    : "text-indigo hover:bg-canvas-warm"
-                }`}
-              >
-                Leaderboard
-                {!isLeaderboardActive && (
-                  <ArrowRight
-                    size={14}
-                    strokeWidth={2.5}
-                    className="text-mustard"
-                  />
-                )}
-              </Link>}
+              {!isConnected && (
+                <Link
+                  href="/leaderboard"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={`flex items-center justify-between py-3 px-4 rounded-xl font-semibold border border-fg-soft/25 transition ${
+                    isLeaderboardActive
+                      ? "bg-mustard/30 text-indigo"
+                      : "text-indigo hover:bg-canvas-warm"
+                  }`}
+                >
+                  Leaderboard
+                  {!isLeaderboardActive && (
+                    <ArrowRight
+                      size={14}
+                      strokeWidth={2.5}
+                      className="text-mustard"
+                    />
+                  )}
+                </Link>
+              )}
 
               {showControl && (
                 <div className="pt-3 border-t border-fg-soft/10">
@@ -207,7 +209,7 @@ const Header = () => {
                       onClick={handleConnectClick}
                       className="w-full rounded-xl px-6 py-3.5 font-semibold text-paper bg-terracotta shadow-lg hover:bg-terracotta/90 transition"
                     >
-                      Connect wallet
+                      Sign in
                     </button>
                   )}
                 </div>
@@ -216,11 +218,7 @@ const Header = () => {
           </div>
         )}
       </header>
-      <div
-        aria-hidden
-        className="shrink-0"
-        style={{ height: headerHeight }}
-      />
+      <div aria-hidden className="shrink-0" style={{ height: headerHeight }} />
 
       {isMobileMenuOpen && (
         <div
@@ -229,6 +227,8 @@ const Header = () => {
           aria-hidden
         />
       )}
+
+      <LoginModal open={loginOpen} onOpenChange={setLoginOpen} />
     </>
   );
 };

@@ -1,28 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import { useSession } from "next-auth/react";
-import { useAppKit } from "@reown/appkit/react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import { ArrowRight, Trophy, Users } from "lucide-react";
 import type { LeaderboardStats } from "./type";
+import { LoginModal } from "@/components/auth/LoginModal";
 
 export function StatsCard({ stats }: { stats: LeaderboardStats | null }) {
   const { status } = useSession();
-  const { open } = useAppKit();
   const router = useRouter();
+  const [loginOpen, setLoginOpen] = useState(false);
 
   const handlePlayClick = () => {
     if (status === "authenticated") {
       router.push("/play");
       return;
     }
-    toast("Connect your wallet to play a round", {
-      action: {
-        label: "Connect",
-        onClick: () => open(),
-      },
-    });
+    setLoginOpen(true);
   };
 
   const weeksPaid = stats?.lifetime.weeks_paid ?? 0;
@@ -82,6 +77,8 @@ export function StatsCard({ stats }: { stats: LeaderboardStats | null }) {
           </button>
         </Partition>
       </div>
+
+      <LoginModal open={loginOpen} onOpenChange={setLoginOpen} />
     </div>
   );
 }

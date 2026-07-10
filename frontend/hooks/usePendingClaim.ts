@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useReadContract } from "wagmi";
 import { toast } from "sonner";
-import { useAppKitAccount } from "@reown/appkit/react";
+import { useConnection } from "wagmi";
 import { onwardBadgesAbi } from "@/constants/abis";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import { useIdentityContext } from "@/contexts/IdentityContext";
@@ -13,7 +13,7 @@ import { CONTRACT_ADDRESSES } from "@/constants/contracts/address";
 const ONWARD_BADGES_ADDRESS = CONTRACT_ADDRESSES.onwardBadges;
 
 export function usePendingClaim() {
-  const { address } = useAppKitAccount();
+  const { address } = useConnection();
   const { isVerified } = useIdentityContext();
   const authFetch = useAuthFetch();
 
