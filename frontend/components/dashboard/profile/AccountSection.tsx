@@ -1,13 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { useDisconnect } from "@reown/appkit/react";
 import { Check, Copy, LogOut, Wallet } from "lucide-react";
+import { useOnwardLogout } from "@/hooks/useOnwardLogout";
 
 export function AccountSection({ walletAddress }: { walletAddress: string }) {
-  const { disconnect } = useDisconnect();
-  const router = useRouter();
+  const logout = useOnwardLogout();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -17,8 +15,7 @@ export function AccountSection({ walletAddress }: { walletAddress: string }) {
   };
 
   const handleSignOut = async () => {
-    await disconnect();
-    router.push("/");
+    await logout();
   };
 
   return (

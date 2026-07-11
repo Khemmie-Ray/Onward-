@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { useAppKitAccount } from "@reown/appkit/react";
+import { useConnection } from "wagmi";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "next-auth/react";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
@@ -11,7 +11,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const [isMounted, setIsMounted] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const { status: walletStatus } = useAppKitAccount();
+  const { isConnecting, isReconnecting } = useConnection();
   const { data: session, status: sessionStatus } = useSession();
   const authFetch = useAuthFetch();
   const lastRedirectRef = useRef<string | null>(null);
@@ -30,10 +30,11 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAuthenticated =
     sessionStatus === "authenticated" && !!session?.address;
 
+  // Wallet hydration only blocks when there's no session yet. With a valid
+  // session, pages render fine; the wallet reconnects in the background and
+  // is only needed when the user signs a transaction.
   const isWalletHydrating =
-    !isAuthenticated &&
-    !hydrationTimedOut &&
-    (walletStatus === "connecting" || walletStatus === "reconnecting");
+    !isAuthenticated && !hydrationTimedOut && (isConnecting || isReconnecting);
 
   const { data, isLoading: isProfileLoading } = useQuery({
     queryKey: ["me", "status", session?.address ?? "anon"],
@@ -91,7 +92,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   }
 
   if (isWalletHydrating) {
-    return <AuthLoadingScreen message="Connecting wallet…" />;
+    return <AuthLoadingScreen message="Connecting…" />;
   }
 
   if (isSessionLoading) {

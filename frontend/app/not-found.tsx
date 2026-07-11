@@ -3,22 +3,19 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, Compass } from "lucide-react";
-import { useAppKitAccount } from "@reown/appkit/react";
+import { useConnection } from "wagmi";
 
 export default function NotFound() {
-  const { isConnected, status } = useAppKitAccount();
+  const { isConnected, isConnecting, isReconnecting } = useConnection();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => setMounted(true), []);
 
-  const isHydrating =
-    status === "connecting" || status === "reconnecting";
+  const isHydrating = isConnecting || isReconnecting;
 
   const showAuthedCTA = mounted && !isHydrating && isConnected;
   const destination = showAuthedCTA ? "/overview" : "/";
-  const destinationLabel = showAuthedCTA
-    ? "Back to dashboard"
-    : "Back to home";
+  const destinationLabel = showAuthedCTA ? "Back to dashboard" : "Back to home";
 
   return (
     <main className="min-h-screen bg-canvas flex flex-col items-center justify-center px-6 relative overflow-hidden">
@@ -43,12 +40,12 @@ export default function NotFound() {
         </div>
 
         <h1 className="display text-[44px] md:text-[56px] font-semibold leading-[1.05] tracking-[-0.025em] text-indigo mb-4">
-          This path doesn't exist yet.
+          This path doesn&apos;t exist yet.
         </h1>
 
         <p className="text-[15px] leading-[1.6] text-fg-soft mb-8">
-          Maybe a typo, maybe a stale link. Either way, let's get you back on
-          track.
+          Maybe a typo, maybe a stale link. Either way, let&apos;s get you back
+          on track.
         </p>
 
         <Link

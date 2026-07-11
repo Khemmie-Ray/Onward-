@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useAppKitAccount } from "@reown/appkit/react";
-import { usePublicClient, useWalletClient } from "wagmi";
+import { useConnection, usePublicClient, useWalletClient } from "wagmi";
 import { celo } from "wagmi/chains";
 import { ClaimSDK, IdentitySDK } from "@goodsdks/citizen-sdk";
 import { useIdentityContext } from "@/contexts/IdentityContext";
@@ -20,7 +19,7 @@ export type ClaimState =
   | "error";
 
 export function useGoodDollarClaim() {
-  const { address } = useAppKitAccount();
+  const { address } = useConnection();
   const publicClient = usePublicClient({ chainId: celo.id });
   const { data: walletClient } = useWalletClient({ chainId: celo.id });
   const { isVerified } = useIdentityContext();
@@ -155,8 +154,7 @@ export function useGoodDollarClaim() {
     error,
     claim,
     refetch,
-    canClaim:
-      state === "available" && isVerified && entitlement > 0n,
+    canClaim: state === "available" && isVerified && entitlement > 0n,
     isClaiming: state === "claiming",
   };
 }

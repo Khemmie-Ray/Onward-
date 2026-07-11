@@ -1,14 +1,9 @@
 import type { NextAuthOptions } from "next-auth";
 import credentialsProvider from "next-auth/providers/credentials";
-import {
-  type SIWESession,
-  verifySignature,
-  getChainIdFromMessage,
-  getAddressFromMessage,
-} from "@reown/appkit-siwe";
+import { SiweMessage } from "siwe";
 
 declare module "next-auth" {
-  interface Session extends SIWESession {
+  interface Session {
     address: string;
     chainId: number;
   }
@@ -17,11 +12,6 @@ declare module "next-auth" {
 const nextAuthSecret = process.env.NEXTAUTH_SECRET;
 if (!nextAuthSecret) {
   throw new Error("NEXTAUTH_SECRET is not set");
-}
-
-const projectId = process.env.NEXT_PUBLIC_PROJECTID;
-if (!projectId) {
-  throw new Error("NEXT_PUBLIC_PROJECTID is not set");
 }
 
 export const authOptions: NextAuthOptions = {
@@ -39,20 +29,16 @@ export const authOptions: NextAuthOptions = {
           if (!credentials?.message) {
             throw new Error("SiweMessage is undefined");
           }
-          const { message, signature } = credentials;
-          const address = getAddressFromMessage(message);
-          const chainId = getChainIdFromMessage(message);
 
-          const isValid = await verifySignature({
-            address,
-            message,
-            signature,
-            chainId,
-            projectId,
+          const siwe = new SiweMessage(credentials.message);
+          const result = await siwe.verify({
+            signature: credentials.signature || "",
           });
 
-          if (isValid) {
-            return { id: `${chainId}:${address}` };
+          if (result.success) {
+            return {
+              id: `${result.data.chainId}:${result.data.address}`,
+            };
           }
           return null;
         } catch {
@@ -62,14 +48,14 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-  session({ session, token }) {
-    if (!token.sub) return session;
-    const [, chainId, address] = token.sub.split(":");
-    if (chainId && address) {
-      session.address = address;
-      session.chainId = parseInt(chainId, 10);
-    }
-    return session;
+    session({ session, token }) {
+      if (!token.sub) return session;
+      const [chainId, address] = token.sub.split(":");
+      if (chainId && address) {
+        session.address = address;
+        session.chainId = parseInt(chainId, 10);
+      }
+      return session;
+    },
   },
-},
 };

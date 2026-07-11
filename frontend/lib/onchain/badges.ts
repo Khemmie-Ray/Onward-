@@ -68,19 +68,6 @@ export type CompletionTxResult = {
   wasAccrued: boolean;
 };
 
-/**
- * Single atomic call: mints badge AND either pays or accrues reward.
- *
- * Returns the tx hash, the badge token ID, and whether payment was direct
- * (vs accrued to pending). The boolean reflects what actually happened
- * onchain: even if isVerified=true was passed, the claimId might already
- * be used, in which case wasPaidDirect=false but the badge still mints.
- *
- * @param userWallet — recipient
- * @param moduleSlug — e.g. "what-is-gooddollar"
- * @param rewardAmountG — G$ amount as a plain number (5 not 5e18)
- * @param isVerified — frontend-determined verification status
- */
 export async function processCompletion(args: {
   userWallet: Address;
   moduleSlug: string;

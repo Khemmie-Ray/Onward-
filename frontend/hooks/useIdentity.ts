@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAppKitAccount } from "@reown/appkit/react";
+import { useConnection } from "wagmi";
 import { usePublicClient, useWalletClient } from "wagmi";
 import { celo } from "wagmi/chains";
 import { IdentitySDK } from "@goodsdks/citizen-sdk";
@@ -11,7 +11,7 @@ const GD_ENV = "production" as const;
 export type IdentityStatus = "loading" | "verified" | "not_verified" | "error";
 
 export function useIdentity() {
-  const { address } = useAppKitAccount();
+  const { address } = useConnection();
   const publicClient = usePublicClient({ chainId: celo.id });
   const { data: walletClient } = useWalletClient({ chainId: celo.id });
 

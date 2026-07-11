@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowRight, Flame } from "lucide-react";
-import { useAppKitAccount } from "@reown/appkit/react";
+import { useConnection } from "wagmi";
 import { formatUnits, type Address } from "viem";
 
 import { LoopSigil, SunMotif } from "@/components/home/motifs";
@@ -20,7 +20,7 @@ import { UBIClaimCard } from "@/components/dashboard/UBIClaimCard";
 
 const Overview = () => {
   const authFetch = useAuthFetch();
-  const { address } = useAppKitAccount();
+  const { address } = useConnection();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -122,9 +122,7 @@ const Overview = () => {
         </div>
       </section>
       <main className="flex flex-col lg:flex-row md:flex-row justify-between  mb-8">
-        <section
-          className="flex flex-wrap justify-between gap-y-4 w-full lg:w-[48%] md:w-[48%] animate-[fade-up_0.8s_0.18s_ease_both]"
-        >
+        <section className="flex flex-wrap justify-between gap-y-4 w-full lg:w-[48%] md:w-[48%] animate-[fade-up_0.8s_0.18s_ease_both]">
           <StatCardHero
             label="Streak"
             value={String(data.currentStreak)}
@@ -165,7 +163,6 @@ const Overview = () => {
           />
         </section>
 
-
         <section className="flex flex-col gap-4 w-full lg:w-[48%] animate-[fade-up_0.8s_0.25s_ease_both]">
           <UBIClaimCard />
           {data.currentModule ? (
@@ -195,7 +192,7 @@ const Overview = () => {
               </p>
             </div>
             <Link
-              href="/profile"
+              href="/me"
               className="inline-flex items-center gap-1 text-[12px] font-semibold text-terracotta hover:opacity-80"
             >
               View all <ArrowRight size={12} strokeWidth={2.8} />

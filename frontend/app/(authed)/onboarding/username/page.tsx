@@ -10,7 +10,7 @@ import {
   AvailabilityIcon,
   AvailabilityMessage,
 } from "@/components/dashboard/onboarding/Avalability";
-import { useDisconnect } from "@reown/appkit/react";
+import { useOnwardLogout } from "@/hooks/useOnwardLogout";
 import { LogOut } from "lucide-react";
 
 type AvailabilityState =
@@ -23,7 +23,7 @@ export default function OnboardingUsernamePage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const authFetch = useAuthFetch();
-  const { disconnect } = useDisconnect();
+  const logout = useOnwardLogout();
 
   const [name, setName] = useState("");
   const [selectedAvatar, setSelectedAvatar] = useState<string | null>(null);
@@ -34,8 +34,7 @@ export default function OnboardingUsernamePage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const handleDisconnect = async () => {
-    await disconnect();
-    router.replace("/");
+    await logout();
   };
 
   const checkAvailability = useCallback(
@@ -88,6 +87,10 @@ export default function OnboardingUsernamePage() {
         body: JSON.stringify({
           display_name: name.trim(),
           avatar_id: selectedAvatar,
+          referral_code:
+            typeof window !== "undefined"
+              ? localStorage.getItem("onward_ref")
+              : null,
         }),
       });
       if (!res.ok) {
