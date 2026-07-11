@@ -1,5 +1,6 @@
 import { type Web3AuthContextConfig } from "@web3auth/modal/react";
 import { WEB3AUTH_NETWORK } from "@web3auth/modal";
+import { CONNECTOR_INITIAL_AUTHENTICATION_MODE } from '@web3auth/modal';
 
 const clientId = process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID;
 
@@ -12,6 +13,7 @@ const web3AuthContextConfig: Web3AuthContextConfig = {
     clientId,
     web3AuthNetwork: WEB3AUTH_NETWORK.SAPPHIRE_DEVNET,
     defaultChainId: "0xa4ec",
+    initialAuthenticationMode: CONNECTOR_INITIAL_AUTHENTICATION_MODE.CONNECT_ONLY,
     // sessionTime: 86400 * 7
   },
 };
