@@ -139,12 +139,9 @@ export function CompletionScreen({
           </div>
           <div className="relative flex items-center justify-between">
             <div className="text-left">
-              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-mustard mb-0.5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-mustard mb-0.5">
                 Reward
-              </div>
-              <div className="text-[12px] text-paper/80">
-                Sent to your wallet
-              </div>
+              </p>
             </div>
             <div className="flex items-baseline gap-1.5">
               <Coins size={18} strokeWidth={2.5} className="text-mustard" />
@@ -186,15 +183,6 @@ export function CompletionScreen({
                 className="inline-flex items-center gap-1 font-semibold text-aubergine hover:opacity-80"
               >
                 View badge mint <ExternalLink size={10} strokeWidth={2.5} />
-              </a>
-              <span className="text-fg-faint">·</span>
-              <a
-                href={`https://celoscan.io/tx/${rewardTxHash}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 font-semibold text-aubergine hover:opacity-80"
-              >
-                View reward tx <ExternalLink size={10} strokeWidth={2.5} />
               </a>
             </div>
           )}

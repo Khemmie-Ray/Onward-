@@ -8,6 +8,7 @@ import { formatUnits, type Address } from "viem";
 
 import { LoopSigil, SunMotif } from "@/components/home/motifs";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
+import { useDailyLoginBonus } from "@/hooks/useDailyLoginBonus";
 import { useGDollarBalance } from "@/hooks/useWhackState";
 import type { DashboardData } from "@/lib/data/dashboard";
 import StatCardHero from "@/components/dashboard/StatCardHero";
@@ -20,6 +21,10 @@ import { UBIClaimCard } from "@/components/dashboard/UBIClaimCard";
 
 const Overview = () => {
   const authFetch = useAuthFetch();
+
+  // Award +5 daily login points on first load each UTC day (toasts on award)
+  useDailyLoginBonus();
+
   const { address } = useConnection();
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState<string | null>(null);
