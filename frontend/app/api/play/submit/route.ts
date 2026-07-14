@@ -6,6 +6,7 @@ import { resolveRoundOnchain } from "@/lib/onchain/play";
 import { isVerifiedOnchainSafe } from "@/lib/onchain/identity";
 import { gradeRound, nextLevel, SCORING, type PlayMode } from "@/lib/scoring";
 import { awardPoints } from "@/lib/server/point";
+import { triggerReferralOnFirstActivity } from "@/lib/referral/trigger";
 
 type SubmitBody = {
   round_id?: string;
@@ -123,6 +124,10 @@ export async function POST(request: Request) {
       level_after: levelAfter,
     })
     .eq("id", session.id);
+
+  // ─── Referral: a completed round (pass or fail) is a qualifying first
+  // activity. Idempotent, so safe to call every round. ─────────────────
+  await triggerReferralOnFirstActivity(user.id);
 
   if (grade.passed) {
     const userUpdate: { current_level: number; total_g_earned?: number } = {

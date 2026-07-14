@@ -7,6 +7,7 @@ import { isVerifiedOnchainSafe } from "@/lib/onchain/identity";
 import { markStreakDay } from "@/lib/streak";
 import { isModuleLocked } from "@/lib/modules/lock-check";
 import { awardPoints } from "@/lib/server/point";
+import { triggerReferralOnFirstActivity } from "@/lib/referral/trigger";
 
 type Body = {
   answers?: Array<{ card_index: number; answer: number | string }>;
@@ -124,7 +125,6 @@ export async function POST(
     });
   }
 
-  // ─── Onchain call (mint badge, distribute G$ if reward > 0) ─
   let onchainResult: {
     badgeTxHash: string;
     badgeTokenId: string;
@@ -163,7 +163,6 @@ export async function POST(
       err instanceof Error ? err.message : "Onchain call failed";
   }
 
-  // ─── DB write ───────────────────────────────────────────
   const { data: completion, error: insertErr } = await supabaseAdmin
     .from("module_completions")
     .insert({
@@ -197,7 +196,6 @@ export async function POST(
       .eq("id", user.id);
   }
 
-  // ─── Award points for module completion ─────────────────
   let pointsAwarded = 0;
   let newPointsBalance: number | null = null;
   try {
@@ -216,8 +214,9 @@ export async function POST(
     newPointsBalance = pointsResult.newBalance;
   } catch (err) {
     console.error("[complete route points award failed]", err);
-    // Don't fail the request — completion still valid, points recoverable later
   }
+
+  await triggerReferralOnFirstActivity(user.id);
 
   await markStreakDay(user.id);
 
