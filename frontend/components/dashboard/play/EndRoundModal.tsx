@@ -83,7 +83,6 @@ export function EndRoundModal({
         </h1>
       </div>
 
-      {/* Stat tiles */}
       <div className="grid grid-cols-3 gap-2 mb-4">
         <StatTile label="Correct" value={result.correctWhacks} tone="forest" />
         <StatTile label="Wrong" value={result.wrongWhacks} tone="terracotta" />
@@ -126,7 +125,7 @@ export function EndRoundModal({
             {newPointsBalance != null && hasPointsReward && (
               <div className="border-t border-paper/15 pt-3 mt-3 flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-paper/70">
-                  Your balance
+                  Your points
                 </span>
                 <span className="display text-[18px] font-bold text-paper tabular-nums">
                   {newPointsBalance.toLocaleString()}
@@ -134,7 +133,6 @@ export function EndRoundModal({
               </div>
             )}
 
-            {/* Only show G$ if it was actually distributed (interim, for premium) */}
             {hasGReward && (
               <div className="border-t border-paper/15 pt-3 mt-3 flex items-center justify-between">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-mustard">
