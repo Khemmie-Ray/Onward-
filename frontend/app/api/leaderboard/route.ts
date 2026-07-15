@@ -1,56 +1,29 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  getWeeklyStandings,
+  getPeriodStart,
+  primaryMode,
+} from "@/lib/leaderboard";
 
 export async function GET(_request: Request) {
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-  const { data: sessions, error } = await supabaseAdmin
-    .from("game_sessions")
-    .select("user_id, correct_whacks, mode")
-    .eq("status", "submitted")
-    .eq("passed", true)
-    .gte("completed_at", sevenDaysAgo.toISOString());
-
-  if (error) {
-    console.error("[leaderboard sessions]", error);
+  let standings;
+  try {
+    standings = await getWeeklyStandings();
+  } catch {
     return NextResponse.json(
       { error: "Failed to load leaderboard" },
       { status: 500 },
     );
   }
 
-  const stats = new Map<
-    string,
-    {
-      user_id: string;
-      correct_whacks: number;
-      rounds: number;
-      premium_rounds: number;
-    }
-  >();
-
-  for (const s of sessions ?? []) {
-    const existing = stats.get(s.user_id) ?? {
-      user_id: s.user_id,
-      correct_whacks: 0,
-      rounds: 0,
-      premium_rounds: 0,
-    };
-    existing.correct_whacks += s.correct_whacks ?? 0;
-    existing.rounds += 1;
-    if (s.mode === "premium") existing.premium_rounds += 1;
-    stats.set(s.user_id, existing);
-  }
-
-  const top10 = Array.from(stats.values())
-    .sort((a, b) => b.correct_whacks - a.correct_whacks)
-    .slice(0, 10);
+  const periodStart = getPeriodStart();
+  const top10 = standings.slice(0, 10);
 
   if (top10.length === 0) {
     return NextResponse.json({
       leaderboard: [],
-      period: { start: sevenDaysAgo.toISOString() },
+      period: { start: periodStart.toISOString() },
     });
   }
 
@@ -72,14 +45,14 @@ export async function GET(_request: Request) {
       streak: user?.current_streak ?? 0,
       correct_whacks: s.correct_whacks,
       rounds_played: s.rounds,
-      primary_mode: s.premium_rounds > s.rounds / 2 ? "premium" : "free",
+      primary_mode: primaryMode(s),
     };
   });
 
   return NextResponse.json({
     leaderboard,
     period: {
-      start: sevenDaysAgo.toISOString(),
+      start: periodStart.toISOString(),
       end: new Date().toISOString(),
     },
   });

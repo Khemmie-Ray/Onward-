@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import type { LeaderboardEntry, LeaderboardStats } from "./type";
+import { TOTAL_WEEKLY_PRIZE_POOL } from "@/lib/leaderboard-constants";
 
 export function StatsMarginalia({
   stats,
@@ -27,14 +28,16 @@ export function StatsMarginalia({
         <Dot />
         <span>
           <span className="font-bold text-indigo tabular-nums">
-            {(stats?.lifetime.g_paid_out ?? 0).toLocaleString()}
+            {(stats?.platform.g_distributed ?? 0).toLocaleString()}
           </span>{" "}
-          G$ paid out
+          G$ distributed
         </span>
         <Dot />
         <span>
-          <span className="font-bold text-mustard tabular-nums">300</span> G$ on
-          the line this week
+          <span className="font-bold text-mustard tabular-nums">
+            {TOTAL_WEEKLY_PRIZE_POOL.toLocaleString()}
+          </span>{" "}
+          points on the line this week
         </span>
       </div>
       <div className="shrink-0">

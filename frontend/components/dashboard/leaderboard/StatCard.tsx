@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Trophy, Users } from "lucide-react";
+import { ArrowRight, Coins, Users } from "lucide-react";
 import type { LeaderboardStats } from "./type";
 import { LoginModal } from "@/components/auth/LoginModal";
 
@@ -20,8 +20,9 @@ export function StatsCard({ stats }: { stats: LeaderboardStats | null }) {
     setLoginOpen(true);
   };
 
+  const gDistributed = stats?.platform.g_distributed ?? 0;
+  const pointsAwarded = stats?.lifetime.points_awarded ?? 0;
   const weeksPaid = stats?.lifetime.weeks_paid ?? 0;
-  const gPaid = stats?.lifetime.g_paid_out ?? 0;
   const activePlayers = stats?.this_week.active_players ?? 0;
   const roundsPlayed = stats?.this_week.rounds_played ?? 0;
 
@@ -29,16 +30,25 @@ export function StatsCard({ stats }: { stats: LeaderboardStats | null }) {
     <div className="bg-paper border border-fg-soft/15 rounded-2xl overflow-hidden mb-10">
       <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.3fr] divide-y md:divide-y-0 md:divide-x divide-fg-soft/15">
         <Partition>
-          <Label>G$ Paid Out</Label>
+          <Label>G$ Distributed</Label>
           <div className="flex items-center gap-3">
             <IconCircle bg="bg-mustard/20" color="text-mustard">
-              <Trophy size={16} strokeWidth={2.5} />
+              <Coins size={16} strokeWidth={2.5} />
             </IconCircle>
-            <BigNumber>{gPaid.toLocaleString()}</BigNumber>
+            <BigNumber>{gDistributed.toLocaleString()}</BigNumber>
           </div>
           <Subtitle>
-            Distributed across {weeksPaid} {weeksPaid === 1 ? "week" : "weeks"}{" "}
-            to top players
+            Paid out across Onward to date
+            {weeksPaid > 0 && (
+              <>
+                {" · "}
+                <span className="text-mustard font-semibold">
+                  {pointsAwarded.toLocaleString()} points
+                </span>{" "}
+                awarded over {weeksPaid} {weeksPaid === 1 ? "week" : "weeks"} of
+                leaderboard contests
+              </>
+            )}
           </Subtitle>
         </Partition>
         <Partition>
@@ -58,14 +68,15 @@ export function StatsCard({ stats }: { stats: LeaderboardStats | null }) {
           <ul className="space-y-2 text-[13px] text-indigo flex flex-wrap justify-between">
             <BulletItem>Pass rounds, climb the board</BulletItem>
             <BulletItem>
-              Rank 1 wins <strong className="text-mustard">80 G$</strong>
+              Rank 1 wins <strong className="text-mustard">500 points</strong>
             </BulletItem>
             <BulletItem>
-              Ranks 2–3 win <strong className="text-mustard">40 G$</strong>
+              Ranks 2–3 win{" "}
+              <strong className="text-mustard">350 & 250 points</strong>
             </BulletItem>
             <BulletItem>
-              Ranks 4–10 win <strong className="text-mustard">20 G$</strong>{" "}
-              each
+              Ranks 4–10 win{" "}
+              <strong className="text-mustard">200 points</strong> each
             </BulletItem>
           </ul>
           <button

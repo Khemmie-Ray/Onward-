@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getWeeklyStandings, findRank } from "@/lib/leaderboard";
 
 export type PlayStats = {
   current_streak: number;
@@ -42,22 +43,12 @@ export async function GET(request: Request) {
     0,
   );
 
-  const weekStart = getWeekStartUTC();
-  const { data: weekRows } = await supabaseAdmin
-    .from("point_transactions")
-    .select("user_id, delta")
-    .gte("created_at", weekStart.toISOString())
-    .gt("delta", 0);
-
   let weeklyRank: number | null = null;
-  if (weekRows && weekRows.length > 0) {
-    const totals = new Map<string, number>();
-    for (const row of weekRows) {
-      totals.set(row.user_id, (totals.get(row.user_id) ?? 0) + row.delta);
-    }
-    const ranked = Array.from(totals.entries()).sort((a, b) => b[1] - a[1]);
-    const userIndex = ranked.findIndex(([id]) => id === user.id);
-    weeklyRank = userIndex >= 0 ? userIndex + 1 : null;
+  try {
+    const standings = await getWeeklyStandings();
+    weeklyRank = findRank(standings, user.id);
+  } catch (err) {
+    console.error("[play/stats standings]", err);
   }
 
   const stats: PlayStats = {
@@ -68,14 +59,4 @@ export async function GET(request: Request) {
   };
 
   return NextResponse.json({ stats });
-}
-
-function getWeekStartUTC(): Date {
-  const now = new Date();
-  const day = now.getUTCDay();
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now);
-  monday.setUTCDate(monday.getUTCDate() + diff);
-  monday.setUTCHours(0, 0, 0, 0);
-  return monday;
 }

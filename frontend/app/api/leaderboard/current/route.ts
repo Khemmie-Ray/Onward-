@@ -7,17 +7,13 @@ import {
   TOP_PAID_RANK,
   TOTAL_WEEKLY_PRIZE_POOL,
   PERIOD_DAYS,
+  getWeeklyStandings,
+  getPeriodStart,
+  primaryMode,
 } from "@/lib/leaderboard";
 
 const MAX_LIMIT = 50;
 const DEFAULT_LIMIT = 10;
-
-type AggregatedStats = {
-  user_id: string;
-  correct_whacks: number;
-  rounds: number;
-  premium_rounds: number;
-};
 
 type LeaderboardEntry = {
   rank: number;
@@ -54,57 +50,30 @@ async function getOptionalUser() {
 }
 
 export async function GET(request: Request) {
-  // Optional auth — public page visits without session work fine.
   const currentUser = await getOptionalUser();
 
   const url = new URL(request.url);
   const limit = Math.min(
     MAX_LIMIT,
-    Math.max(1, parseInt(url.searchParams.get("limit") ?? `${DEFAULT_LIMIT}`))
+    Math.max(1, parseInt(url.searchParams.get("limit") ?? `${DEFAULT_LIMIT}`)),
   );
   const offset = Math.max(0, parseInt(url.searchParams.get("offset") ?? "0"));
 
-  // Period: rolling 7 days (matches the cron's window)
   const periodEnd = new Date();
-  const periodStart = new Date();
-  periodStart.setDate(periodStart.getDate() - PERIOD_DAYS);
+  const periodStart = getPeriodStart();
 
-  const { data: sessions, error } = await supabaseAdmin
-    .from("game_sessions")
-    .select("user_id, correct_whacks, mode")
-    .eq("status", "submitted")
-    .eq("passed", true)
-    .gte("completed_at", periodStart.toISOString());
-
-  if (error) {
-    console.error("[leaderboard sessions]", error);
+  let sortedStats;
+  try {
+    sortedStats = await getWeeklyStandings();
+  } catch {
     return NextResponse.json(
       { error: "Failed to load leaderboard" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
-  // Aggregate per user
-  const statsMap = new Map<string, AggregatedStats>();
-  for (const s of sessions ?? []) {
-    const existing = statsMap.get(s.user_id) ?? {
-      user_id: s.user_id,
-      correct_whacks: 0,
-      rounds: 0,
-      premium_rounds: 0,
-    };
-    existing.correct_whacks += s.correct_whacks ?? 0;
-    existing.rounds += 1;
-    if (s.mode === "premium") existing.premium_rounds += 1;
-    statsMap.set(s.user_id, existing);
-  }
-
-  const sortedStats = Array.from(statsMap.values()).sort(
-    (a, b) => b.correct_whacks - a.correct_whacks
-  );
   const totalPlayers = sortedStats.length;
 
-  // Find viewer's rank in the full sorted list (if signed in)
   const viewerIdx = currentUser
     ? sortedStats.findIndex((s) => s.user_id === currentUser.id)
     : -1;
@@ -147,7 +116,7 @@ export async function GET(request: Request) {
       streak: u?.current_streak ?? 0,
       correct_whacks: s.correct_whacks,
       rounds_played: s.rounds,
-      primary_mode: s.premium_rounds > s.rounds / 2 ? "premium" : "free",
+      primary_mode: primaryMode(s),
       prize_g: PAYOUTS_BY_RANK[rank] ?? 0,
       is_viewer: currentUser ? s.user_id === currentUser.id : false,
     };
@@ -165,10 +134,7 @@ export async function GET(request: Request) {
       streak: u?.current_streak ?? 0,
       correct_whacks: viewerStats.correct_whacks,
       rounds_played: viewerStats.rounds,
-      primary_mode:
-        viewerStats.premium_rounds > viewerStats.rounds / 2
-          ? "premium"
-          : "free",
+      primary_mode: primaryMode(viewerStats),
       prize_g: PAYOUTS_BY_RANK[viewerRank] ?? 0,
       is_viewer: true,
     };

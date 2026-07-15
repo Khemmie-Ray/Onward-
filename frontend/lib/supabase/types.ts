@@ -161,15 +161,14 @@ export type DbStreakDay = {
   rounds_played: number;
 };
 
-export type DbLeaderboardPayout = {
+export type DbLeaderboardPeriod = {
   id: string;
-  user_id: string;
-  rank: number;
   period_start: string;
   period_end: string;
-  amount_g: number;
-  tx_hash: string | null;
-  paid_at: string;
+  week_slug: string;
+  winners_count: number;
+  points_awarded: number;
+  created_at: string;
 };
 
 export type DbUserPoints = {
@@ -276,16 +275,14 @@ export type Database = {
         Update: Partial<DbStreakDay>;
         Relationships: [];
       };
-      leaderboard_payouts: {
-        Row: DbLeaderboardPayout;
-        Insert: Partial<DbLeaderboardPayout> & {
-          user_id: string;
-          rank: number;
+      leaderboard_periods: {
+        Row: DbLeaderboardPeriod;
+        Insert: Partial<DbLeaderboardPeriod> & {
           period_start: string;
           period_end: string;
-          amount_g: number;
+          week_slug: string;
         };
-        Update: Partial<DbLeaderboardPayout>;
+        Update: Partial<DbLeaderboardPeriod>;
         Relationships: [];
       };
       user_points: {

@@ -1,23 +1,7 @@
 import { NextResponse } from "next/server";
-import { type Address, keccak256, toBytes, parseUnits } from "viem";
-import onwardBadgesAbi from "@/constants/abis/abi.json";
-import { CONTRACT_ADDRESSES } from "@/constants/contracts/address";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { publicClient, walletClient } from "@/lib/onchain/badges";
-import { isVerifiedOnchainSafe } from "@/lib/onchain/identity";
-
-const PAYOUTS_BY_RANK: Record<number, number> = {
-  1: 80,
-  2: 40,
-  3: 40,
-  4: 20,
-  5: 20,
-  6: 20,
-  7: 20,
-  8: 20,
-  9: 20,
-  10: 20,
-};
+import { awardPoints } from "@/lib/server/point";
+import { PAYOUTS_BY_RANK, TOP_PAID_RANK } from "@/lib/leaderboard";
 
 function isoWeekSlug(d: Date): string {
   const target = new Date(d.valueOf());
@@ -31,7 +15,7 @@ function isoWeekSlug(d: Date): string {
   const weekNumber =
     1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
   const year = new Date(firstThursday).getUTCFullYear();
-  return `leaderboard-week-${year}-W${String(weekNumber).padStart(2, "0")}`;
+  return `${year}-W${String(weekNumber).padStart(2, "0")}`;
 }
 
 export async function GET(request: Request) {
@@ -49,7 +33,7 @@ export async function GET(request: Request) {
   const periodEndStr = periodEnd.toISOString().slice(0, 10);
   const weekSlug = isoWeekSlug(periodStart);
 
-  const { data: sessions } = await supabaseAdmin
+  const { data: sessions, error: sessErr } = await supabaseAdmin
     .from("game_sessions")
     .select("user_id, correct_whacks")
     .eq("status", "submitted")
@@ -57,20 +41,32 @@ export async function GET(request: Request) {
     .gte("completed_at", periodStart.toISOString())
     .lt("completed_at", periodEnd.toISOString());
 
-  const stats = new Map<string, number>();
-  for (const s of sessions ?? []) {
-    stats.set(
-      s.user_id,
-      (stats.get(s.user_id) ?? 0) + (s.correct_whacks ?? 0)
+  if (sessErr) {
+    console.error("[leaderboard payout] sessions query failed", sessErr);
+    return NextResponse.json(
+      { error: "Failed to load sessions" },
+      { status: 500 },
     );
   }
 
-  const top10 = Array.from(stats.entries())
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 10)
-    .map(([user_id], idx) => ({ user_id, rank: idx + 1 }));
+  const totals = new Map<string, number>();
+  for (const s of sessions ?? []) {
+    totals.set(
+      s.user_id,
+      (totals.get(s.user_id) ?? 0) + (s.correct_whacks ?? 0),
+    );
+  }
 
-  if (top10.length === 0) {
+  const winners = Array.from(totals.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, TOP_PAID_RANK)
+    .map(([user_id, correct_whacks], idx) => ({
+      user_id,
+      correct_whacks,
+      rank: idx + 1,
+    }));
+
+  if (winners.length === 0) {
     return NextResponse.json({
       message: "No players this period",
       period_start: periodStartStr,
@@ -78,98 +74,80 @@ export async function GET(request: Request) {
     });
   }
 
-  const userIds = top10.map((p) => p.user_id);
-  const { data: users } = await supabaseAdmin
-    .from("users")
-    .select("id, wallet_address")
-    .in("id", userIds);
+  const results: Array<{
+    user_id: string;
+    rank: number;
+    points?: number;
+    status: string;
+    error?: string;
+  }> = [];
 
-  const walletMap = new Map(
-    (users ?? []).map((u) => [u.id, u.wallet_address as Address])
-  );
+  let totalPointsAwarded = 0;
 
-  const results = [];
-  for (const player of top10) {
-    const amount = PAYOUTS_BY_RANK[player.rank] ?? 0;
-    if (amount === 0) continue;
+  for (const w of winners) {
+    const points = PAYOUTS_BY_RANK[w.rank] ?? 0;
+    if (points === 0) continue;
 
-    const wallet = walletMap.get(player.user_id);
-    if (!wallet) {
-      results.push({
-        user_id: player.user_id,
-        rank: player.rank,
-        status: "no_wallet",
-      });
-      continue;
-    }
-
-    const { data: existing } = await supabaseAdmin
-      .from("leaderboard_payouts")
-      .select("id")
-      .eq("user_id", player.user_id)
-      .eq("period_start", periodStartStr)
-      .maybeSingle();
-
-    if (existing) {
-      results.push({
-        user_id: player.user_id,
-        rank: player.rank,
-        status: "already_paid",
-      });
-      continue;
-    }
-
-    // Per-winner GoodID verification. Unverified winners still get their
-    // rewards, but they accrue to pendingClaim and unlock on verification.
-    const isVerified = await isVerifiedOnchainSafe(wallet);
-
-    const claimId = keccak256(
-      toBytes(`${wallet.toLowerCase()}:leaderboard:${periodStartStr}`)
-    );
-    const slug = `${weekSlug}-rank-${player.rank}`;
+    // Idempotency key: one award per user, per period, per source.
+    const referenceId = `leaderboard:${periodStartStr}`;
 
     try {
-      const txHash = await walletClient.writeContract({
-        address: CONTRACT_ADDRESSES.onwardBadges,
-        abi: onwardBadgesAbi,
-        functionName: "distribute",
-        args: [
-          wallet,
-          parseUnits(amount.toString(), 18),
-          claimId,
-          slug,
-          isVerified,
-        ],
-      });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
-
-      await supabaseAdmin.from("leaderboard_payouts").insert({
-        user_id: player.user_id,
-        rank: player.rank,
-        period_start: periodStartStr,
-        period_end: periodEndStr,
-        amount_g: amount,
-        tx_hash: txHash,
+      const result = await awardPoints({
+        userId: w.user_id,
+        delta: points,
+        source: "leaderboard_weekly",
+        referenceId,
+        metadata: {
+          rank: w.rank,
+          correct_whacks: w.correct_whacks,
+          period_start: periodStartStr,
+          period_end: periodEndStr,
+          week_slug: weekSlug,
+        },
       });
 
-      results.push({
-        user_id: player.user_id,
-        rank: player.rank,
-        amount,
-        tx_hash: txHash,
-        status: isVerified ? "paid_direct" : "accrued_to_pending",
-      });
+      if (result.wasNew) {
+        totalPointsAwarded += points;
+        results.push({
+          user_id: w.user_id,
+          rank: w.rank,
+          points,
+          status: "awarded",
+        });
+      } else {
+        results.push({
+          user_id: w.user_id,
+          rank: w.rank,
+          status: "already_awarded",
+        });
+      }
     } catch (err) {
-      console.error(
-        `[leaderboard payout failed for ${player.user_id}]`,
-        err
-      );
+      console.error(`[leaderboard payout] failed for ${w.user_id}`, err);
       results.push({
-        user_id: player.user_id,
-        rank: player.rank,
+        user_id: w.user_id,
+        rank: w.rank,
         status: "failed",
         error: err instanceof Error ? err.message : "unknown",
       });
+    }
+  }
+
+  const awardedCount = results.filter((r) => r.status === "awarded").length;
+  if (awardedCount > 0) {
+    const { error: periodErr } = await supabaseAdmin
+      .from("leaderboard_periods")
+      .upsert(
+        {
+          period_start: periodStartStr,
+          period_end: periodEndStr,
+          week_slug: weekSlug,
+          winners_count: awardedCount,
+          points_awarded: totalPointsAwarded,
+        },
+        { onConflict: "period_start" },
+      );
+    if (periodErr) {
+      console.error("[leaderboard payout] period record failed", periodErr);
     }
   }
 
@@ -177,6 +155,8 @@ export async function GET(request: Request) {
     period_start: periodStartStr,
     period_end: periodEndStr,
     week_slug: weekSlug,
+    winners_awarded: awardedCount,
+    total_points_awarded: totalPointsAwarded,
     results,
   });
 }
