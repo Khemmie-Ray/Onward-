@@ -4,7 +4,6 @@ import {
   http,
   keccak256,
   toBytes,
-  parseUnits,
   type Address,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -61,35 +60,38 @@ export function ipfsToHttp(uri: string): string {
 // ============================================================
 
 export type CompletionTxResult = {
-  txHash: `0x${string}`;
+  txHash: `0x${string}` | null;
   badgeTokenId: bigint;
-  wasPaidDirect: boolean;
-  /** Set to true only when the contract reports the claim went straight to pending. */
-  wasAccrued: boolean;
+  alreadyMinted: boolean;
 };
 
-export async function processCompletion(args: {
+export async function mintModuleBadge(args: {
   userWallet: Address;
   moduleSlug: string;
-  rewardAmountG: number;
-  isVerified: boolean;
 }): Promise<CompletionTxResult> {
-  const { userWallet, moduleSlug, rewardAmountG, isVerified } = args;
+  const { userWallet, moduleSlug } = args;
   const contract = CONTRACT_ADDRESSES.onwardBadges;
-  const amount = parseUnits(rewardAmountG.toString(), 18);
-  const claimId = makeClaimId(userWallet, moduleSlug);
 
-  // Submit the single-tx processCompletion call
+  const existing = (await publicClient.readContract({
+    address: contract,
+    abi: onwardBadgesAbi,
+    functionName: "earnedTokenId",
+    args: [userWallet, slugHash(moduleSlug)],
+  })) as bigint;
+
+  if (existing !== 0n) {
+    return { txHash: null, badgeTokenId: existing, alreadyMinted: true };
+  }
+
   const txHash = await walletClient.writeContract({
     address: contract,
     abi: onwardBadgesAbi,
-    functionName: "processCompletion",
-    args: [userWallet, moduleSlug, amount, claimId, isVerified],
+    functionName: "mint",
+    args: [userWallet, moduleSlug],
   });
 
   await publicClient.waitForTransactionReceipt({ hash: txHash });
 
-  // After the tx settles, read the canonical state
   const badgeTokenId = (await publicClient.readContract({
     address: contract,
     abi: onwardBadgesAbi,
@@ -97,22 +99,7 @@ export async function processCompletion(args: {
     args: [userWallet, slugHash(moduleSlug)],
   })) as bigint;
 
-  const claimedFlag = (await publicClient.readContract({
-    address: contract,
-    abi: onwardBadgesAbi,
-    functionName: "claimed",
-    args: [claimId],
-  })) as boolean;
-
-  const wasPaidDirect = claimedFlag && isVerified;
-  const wasAccrued = claimedFlag && !isVerified;
-
-  return {
-    txHash,
-    badgeTokenId,
-    wasPaidDirect,
-    wasAccrued,
-  };
+  return { txHash, badgeTokenId, alreadyMinted: false };
 }
 
 // ============================================================
@@ -129,7 +116,6 @@ export async function claimPendingForUser(
 ): Promise<ClaimPendingResult> {
   const contract = CONTRACT_ADDRESSES.onwardBadges;
 
-  // Read pending balance BEFORE the tx (after the tx it's zeroed)
   const pendingBefore = (await publicClient.readContract({
     address: contract,
     abi: onwardBadgesAbi,
