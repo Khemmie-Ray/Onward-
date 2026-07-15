@@ -61,7 +61,7 @@ export function PlayerHole({
   const dims = SIZE_MAP[size];
   const initials = getInitials(entry.display_name);
   const bgColor = colorForUser(entry.user_id);
-  const isPaid = entry.prize_g > 0;
+  const isPaid = entry.prize_points > 0;
   const isTopThree = entry.rank <= 3;
 
   return (
@@ -118,7 +118,7 @@ export function PlayerHole({
       >
         {entry.display_name}
         {entry.is_viewer && (
-          <span className="ml-1 text-[9px] font-bold uppercase tracking-[0.1em] text-terracotta">
+          <span className="ml-1 text-[9px] font-bold uppercase tracking-widest text-terracotta">
             You
           </span>
         )}
@@ -135,7 +135,7 @@ export function PlayerHole({
       {/* Prize tag */}
       {isPaid && (
         <div className="mt-1.5 text-[10px] font-bold text-mustard tabular-nums leading-none">
-          +{entry.prize_g} G$
+          +{entry.prize_points} pts
         </div>
       )}
     </div>

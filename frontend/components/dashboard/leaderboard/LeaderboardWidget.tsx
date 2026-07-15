@@ -25,25 +25,25 @@ export function LeaderboardWidget() {
     async (offset: number, append: boolean) => {
       try {
         const res = await authFetch(
-          `/api/leaderboard/current?limit=${PAGE_SIZE}&offset=${offset}`
+          `/api/leaderboard/current?limit=${PAGE_SIZE}&offset=${offset}`,
         );
         if (!res.ok) throw new Error(`Status ${res.status}`);
         const data: LeaderboardResponse = await res.json();
 
         setEntries((prev) =>
-          append ? [...prev, ...data.entries] : data.entries
+          append ? [...prev, ...data.entries] : data.entries,
         );
         setViewer(data.viewer);
         setTotalPlayers(data.pagination.total_players);
         setHasMore(data.pagination.has_more);
-        setTotalPrizePool(data.prizes.total_pool_g);
+        setTotalPrizePool(data.prizes.total_pool_points);
         setTopPaidRank(data.prizes.top_paid_rank);
         setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Failed to load leaderboard");
       }
     },
-    [authFetch]
+    [authFetch],
   );
 
   useEffect(() => {
@@ -84,8 +84,8 @@ export function LeaderboardWidget() {
             Leaderboard
           </h2>
           <p className="text-[11px] text-fg-soft mt-0.5">
-            Last 7 days · Top {topPaidRank} share {totalPrizePool} G$ each
-            Sunday
+            Last 7 days · Top {topPaidRank} share{" "}
+            {totalPrizePool.toLocaleString()} points every Sunday
           </p>
         </div>
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-mustard/15">

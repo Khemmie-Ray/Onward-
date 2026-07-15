@@ -8,7 +8,7 @@ export type LeaderboardEntry = {
   correct_whacks: number;
   rounds_played: number;
   primary_mode: "free" | "premium";
-  prize_g: number;
+  prize_points: number;
   is_viewer: boolean;
 };
 
@@ -29,13 +29,16 @@ export type LeaderboardResponse = {
   prizes: {
     by_rank: Record<number, number>;
     top_paid_rank: number;
-    total_pool_g: number;
+    total_pool_points: number;
   };
 };
 
 export type LeaderboardStats = {
+  platform: {
+    g_distributed: number;
+  };
   lifetime: {
-    g_paid_out: number;
+    points_awarded: number;
     weeks_paid: number;
   };
   this_week: {

@@ -52,7 +52,11 @@ export function LeaderboardRow({
             <span>Lvl {entry.level}</span>
             {entry.streak > 0 && (
               <span className="inline-flex items-center gap-0.5">
-                <Flame size={10} strokeWidth={2.5} className="text-terracotta" />
+                <Flame
+                  size={10}
+                  strokeWidth={2.5}
+                  className="text-terracotta"
+                />
                 {entry.streak}d
               </span>
             )}
@@ -74,9 +78,9 @@ export function LeaderboardRow({
           >
             {entry.correct_whacks}
           </div>
-          {entry.prize_g > 0 && (
+          {entry.prize_points > 0 && (
             <div className="text-[10px] font-bold text-mustard tabular-nums">
-              +{entry.prize_g} G$
+              +{entry.prize_points} pts
             </div>
           )}
         </div>
