@@ -2,12 +2,14 @@ import { NextResponse } from "next/server";
 import { getAuthedAddress } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { isValidAvatarId } from "@/constants/avatars";
+import { attributeReferral } from "@/lib/server/referral";
 
 const NAME_REGEX = /^[a-zA-Z0-9_-]+$/;
 
 type Body = {
   display_name?: string;
   avatar_id?: string;
+  referral_code?: string | null;
 };
 
 export async function POST(request: Request) {
@@ -28,6 +30,7 @@ export async function POST(request: Request) {
 
   const name = body.display_name?.trim();
   const avatarId = body.avatar_id;
+  const referralCode = body.referral_code ?? null;
 
   // Look up existing row (may not exist for first-time SIWE users)
   const { data: existingUser } = await supabaseAdmin
@@ -73,6 +76,9 @@ export async function POST(request: Request) {
     );
   }
 
+  // Track the user id so we can attribute the referral after the row exists
+  let userId: string | null = existingUser?.id ?? null;
+
   // Branch: update existing row OR insert new row
   if (existingUser) {
     const update: { display_name?: string; avatar_id?: string } = {};
@@ -95,12 +101,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Failed to save" }, { status: 500 });
     }
   } else {
-    // First-time SIWE user — create the row
-    const { error } = await supabaseAdmin.from("users").insert({
-      wallet_address: walletAddress,
-      display_name: name,
-      avatar_id: avatarId,
-    });
+    const { data: inserted, error } = await supabaseAdmin
+      .from("users")
+      .insert({
+        wallet_address: walletAddress,
+        display_name: name,
+        avatar_id: avatarId,
+      })
+      .select("id")
+      .single();
 
     if (error) {
       if (error.code === "23505") {
@@ -112,7 +121,19 @@ export async function POST(request: Request) {
       console.error("[profile/username] insert failed:", error);
       return NextResponse.json({ error: "Failed to save" }, { status: 500 });
     }
+
+    userId = inserted?.id ?? null;
   }
 
-  return NextResponse.json({ ok: true });
+  let referralAttributed = false;
+  if (userId && referralCode) {
+    try {
+      const result = await attributeReferral(userId, referralCode);
+      referralAttributed = result.attributed;
+    } catch (err) {
+      console.error("[profile/username] referral attribution failed:", err);
+    }
+  }
+
+  return NextResponse.json({ ok: true, referral_attributed: referralAttributed });
 }
