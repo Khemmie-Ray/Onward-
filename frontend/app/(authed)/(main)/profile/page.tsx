@@ -138,8 +138,6 @@ const Profile = () => {
           <ReferralCard />
         </div>
       </section>
-
-      <section></section>
       <section className="mb-6 animate-[fade-up_0.8s_0.24s_ease_both]">
         <ClaimCard />
       </section>

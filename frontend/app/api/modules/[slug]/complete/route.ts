@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 import type { Address } from "viem";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { processCompletion } from "@/lib/onchain/badges";
-import { isVerifiedOnchainSafe } from "@/lib/onchain/identity";
+import { mintModuleBadge } from "@/lib/onchain/badges";
 import { markStreakDay } from "@/lib/streak";
 import { isModuleLocked } from "@/lib/modules/lock-check";
 import { awardPoints } from "@/lib/server/point";
@@ -27,13 +26,9 @@ export async function POST(
   const body = (await request.json().catch(() => null)) as Body | null;
   const answers = body?.answers ?? [];
 
-  const isVerified = await isVerifiedOnchainSafe(
-    user.wallet_address as Address,
-  );
-
   const { data: module, error: modErr } = await supabaseAdmin
     .from("modules")
-    .select("id, slug, category, order_in_category, reward_g_amount, status")
+    .select("id, slug, category, order_in_category, status")
     .eq("slug", slug)
     .single();
 
@@ -125,42 +120,39 @@ export async function POST(
     });
   }
 
+  // Badge only — no G$ moves on module completion. Modules award POINTS; G$
+  // moves only when a verified user claims. The contract's processCompletion()
+  // bundles the mint with a G$ transfer, so an underfunded reserve reverted
+  // with InsufficientReserve() and silently killed the badge too. mint() has
+  // no reserve dependency.
   let onchainResult: {
-    badgeTxHash: string;
+    badgeTxHash: string | null;
     badgeTokenId: string;
-    rewardTxHash: string;
-    wasPaidDirect: boolean;
-    wasAccrued: boolean;
+    alreadyMinted: boolean;
     onchainError: string | null;
   } = {
-    badgeTxHash: "0x" + "0".repeat(64),
+    badgeTxHash: null,
     badgeTokenId: "0",
-    rewardTxHash: "0x" + "0".repeat(64),
-    wasPaidDirect: false,
-    wasAccrued: false,
+    alreadyMinted: false,
     onchainError: null,
   };
 
   try {
-    const result = await processCompletion({
+    const result = await mintModuleBadge({
       userWallet: user.wallet_address as Address,
       moduleSlug: slug,
-      rewardAmountG: module.reward_g_amount,
-      isVerified,
     });
 
     onchainResult = {
       badgeTxHash: result.txHash,
       badgeTokenId: result.badgeTokenId.toString(),
-      rewardTxHash: result.txHash,
-      wasPaidDirect: result.wasPaidDirect,
-      wasAccrued: result.wasAccrued,
+      alreadyMinted: result.alreadyMinted,
       onchainError: null,
     };
   } catch (err) {
-    console.error("[complete route onchain failed]", err);
+    console.error("[complete route badge mint failed]", err);
     onchainResult.onchainError =
-      err instanceof Error ? err.message : "Onchain call failed";
+      err instanceof Error ? err.message : "Badge mint failed";
   }
 
   const { data: completion, error: insertErr } = await supabaseAdmin
@@ -169,10 +161,7 @@ export async function POST(
       user_id: user.id,
       module_id: module.id,
       quiz_score: correct,
-      reward_tx_hash:
-        onchainResult.badgeTxHash !== "0x" + "0".repeat(64)
-          ? onchainResult.badgeTxHash
-          : null,
+      reward_tx_hash: onchainResult.badgeTxHash,
       badge_token_id:
         onchainResult.badgeTokenId !== "0" ? onchainResult.badgeTokenId : null,
     })
@@ -184,16 +173,6 @@ export async function POST(
       { error: insertErr.message, onchain: onchainResult },
       { status: 500 },
     );
-  }
-
-  if (onchainResult.wasPaidDirect) {
-    await supabaseAdmin
-      .from("users")
-      .update({
-        total_g_earned:
-          (Number(user.total_g_earned) || 0) + module.reward_g_amount,
-      })
-      .eq("id", user.id);
   }
 
   let pointsAwarded = 0;
@@ -225,7 +204,6 @@ export async function POST(
     passed: true,
     correct,
     total: totalGraded,
-    reward_g_amount: module.reward_g_amount,
     points_awarded: pointsAwarded,
     new_points_balance: newPointsBalance,
     completion,
