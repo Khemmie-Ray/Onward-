@@ -99,6 +99,9 @@ export default function OnboardingUsernamePage() {
         setSubmitting(false);
         return;
       }
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("onward_ref");
+      }
       // Invalidate the status query so AuthGuard picks up the change
       await queryClient.refetchQueries({ queryKey: ["me", "status"] });
       router.replace("/overview");
