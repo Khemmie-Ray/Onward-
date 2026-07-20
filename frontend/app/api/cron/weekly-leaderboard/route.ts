@@ -2,21 +2,27 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { awardPoints } from "@/lib/server/point";
 import { PAYOUTS_BY_RANK, TOP_PAID_RANK } from "@/lib/leaderboard";
+import {
+  getPreviousPeriodStart,
+  getPeriodStart,
+  getWeekSlug,
+} from "@/lib/leaderboard-period";
 
-function isoWeekSlug(d: Date): string {
-  const target = new Date(d.valueOf());
-  const dayNr = (d.getUTCDay() + 6) % 7;
-  target.setUTCDate(target.getUTCDate() - dayNr + 3);
-  const firstThursday = target.valueOf();
-  target.setUTCMonth(0, 1);
-  if (target.getUTCDay() !== 4) {
-    target.setUTCMonth(0, 1 + ((4 - target.getUTCDay() + 7) % 7));
-  }
-  const weekNumber =
-    1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
-  const year = new Date(firstThursday).getUTCFullYear();
-  return `${year}-W${String(weekNumber).padStart(2, "0")}`;
-}
+/**
+ * Weekly leaderboard payout.
+ *
+ * Winners are awarded POINTS (not G$). They convert points to G$ themselves
+ * once verified, which keeps this route off-chain: no gas, no tx failures,
+ * no per-winner RPC verification check. Unverified winners simply hold points
+ * they cannot convert yet, which is itself the verification incentive.
+ *
+ * Idempotent: reference_id is keyed to the period, so re-running the cron for
+ * the same week is a no-op (award_points rejects the duplicate).
+ *
+ * Ranking uses the same rule as every other leaderboard surface: correct_whacks
+ * over the period, passed rounds only. Payout amounts come from lib/leaderboard
+ * so the cron can never drift from what the UI advertises.
+ */
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -24,15 +30,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const periodEnd = new Date();
-  periodEnd.setUTCHours(0, 0, 0, 0);
-  const periodStart = new Date(periodEnd);
-  periodStart.setDate(periodStart.getDate() - 7);
+  // Pay the PREVIOUS full week. Run this at/after the Monday boundary: "now"
+  // is in the new period, so the previous period is the week that just closed.
+  const periodStart = getPreviousPeriodStart();
+  const periodEnd = getPeriodStart(); // start of current = end of previous
 
   const periodStartStr = periodStart.toISOString().slice(0, 10);
   const periodEndStr = periodEnd.toISOString().slice(0, 10);
-  const weekSlug = isoWeekSlug(periodStart);
+  const weekSlug = getWeekSlug(periodStart);
 
+  // Standings for the CLOSED period (not the rolling window the UI shows).
   const { data: sessions, error: sessErr } = await supabaseAdmin
     .from("game_sessions")
     .select("user_id, correct_whacks")
@@ -132,6 +139,8 @@ export async function GET(request: Request) {
     }
   }
 
+  // Record the period so the public stats card can report cumulative totals.
+  // Idempotent via a unique (period_start) constraint — see migration.
   const awardedCount = results.filter((r) => r.status === "awarded").length;
   if (awardedCount > 0) {
     const { error: periodErr } = await supabaseAdmin
