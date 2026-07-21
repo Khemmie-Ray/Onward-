@@ -199,6 +199,7 @@ export type DbPointClaim = {
   error_message: string | null;
   created_at: string;
   confirmed_at: string | null;
+  claim_id: string | null; 
 };
 
 export type DbSpendEvent = {
