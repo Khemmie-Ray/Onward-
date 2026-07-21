@@ -6,8 +6,10 @@ import { useConnection, usePublicClient, useWalletClient } from "wagmi";
 import { celo } from "wagmi/chains";
 import { ClaimSDK, IdentitySDK } from "@goodsdks/citizen-sdk";
 import { useIdentityContext } from "@/contexts/IdentityContext";
+import { useAuthFetch } from "@/hooks/useAuthFetch";
 
 const GD_ENV = "production" as const;
+const ZERO_HASH = ("0x" + "0".repeat(64)) as `0x${string}`;
 
 export type ClaimState =
   | "idle"
@@ -23,6 +25,7 @@ export function useGoodDollarClaim() {
   const publicClient = usePublicClient({ chainId: celo.id });
   const { data: walletClient } = useWalletClient({ chainId: celo.id });
   const { isVerified } = useIdentityContext();
+  const authFetch = useAuthFetch();
 
   const [state, setState] = useState<ClaimState>("not_verified");
   const [entitlement, setEntitlement] = useState<bigint>(0n);
@@ -38,6 +41,7 @@ export function useGoodDollarClaim() {
       publicClient,
       walletClient,
       env: GD_ENV,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
     return new ClaimSDK({
       account: address as `0x${string}`,
@@ -45,10 +49,10 @@ export function useGoodDollarClaim() {
       walletClient,
       identitySDK,
       env: GD_ENV,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
   }, [address, publicClient, walletClient]);
 
-  // ─── Read claim entitlement ─────────────────────────────
   const refetch = useCallback(async () => {
     if (refetchingRef.current) return;
 
@@ -73,6 +77,7 @@ export function useGoodDollarClaim() {
 
       const result = await sdk.checkEntitlement();
       const amount =
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (result as any)?.amount ?? (result as any)?.entitlement ?? 0n;
       setEntitlement(amount);
 
@@ -97,12 +102,10 @@ export function useGoodDollarClaim() {
     }
   }, [address, isVerified, buildSDK]);
 
-  // Refetch when address or verification status changes
   useEffect(() => {
     refetch();
   }, [refetch]);
 
-  // ─── Claim action ───────────────────────────────────────
   const claim = useCallback(async () => {
     if (!isVerified) {
       toast.error("Verify with GoodID first");
@@ -112,6 +115,8 @@ export function useGoodDollarClaim() {
       toast.error("Nothing to claim right now");
       return;
     }
+
+    const claimedAmount = entitlement;
 
     const loadingToast = toast.loading("Confirming UBI claim…");
 
@@ -127,7 +132,15 @@ export function useGoodDollarClaim() {
         return;
       }
 
-      await sdk.claim();
+      await authFetch("/api/ubi/prepare", { method: "POST" }).catch((e) => {
+        console.warn(
+          "[useGoodDollarClaim] gas prepare failed, claiming anyway",
+          e,
+        );
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const claimResult = (await sdk.claim()) as any;
 
       toast.dismiss(loadingToast);
       toast.success("UBI claimed", {
@@ -135,6 +148,24 @@ export function useGoodDollarClaim() {
       });
 
       setEntitlement(0n);
+
+      const txRef: `0x${string}` =
+        (typeof claimResult === "string" && claimResult.startsWith("0x")
+          ? (claimResult as `0x${string}`)
+          : (claimResult?.transactionHash ??
+            claimResult?.txHash ??
+            claimResult?.hash)) ?? ZERO_HASH;
+
+      void authFetch("/api/ubi/record", {
+        method: "POST",
+        body: JSON.stringify({
+          amount: claimedAmount.toString(),
+          txRef,
+        }),
+      }).catch((e) => {
+        console.warn("[useGoodDollarClaim] volume record failed", e);
+      });
+
       await new Promise((r) => setTimeout(r, 2000));
       await refetch();
     } catch (err) {
@@ -145,7 +176,7 @@ export function useGoodDollarClaim() {
       setState("error");
       toast.error("Couldn't claim UBI", { description: msg });
     }
-  }, [isVerified, entitlement, buildSDK, refetch]);
+  }, [isVerified, entitlement, buildSDK, refetch, authFetch]);
 
   return {
     state,
