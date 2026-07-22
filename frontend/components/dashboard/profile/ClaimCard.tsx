@@ -1,52 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Coins, Lock, ArrowRight, Info, ShieldCheck } from "lucide-react";
-import { useAuthFetch } from "@/hooks/useAuthFetch";
+import { useState } from "react";
+import {
+  Coins,
+  Lock,
+  ArrowRight,
+  Info,
+  ShieldCheck,
+  Loader2,
+  ExternalLink,
+} from "lucide-react";
 import { useIdentityContext } from "@/contexts/IdentityContext";
-
-type PointsData = {
-  balance: number;
-  lifetime_earned: number;
-  lifetime_claimed: number;
-  claimed_this_week: number;
-  weekly_cap: number;
-  thresholds: {
-    min_claim: number;
-    max_single_claim: number;
-    weekly_cap: number;
-  };
-};
-
-const TIERS = [100, 250, 500];
+import { useClaim, CLAIM_TIERS, type ClaimTier } from "@/hooks/useClaim";
+import { EXPLORER_BASE } from "@/constants/contracts/address";
 
 export function ClaimCard() {
-  const authFetch = useAuthFetch();
   const { isVerified, startVerifying } = useIdentityContext();
-  const [data, setData] = useState<PointsData | null>(null);
-  const [selectedTier, setSelectedTier] = useState<number | null>(null);
+  const { status, loadingStatus, claiming, lastTx, canClaimTier, claim } =
+    useClaim();
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await authFetch("/api/points/balance");
-        if (!res.ok) return;
-        const json = (await res.json()) as PointsData;
-        if (!cancelled) setData(json);
-      } catch {
-        // silent
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authFetch]);
+  const [selectedTier, setSelectedTier] = useState<ClaimTier | null>(null);
 
-  const balance = data?.balance ?? 0;
-  const weeklyRemaining = data
-    ? Math.max(0, data.weekly_cap - data.claimed_this_week)
-    : 0;
+  const balance = status?.points_balance ?? 0;
+  const claimableG = status?.claimable_g ?? 0;
+
+  const handleClaim = async () => {
+    if (!selectedTier) return;
+    const ok = await claim(selectedTier);
+    if (ok) setSelectedTier(null);
+  };
+
+  console.log(selectedTier)
 
   return (
     <div className="rounded-[18px] bg-paper p-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)]">
@@ -65,13 +49,14 @@ export function ClaimCard() {
         </div>
         <div className="text-right">
           <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-fg-soft mb-0.5">
-            Claimed so far
+            Claimable now
           </div>
           <div className="display text-[20px] font-bold text-forest tabular-nums">
-            {(data?.lifetime_claimed ?? 0).toLocaleString()} G$
+            {claimableG.toLocaleString()} G$
           </div>
         </div>
       </div>
+
       {!isVerified ? (
         <>
           <div className="flex items-start gap-2 rounded-xl bg-mustard/10 border border-mustard/30 p-3 mb-5">
@@ -101,39 +86,23 @@ export function ClaimCard() {
         </>
       ) : (
         <>
-          <div className="flex items-start gap-2 rounded-xl bg-forest/10 border border-forest/30 p-3 mb-5">
-            <Lock
-              size={14}
-              strokeWidth={2.5}
-              className="text-forest mt-0.5 shrink-0"
-            />
-            <div>
-              <p className="text-[12px] font-bold text-indigo leading-snug">
-                You&apos;re verified. Claims opening soon.
-              </p>
-              <p className="text-[11px] text-fg-soft leading-snug mt-0.5">
-                Point conversion goes live shortly. Pick an amount below to see
-                what you&apos;ll receive at 1 point = 1 G$.
-              </p>
-            </div>
-          </div>
           <div className="mb-4">
             <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-fg-soft mb-2">
               Pick an amount
             </div>
             <div className="grid grid-cols-3 gap-2">
-              {TIERS.map((tier) => {
-                const affordable = balance >= tier;
+              {CLAIM_TIERS.map((tier) => {
+                const claimable = canClaimTier(tier);
                 const isSelected = selectedTier === tier;
                 return (
                   <button
                     key={tier}
-                    onClick={() => affordable && setSelectedTier(tier)}
-                    disabled={!affordable}
+                    onClick={() => claimable && setSelectedTier(tier)}
+                    disabled={!claimable || claiming}
                     className={`rounded-xl p-3 text-center transition ${
                       isSelected
                         ? "bg-indigo text-cream"
-                        : affordable
+                        : claimable
                           ? "bg-canvas-warm text-indigo hover:bg-canvas-warm/70"
                           : "bg-canvas-warm/40 text-fg-soft/40 cursor-not-allowed"
                     }`}
@@ -149,17 +118,52 @@ export function ClaimCard() {
               })}
             </div>
           </div>
+
           <button
-            disabled
-            className="w-full py-3.5 rounded-xl bg-indigo/40 text-cream font-bold text-sm cursor-not-allowed flex items-center justify-center gap-2 mb-4 lg:w-[50%] md:w-[50%] mx-auto"
+            onClick={handleClaim}
+            disabled={!selectedTier || claiming}
+            className={`w-full py-3.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-4 lg:w-[50%] md:w-[50%] mx-auto ${
+              !selectedTier || claiming
+                ? "bg-indigo/40 text-cream cursor-not-allowed"
+                : "bg-indigo text-cream hover:bg-indigo/90"
+            }`}
           >
-            {selectedTier
-              ? `Convert ${selectedTier} points to ${selectedTier} G$`
-              : "Select an amount"}
-            <ArrowRight size={15} strokeWidth={2.8} />
+            {claiming ? (
+              <>
+                <Loader2 size={15} strokeWidth={2.8} className="animate-spin" />
+                Converting...
+              </>
+            ) : selectedTier ? (
+              <>
+                Convert {selectedTier} points to {selectedTier} G$
+                <ArrowRight size={15} strokeWidth={2.8} />
+              </>
+            ) : (
+              "Select an amount"
+            )}
           </button>
+
+          {lastTx && (
+            <a
+              href={`${EXPLORER_BASE}tx/${lastTx}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-forest hover:text-forest/80 transition mb-4"
+            >
+              View your last claim
+              <ExternalLink size={12} strokeWidth={2.5} />
+            </a>
+          )}
+
+          {claimableG === 0 && balance >= 100 && !loadingStatus && (
+            <p className="text-[11px] text-fg-soft text-center mb-4 leading-snug">
+              You&apos;ve hit your claim limit for now. Check back after your
+              daily or weekly window resets.
+            </p>
+          )}
         </>
       )}
+
       <div className="border-t border-indigo/8 mt-4 py-3">
         <div className="flex items-center gap-1.5 mb-3">
           <Info size={14} strokeWidth={2.5} className="text-fg-soft" />
@@ -167,7 +171,7 @@ export function ClaimCard() {
             Claim rules
           </span>
         </div>
-        <div className="flex justify-between text-[11px] flex-wrap">
+        <div className="flex justify-between text-[11px] flex-wrap gap-y-1.5">
           <p className="text-fg-soft">
             Minimum:{" "}
             <span className="font-semibold text-indigo tabular-nums ml-2">
@@ -175,23 +179,15 @@ export function ClaimCard() {
             </span>
           </p>
           <p className="text-fg-soft">
-            Max per claim:{" "}
+            Daily cap:{" "}
             <span className="font-semibold text-indigo tabular-nums ml-2">
-              {" "}
-              500 pts
+              500 G$
             </span>
           </p>
           <p className="text-fg-soft">
             Weekly cap:{" "}
             <span className="font-semibold text-indigo tabular-nums ml-2">
-              1,000 pts
-            </span>
-          </p>
-          <p className="text-fg-soft">
-            This week:{" "}
-            <span className="font-semibold text-indigo tabular-nums ml-2">
-              {" "}
-              {weeklyRemaining.toLocaleString()} left
+              1,000 G$
             </span>
           </p>
         </div>

@@ -1,9 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { PERIOD_DAYS } from "@/lib/leaderboard";
+import { getPeriodStart, getPeriodEnd } from "@/lib/leaderboard-period";
 
 export async function GET() {
-  
   const { data: users } = await supabaseAdmin
     .from("users")
     .select("total_g_earned");
@@ -23,15 +22,16 @@ export async function GET() {
   );
   const weeksPaid = (periods ?? []).length;
 
-  const periodStart = new Date();
-  periodStart.setDate(periodStart.getDate() - PERIOD_DAYS);
+  const periodStart = getPeriodStart();
+  const periodEnd = getPeriodEnd();
 
   const { data: weekSessions } = await supabaseAdmin
     .from("game_sessions")
     .select("user_id")
     .eq("status", "submitted")
     .eq("passed", true)
-    .gte("completed_at", periodStart.toISOString());
+    .gte("completed_at", periodStart.toISOString())
+    .lt("completed_at", periodEnd.toISOString());
 
   const activePlayersThisWeek = new Set(
     (weekSessions ?? []).map((s) => s.user_id),
@@ -49,7 +49,6 @@ export async function GET() {
     this_week: {
       active_players: activePlayersThisWeek,
       rounds_played: roundsThisWeek,
-      days: PERIOD_DAYS,
     },
   });
 }

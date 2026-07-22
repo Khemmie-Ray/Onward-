@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import {
-  getWeeklyStandings,
-  getPeriodStart,
-  primaryMode,
-} from "@/lib/leaderboard";
+import { getWeeklyStandings, primaryMode } from "@/lib/leaderboard";
+import { getPeriodStart, getPeriodEnd } from "@/lib/leaderboard-period";
 
 export async function GET(_request: Request) {
   let standings;
@@ -18,6 +15,7 @@ export async function GET(_request: Request) {
   }
 
   const periodStart = getPeriodStart();
+  const periodEnd = getPeriodEnd();
   const top10 = standings.slice(0, 10);
 
   if (top10.length === 0) {
@@ -53,7 +51,7 @@ export async function GET(_request: Request) {
     leaderboard,
     period: {
       start: periodStart.toISOString(),
-      end: new Date().toISOString(),
+      end: periodEnd.toISOString(),
     },
   });
 }

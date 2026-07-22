@@ -116,7 +116,7 @@ const Profile = () => {
             label="g$ claimed"
             value={gClaimed.toLocaleString(undefined, {
               maximumFractionDigits: 2,
-            })}
+            }) + "g"}
             tone="forest"
             icon={<Coins size={28} strokeWidth={2} />}
             sub="from point conversion"

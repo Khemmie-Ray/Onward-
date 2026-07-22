@@ -30,7 +30,8 @@ const NEGATIVE_ONLY_SOURCES: ReadonlySet<PointSource> = new Set([
 
 function validateDelta(delta: number, source: PointSource): void {
   if (delta === 0) throw new Error(`awardPoints: delta cannot be zero`);
-  if (!Number.isInteger(delta)) throw new Error(`awardPoints: delta must be integer`);
+  if (!Number.isInteger(delta))
+    throw new Error(`awardPoints: delta must be integer`);
   if (POSITIVE_ONLY_SOURCES.has(source) && delta <= 0) {
     throw new Error(`awardPoints: source '${source}' requires positive delta`);
   }
@@ -45,9 +46,16 @@ export async function awardPoints(
   const { userId, delta, source, referenceId, metadata } = input;
 
   if (!userId) throw new Error("awardPoints: userId required");
-  if (!referenceId?.trim()) throw new Error("awardPoints: referenceId required");
+  if (!referenceId?.trim())
+    throw new Error("awardPoints: referenceId required");
   validateDelta(delta, source);
 
+  console.log("[awardPoints] RPC PAYLOAD", {
+    p_delta: delta,
+    p_source: source,
+    p_user_id: userId,
+  });
+  
   const { data, error } = await supabaseAdmin.rpc("award_points", {
     p_user_id: userId,
     p_delta: delta,

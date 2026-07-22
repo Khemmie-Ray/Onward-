@@ -6,11 +6,10 @@ import {
   PAYOUTS_BY_RANK,
   TOP_PAID_RANK,
   TOTAL_WEEKLY_PRIZE_POOL,
-  PERIOD_DAYS,
   getWeeklyStandings,
-  getPeriodStart,
   primaryMode,
 } from "@/lib/leaderboard";
+import { getPeriodStart, getPeriodEnd } from "@/lib/leaderboard-period";
 
 const MAX_LIMIT = 50;
 const DEFAULT_LIMIT = 10;
@@ -59,8 +58,8 @@ export async function GET(request: Request) {
   );
   const offset = Math.max(0, parseInt(url.searchParams.get("offset") ?? "0"));
 
-  const periodEnd = new Date();
   const periodStart = getPeriodStart();
+  const periodEnd = getPeriodEnd();
 
   let sortedStats;
   try {
@@ -152,12 +151,11 @@ export async function GET(request: Request) {
     period: {
       start: periodStart.toISOString(),
       end: periodEnd.toISOString(),
-      days: PERIOD_DAYS,
     },
     prizes: {
       by_rank: PAYOUTS_BY_RANK,
       top_paid_rank: TOP_PAID_RANK,
-      total_pool_g: TOTAL_WEEKLY_PRIZE_POOL,
+      total_pool_points: TOTAL_WEEKLY_PRIZE_POOL,
     },
   });
 }
