@@ -323,6 +323,56 @@ export type Database = {
         Update: Partial<DbSpendEvent>;
         Relationships: [];
       };
+      learn_tracks: {
+        Row: DbLearnTrack;
+        Insert: Partial<DbLearnTrack> & {
+          slug: string;
+          title: string;
+          order_index: number;
+        };
+        Update: Partial<DbLearnTrack>;
+        Relationships: [];
+      };
+      learn_modules: {
+        Row: DbLearnModule;
+        Insert: Partial<DbLearnModule> & {
+          track_id: string;
+          slug: string;
+          title: string;
+          order_in_track: number;
+        };
+        Update: Partial<DbLearnModule>;
+        Relationships: [];
+      };
+      learn_cards: {
+        Row: DbLearnCard;
+        Insert: Partial<DbLearnCard> & {
+          module_id: string;
+          order_index: number;
+          type: LearnCardType;
+          content: CardContent;
+        };
+        Update: Partial<DbLearnCard>;
+        Relationships: [];
+      };
+      learn_progress: {
+        Row: DbLearnProgress;
+        Insert: Partial<DbLearnProgress> & {
+          user_id: string;
+          module_id: string;
+        };
+        Update: Partial<DbLearnProgress>;
+        Relationships: [];
+      };
+      learn_completions: {
+        Row: DbLearnCompletion;
+        Insert: Partial<DbLearnCompletion> & {
+          user_id: string;
+          module_id: string;
+        };
+        Update: Partial<DbLearnCompletion>;
+        Relationships: [];
+      };
     };
     Views: {};
     Functions: {
@@ -352,4 +402,63 @@ export type ModuleWithProgress = DbModule & {
 
 export type ModuleDetail = DbModule & {
   cards: DbModuleCard[];
+};
+
+export type LearnTrackStatus = "available" | "coming_soon";
+export type LearnModuleStatus = "draft" | "live";
+export type LearnCardType = "flip" | "choice" | "spotter" | "visual";
+
+export type DbLearnTrack = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  order_index: number;
+  status: LearnTrackStatus;
+  icon: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DbLearnModule = {
+  id: string;
+  track_id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  order_in_track: number;
+  estimated_minutes: number;
+  points_reward: number;
+  first_card_tease: string | null;
+  what_you_will_learn: string[];
+  status: LearnModuleStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DbLearnCard = {
+  id: string;
+  module_id: string;
+  order_index: number;
+  type: LearnCardType;
+  content: CardContent;
+};
+
+export type DbLearnProgress = {
+  user_id: string;
+  module_id: string;
+  current_card: number;
+  started_at: string;
+  last_active_at: string;
+};
+
+export type DbLearnCompletion = {
+  id: string;
+  user_id: string;
+  module_id: string;
+  completed_at: string;
+  quiz_score: number | null;
+  points_awarded: number;
+  badge_token_id: string | null;
+  badge_tx_hash: string | null;
 };
