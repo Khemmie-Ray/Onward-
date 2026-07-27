@@ -8,10 +8,14 @@ interface NextActionCardProps {
   module: NonNullable<DashboardData["currentModule"]>;
 }
 
-const  NextActionCard = ({ module }: NextActionCardProps) => {
+const NextActionCard = ({ module }: NextActionCardProps) => {
+  const href = module.trackSlug
+    ? `/learn/${module.trackSlug}?lesson=${module.slug}`
+    : "/learn";
+
   return (
     <Link
-      href={`/modules/${module.slug}`}
+      href={href}
       className="group relative block overflow-hidden rounded-[24px] bg-aubergine p-7 shadow-[0_12px_32px_rgba(91,46,92,0.25)] transition-transform hover:-translate-y-1"
     >
       <div
@@ -35,19 +39,19 @@ const  NextActionCard = ({ module }: NextActionCardProps) => {
           <h2 className="display text-[28px] md:text-[34px] font-bold leading-[1.1] tracking-[-0.02em] text-paper mb-2">
             {module.title}
           </h2>
-          <p className="max-w-[440px] text-[13.5px] leading-[1.6] text-paper/80 mb-4">
-            {module.description} You're on card {module.currentCard} of{" "}
+          <p className="max-w-110 text-[13.5px] leading-[1.6] text-paper/80 mb-4">
+            {module.description} You&apos;re on card {module.currentCard} of{" "}
             {module.totalCards}.
           </p>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-paper/70">
+            <span className="text-[11px] font-semibold uppercase tracking-widest text-paper/70">
               Card {module.currentCard} of {module.totalCards}
             </span>
             <span className="display text-[12px] font-bold tabular-nums text-mustard">
               {module.progressPercent}%
             </span>
           </div>
-          <div className="h-2 max-w-[300px] overflow-hidden rounded-full bg-white/15">
+          <div className="h-2 max-w-75 overflow-hidden rounded-full bg-white/15">
             <div
               className="h-full rounded-full bg-mustard transition-[width]"
               style={{ width: `${module.progressPercent}%` }}
@@ -60,6 +64,6 @@ const  NextActionCard = ({ module }: NextActionCardProps) => {
       </div>
     </Link>
   );
-}
+};
 
 export default NextActionCard;

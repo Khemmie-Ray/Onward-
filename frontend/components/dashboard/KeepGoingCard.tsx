@@ -10,14 +10,6 @@ interface KeepGoingCardProps {
   modulesTotal: number;
 }
 
-/**
- * Shown when the user has completed at least one module but currently has
- * nothing in progress. Contrasts with EmptyStateCard (0 completions) and
- * NextActionCard (active module in progress).
- *
- * Visual: forest-tint background to signal "progress, keep going" rather
- * than "start fresh" (mustard) or "resume current" (aubergine).
- */
 const KeepGoingCard = ({
   modulesCompleted,
   modulesTotal,
@@ -27,7 +19,7 @@ const KeepGoingCard = ({
 
   return (
     <Link
-      href="/modules"
+      href="/learn"
       className="group relative block overflow-hidden rounded-[24px] bg-forest-tint p-7 transition-transform hover:-translate-y-1 shadow-[0_8px_24px_rgba(31,58,110,0.08)]"
     >
       <div
@@ -54,7 +46,7 @@ const KeepGoingCard = ({
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-full bg-indigo px-5 py-3 text-[13px] font-bold text-paper shadow-[0_6px_18px_rgba(0,0,0,0.15)] transition-transform group-hover:translate-x-1">
-          {allDone ? "Browse modules" : "Continue learning"}
+          {allDone ? "Browse tracks" : "Continue learning"}
           <ArrowRight size={14} strokeWidth={2.8} />
         </div>
       </div>
