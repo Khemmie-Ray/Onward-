@@ -66,3 +66,17 @@ export async function recordUbiClaim(args: {
   await publicClient.waitForTransactionReceipt({ hash: txHash });
   return txHash;
 }
+
+export async function getTotalUbiClaimedG(): Promise<number> {
+  try {
+    const wei = (await publicClient.readContract({
+      address: CONTRACT_ADDRESSES.onwardClaims,
+      abi: onwardClaimsAbi,
+      functionName: "totalUbiClaimedG",
+    })) as bigint;
+    return Number(wei / 1_000_000_000_000_000_000n);
+  } catch (err) {
+    console.error("[getTotalUbiClaimedG] read failed", err);
+    return 0; 
+  }
+}

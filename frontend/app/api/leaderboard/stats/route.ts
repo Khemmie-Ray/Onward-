@@ -1,16 +1,10 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getPeriodStart, getPeriodEnd } from "@/lib/leaderboard-period";
+import { getPlatformVolumeG } from "@/lib/onchain/volume";
 
 export async function GET() {
-  const { data: users } = await supabaseAdmin
-    .from("users")
-    .select("total_g_earned");
-
-  const platformGDistributed = (users ?? []).reduce(
-    (sum, u) => sum + (Number(u.total_g_earned) || 0),
-    0,
-  );
+  const platformGDistributed = await getPlatformVolumeG();
 
   const { data: periods } = await supabaseAdmin
     .from("leaderboard_periods")

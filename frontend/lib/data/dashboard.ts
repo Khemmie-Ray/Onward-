@@ -1,10 +1,10 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import type { DbUser, DbModule } from "@/lib/supabase/types";
+import type { DbUser } from "@/lib/supabase/types";
 
 export type RecentBadge = {
   moduleSlug: string;
   moduleTitle: string;
-  category: string;
+  category: string; // now holds the track title
   earnedAt: string;
 };
 
@@ -14,7 +14,7 @@ export type DashboardData = {
   currentStreak: number;
   longestStreak: number;
   totalGEarned: number;
-  gEarnedThisWeek: number;
+  gEarnedThisWeek: number; // retained for shape; now reflects points earned this week
   currentLevel: number;
   avatarId: string | null;
 
@@ -27,6 +27,7 @@ export type DashboardData = {
     slug: string;
     title: string;
     description: string;
+    trackSlug: string; // added so the resume link can point at /learn/[track]
     currentCard: number;
     totalCards: number;
     progressPercent: number;
@@ -39,7 +40,9 @@ export type DashboardData = {
 };
 
 export async function loadDashboardData(user: DbUser): Promise<DashboardData> {
-  const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const oneWeekAgo = new Date(
+    Date.now() - 7 * 24 * 60 * 60 * 1000,
+  ).toISOString();
 
   const [
     { count: modulesCompletedCount },
@@ -48,32 +51,31 @@ export async function loadDashboardData(user: DbUser): Promise<DashboardData> {
     { data: progressRows },
     { data: recentCompletions },
   ] = await Promise.all([
-
     supabaseAdmin
-      .from("module_completions")
+      .from("learn_completions")
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id),
 
     supabaseAdmin
-      .from("modules")
+      .from("learn_modules")
       .select("id", { count: "exact", head: true })
       .eq("status", "live"),
 
     supabaseAdmin
-      .from("module_completions")
-      .select("module_id, completed_at")
+      .from("learn_completions")
+      .select("module_id, completed_at, points_awarded")
       .eq("user_id", user.id)
       .gte("completed_at", oneWeekAgo),
 
     supabaseAdmin
-      .from("module_progress")
+      .from("learn_progress")
       .select("module_id, current_card, last_active_at")
       .eq("user_id", user.id)
       .order("last_active_at", { ascending: false })
       .limit(1),
 
     supabaseAdmin
-      .from("module_completions")
+      .from("learn_completions")
       .select("module_id, completed_at")
       .eq("user_id", user.id)
       .order("completed_at", { ascending: false })
@@ -86,21 +88,41 @@ export async function loadDashboardData(user: DbUser): Promise<DashboardData> {
     ...(recentCompletions ?? []).map((c) => c.module_id),
   ]);
 
+  // Load the modules we need, plus their track (for the title that stands in
+  // for the old "category", and the track slug for resume links).
   const { data: relevantModules } = moduleIds.size
     ? await supabaseAdmin
-        .from("modules")
-        .select("id, slug, title, description, category, reward_g_amount")
+        .from("learn_modules")
+        .select("id, slug, title, description, track_id")
         .in("id", Array.from(moduleIds))
-    : { data: [] as Partial<DbModule>[] };
+    : {
+        data: [] as Array<{
+          id: string;
+          slug: string;
+          title: string;
+          description: string | null;
+          track_id: string;
+        }>,
+      };
 
-  const moduleById = new Map(
-    (relevantModules ?? []).map((m) => [m.id as string, m])
+  const trackIds = new Set(
+    (relevantModules ?? []).map((m) => m.track_id).filter(Boolean),
   );
+  const { data: tracks } = trackIds.size
+    ? await supabaseAdmin
+        .from("learn_tracks")
+        .select("id, slug, title")
+        .in("id", Array.from(trackIds))
+    : { data: [] as Array<{ id: string; slug: string; title: string }> };
 
-  const gEarnedThisWeek = (weekCompletions ?? []).reduce((sum, c) => {
-    const m = moduleById.get(c.module_id);
-    return sum + (m?.reward_g_amount ?? 0);
-  }, 0);
+  const trackById = new Map((tracks ?? []).map((t) => [t.id, t]));
+  const moduleById = new Map((relevantModules ?? []).map((m) => [m.id, m]));
+
+  // Points earned this week from learn completions.
+  const gEarnedThisWeek = (weekCompletions ?? []).reduce(
+    (sum, c) => sum + (c.points_awarded ?? 0),
+    0,
+  );
 
   let currentModule: DashboardData["currentModule"] = null;
   const inProgressRow = progressRows?.[0];
@@ -108,18 +130,20 @@ export async function loadDashboardData(user: DbUser): Promise<DashboardData> {
     const mod = moduleById.get(inProgressRow.module_id);
     if (mod) {
       const { count: cardCount } = await supabaseAdmin
-        .from("module_cards")
+        .from("learn_cards")
         .select("id", { count: "exact", head: true })
         .eq("module_id", inProgressRow.module_id);
       const totalCards = cardCount ?? 5;
+      const track = trackById.get(mod.track_id);
       currentModule = {
-        slug: mod.slug as string,
-        title: mod.title as string,
-        description: (mod.description as string) ?? "",
+        slug: mod.slug,
+        title: mod.title,
+        description: mod.description ?? "",
+        trackSlug: track?.slug ?? "",
         currentCard: inProgressRow.current_card,
         totalCards,
         progressPercent: Math.round(
-          (inProgressRow.current_card / totalCards) * 100
+          (inProgressRow.current_card / totalCards) * 100,
         ),
       };
     }
@@ -129,10 +153,11 @@ export async function loadDashboardData(user: DbUser): Promise<DashboardData> {
     .map((c) => {
       const mod = moduleById.get(c.module_id);
       if (!mod) return null;
+      const track = trackById.get(mod.track_id);
       return {
-        moduleSlug: mod.slug as string,
-        moduleTitle: mod.title as string,
-        category: mod.category as string,
+        moduleSlug: mod.slug,
+        moduleTitle: mod.title,
+        category: track?.title ?? "Learn",
         earnedAt: c.completed_at,
       };
     })
@@ -144,7 +169,7 @@ export async function loadDashboardData(user: DbUser): Promise<DashboardData> {
   const msUntil = midnight.getTime() - now.getTime();
   const hoursUntilMidnightUTC = Math.floor(msUntil / (1000 * 60 * 60));
   const minutesUntilMidnightUTC = Math.floor(
-    (msUntil % (1000 * 60 * 60)) / (1000 * 60)
+    (msUntil % (1000 * 60 * 60)) / (1000 * 60),
   );
 
   return {
@@ -158,8 +183,8 @@ export async function loadDashboardData(user: DbUser): Promise<DashboardData> {
     currentLevel: user.current_level,
     modulesCompleted: modulesCompletedCount ?? 0,
     modulesTotal: modulesTotalCount ?? 0,
-    ecosystemAppsExplored: 0, 
-    ecosystemAppsTotal: 8, 
+    ecosystemAppsExplored: 0,
+    ecosystemAppsTotal: 8,
     currentModule,
     recentBadges,
     hoursUntilMidnightUTC,

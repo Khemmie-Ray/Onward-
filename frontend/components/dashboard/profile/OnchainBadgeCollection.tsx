@@ -1,55 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
-import { ExternalLink, Lock, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Lock } from "lucide-react";
 import { tintForCategory } from "@/lib/themes/tones";
 import { LoopSigil, MudclothPattern } from "@/components/home/motifs";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { LEARN_BADGE_SLUGS } from "@/lib/badges/badge-slugs";
+import { BadgeDetail } from "./BadgeDetail";
+import type { OnchainBadge, BadgesResponse } from "./badge-type";
+import { resolveCategory, resolveImage } from "./badge-type";
 
-type OnchainBadge = {
-  slug: string;
-  label: string;
-  category: string;
-  deprecated: boolean;
-  owned: boolean;
-  tokenId: string | null;
-  tokenURI: string | null;
-  explorerUrl?: string | null;
-  metadata: {
-    name?: string;
-    description?: string;
-    image?: string;
-  } | null;
-};
+const PAGE_SIZE = 4;
 
-type BadgesResponse = {
-  owned: OnchainBadge[];
-  unearned: OnchainBadge[];
-  total_owned: number;
-};
-
-type Category = "Foundations" | "Identity" | "Economics" | "Safety" | "Utility";
-
-function resolveCategory(cat: string): Category {
-  switch (cat) {
-    case "Foundations":
-    case "Identity":
-    case "Economics":
-    case "Safety":
-    case "Utility":
-      return cat;
-    default:
-      return "Utility";
-  }
-}
-
-function resolveImage(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  return raw.startsWith("ipfs://")
-    ? `https://gateway.pinata.cloud/ipfs/${raw.slice(7)}`
-    : raw;
-}
+const LEARN_SLUG_SET = new Set(LEARN_BADGE_SLUGS.map((b) => b.slug));
 
 export function OnchainBadgeCollection() {
   const authFetch = useAuthFetch();
@@ -91,43 +56,116 @@ export function OnchainBadgeCollection() {
 
   if (!data) return null;
 
+  const isLearn = (b: OnchainBadge) => LEARN_SLUG_SET.has(b.slug);
+
+  const activeOwned = data.owned.filter(isLearn);
+  const activeUnearned = data.unearned.filter(isLearn);
+  const legacyOwned = data.owned.filter((b) => !isLearn(b));
+
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-[13px] font-semibold text-indigo">
-          {data.total_owned} {data.total_owned === 1 ? "badge" : "badges"}{" "}
-          earned
-        </span>
-      </div>
-
-      {data.owned.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-6">
-          {data.owned.map((badge) => (
-            <BadgeTile
-              key={badge.slug}
-              badge={badge}
-              owned
-              onClick={() => setSelected(badge)}
-            />
-          ))}
+      <Tabs defaultValue="active">
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-[13px] font-semibold text-indigo">
+            {data.total_owned} {data.total_owned === 1 ? "badge" : "badges"}{" "}
+            earned
+          </span>
+          <TabsList>
+            <TabsTrigger value="active">Active</TabsTrigger>
+            {legacyOwned.length > 0 && (
+              <TabsTrigger value="legacy">Legacy</TabsTrigger>
+            )}
+          </TabsList>
         </div>
-      )}
 
-      {data.unearned.length > 0 && (
-        <>
-          <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-fg-soft mb-3">
-            Still to earn
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {data.unearned.map((badge) => (
-              <BadgeTile key={badge.slug} badge={badge} owned={false} />
-            ))}
-          </div>
-        </>
-      )}
+        <TabsContent value="active">
+          {activeOwned.length > 0 && (
+            <PaginatedGrid badges={activeOwned} owned onSelect={setSelected} />
+          )}
+
+          {activeUnearned.length > 0 && (
+            <div className="mt-6">
+              <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-fg-soft mb-3">
+                Still to earn
+              </div>
+              <PaginatedGrid badges={activeUnearned} owned={false} />
+            </div>
+          )}
+
+          {activeOwned.length === 0 && activeUnearned.length === 0 && (
+            <p className="text-[12px] text-fg-soft py-4">
+              No badges yet. Complete a lesson to earn your first.
+            </p>
+          )}
+        </TabsContent>
+
+        <TabsContent value="legacy">
+          {legacyOwned.length > 0 ? (
+            <PaginatedGrid badges={legacyOwned} owned onSelect={setSelected} />
+          ) : (
+            <p className="text-[12px] text-fg-soft py-4">No legacy badges.</p>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {selected && (
         <BadgeDetail badge={selected} onClose={() => setSelected(null)} />
+      )}
+    </div>
+  );
+}
+
+function PaginatedGrid({
+  badges,
+  owned,
+  onSelect,
+}: {
+  badges: OnchainBadge[];
+  owned: boolean;
+  onSelect?: (b: OnchainBadge) => void;
+}) {
+  const [page, setPage] = useState(0);
+  const totalPages = Math.max(1, Math.ceil(badges.length / PAGE_SIZE));
+  const pageBadges = useMemo(
+    () => badges.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE),
+    [badges, page],
+  );
+
+  return (
+    <div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+        {pageBadges.map((badge) => (
+          <BadgeTile
+            key={badge.slug}
+            badge={badge}
+            owned={owned}
+            onClick={owned ? () => onSelect?.(badge) : undefined}
+          />
+        ))}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 mt-4">
+          <button
+            onClick={() => setPage((p) => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-indigo disabled:opacity-30 hover:bg-canvas-warm transition"
+            aria-label="Previous page"
+          >
+            <ChevronLeft size={16} strokeWidth={2.5} />
+          </button>
+          <span className="text-[11px] font-semibold text-fg-soft tabular-nums">
+            {page + 1} / {totalPages}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+            disabled={page === totalPages - 1}
+            className="flex h-8 w-8 items-center justify-center rounded-full text-indigo disabled:opacity-30 hover:bg-canvas-warm transition"
+            aria-label="Next page"
+          >
+            <ChevronRight size={16} strokeWidth={2.5} />
+          </button>
+        </div>
       )}
     </div>
   );
@@ -158,7 +196,7 @@ function BadgeTile({
         </div>
         <div className="relative">
           <div
-            className={`mb-3 mx-auto flex h-[100px] w-[100px] items-center justify-center rounded-full ${t.iconBg} opacity-50`}
+            className={`mb-3 mx-auto flex h-25 w-25 items-center justify-center rounded-full ${t.iconBg} opacity-50`}
           >
             <Lock size={28} strokeWidth={2.5} className={t.iconColor} />
           </div>
@@ -187,7 +225,7 @@ function BadgeTile({
         <MudclothPattern />
       </div>
       <div className="relative">
-        <div className="mb-3 mx-auto h-[100px] w-[100px] relative">
+        <div className="mb-3 mx-auto h-25 w-25 relative">
           {resolvedImage ? (
             <Image
               src={resolvedImage}
@@ -223,86 +261,5 @@ function BadgeTile({
         </div>
       )}
     </button>
-  );
-}
-
-function BadgeDetail({
-  badge,
-  onClose,
-}: {
-  badge: OnchainBadge;
-  onClose: () => void;
-}) {
-  const t = tintForCategory(resolveCategory(badge.category));
-  const resolvedImage = resolveImage(badge.metadata?.image);
-  const description = badge.metadata?.description;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 animate-[fade-up_0.2s_ease_both]"
-      onClick={onClose}
-    >
-      <div
-        className="relative w-full max-w-[420px] rounded-[24px] bg-paper p-6 shadow-[0_24px_60px_rgba(0,0,0,0.20)]"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-canvas-warm text-fg-soft hover:text-indigo"
-          aria-label="Close"
-        >
-          <X size={16} strokeWidth={2.5} />
-        </button>
-
-        <div
-          className={`mb-5 mx-auto h-[140px] w-[140px] relative rounded-full overflow-hidden ${t.bg}`}
-        >
-          {resolvedImage ? (
-            <Image
-              src={resolvedImage}
-              alt={`${badge.label} badge`}
-              fill
-              sizes="140px"
-              className="object-contain"
-              unoptimized
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center">
-              <LoopSigil size={64} className={t.iconColor} />
-            </div>
-          )}
-        </div>
-
-        <div className="text-center mb-4">
-          <div
-            className={`text-[10px] font-bold uppercase tracking-[0.14em] ${t.accent} mb-2`}
-          >
-            {badge.category} · Soulbound
-          </div>
-          <h2 className="display text-[22px] font-bold leading-[1.2] tracking-[-0.015em] text-indigo mb-1">
-            {badge.metadata?.name ?? badge.label}
-          </h2>
-        </div>
-
-        {description && (
-          <div className="rounded-[12px] bg-canvas-warm p-4 mb-4">
-            <p className="text-[12px] text-fg-soft leading-relaxed">
-              {description}
-            </p>
-          </div>
-        )}
-
-        {badge.explorerUrl && (
-          <a
-            href={badge.explorerUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-aubergine hover:opacity-80"
-          >
-            View on Celoscan <ExternalLink size={11} strokeWidth={2.5} />
-          </a>
-        )}
-      </div>
-    </div>
   );
 }

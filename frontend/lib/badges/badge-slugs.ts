@@ -1,13 +1,7 @@
 export type BadgeSlug = {
   slug: string;
   label: string;
-  category:
-    | "Foundations"
-    | "Identity"
-    | "Economics"
-    | "Safety"
-    | "Utility"
-    | "Milestone";
+  category: string;
   deprecated?: boolean;
 };
 
@@ -77,8 +71,77 @@ export const LEVEL_BADGE_SLUGS: BadgeSlug[] = [
   { slug: "level-100", label: "Level 100", category: "Milestone" },
 ];
 
+export const LEARN_BADGE_SLUGS: BadgeSlug[] = [
+  {
+    slug: "money-on-the-internet",
+    label: "Money that lives on the internet",
+    category: "The world of digital money",
+  },
+  {
+    slug: "why-anyone-made-this",
+    label: "Why anyone made this",
+    category: "The world of digital money",
+  },
+  {
+    slug: "who-runs-it",
+    label: "How strangers agree without trusting each other",
+    category: "The world of digital money",
+  },
+  {
+    slug: "what-you-can-do",
+    label: "What you can actually do with it",
+    category: "The world of digital money",
+  },
+  {
+    slug: "what-a-wallet-is",
+    label: "What a wallet is",
+    category: "Wallets",
+  },
+  {
+    slug: "what-your-wallet-holds",
+    label: "What your wallet actually holds",
+    category: "Wallets",
+  },
+  {
+    slug: "wallets-people-use",
+    label: "The wallets people actually use",
+    category: "Wallets",
+  },
+  {
+    slug: "setting-up-your-wallet",
+    label: "Setting up a wallet you control",
+    category: "Wallets",
+  },
+  {
+    slug: "your-address-is-your-identity",
+    label: "Your address is who you are on-chain",
+    category: "Wallets",
+  },
+  {
+    slug: "your-address-is-public",
+    label: "Sharing your address, safely",
+    category: "Wallets",
+  },
+  {
+    slug: "key-you-never-share",
+    label: "The key you never share",
+    category: "Wallets",
+  },
+  {
+    slug: "words-that-restore-everything",
+    label: "The words that restore everything",
+    category: "Wallets",
+  },
+  {
+    slug: "hot-and-cold-wallets",
+    label: "Hot wallets and cold wallets",
+    category: "Wallets",
+  },
+];
+
 export const ALL_BADGE_SLUGS: BadgeSlug[] = [
   ...MODULE_BADGE_SLUGS,
   ...DEPRECATED_BADGE_SLUGS,
+  ...LEARN_BADGE_SLUGS, 
   ...LEVEL_BADGE_SLUGS,
 ];

@@ -18,17 +18,12 @@ export type NavDestination = {
 
 export const NAV_DESTINATIONS: NavDestination[] = [
   { href: "/overview", label: "Overview", icon: Folder, tone: "indigo" },
-  { href: "/modules", label: "Modules", icon: BookOpen, tone: "mustard" },
+  { href: "/learn", label: "Learn", icon: BookOpen, tone: "mustard" },
   { href: "/play", label: "Play", icon: Target, tone: "terracotta" },
   { href: "/ecosystem", label: "Ecosystem", icon: Globe, tone: "forest" },
   { href: "/profile", label: "Profile", icon: User, tone: "aubergine" },
 ];
 
-/**
- * Decide whether a destination matches the current pathname.
- * Exact match for /dashboard, prefix match for everything else so
- * /modules/[slug] still highlights the Modules tab.
- */
 export function isActiveDestination(pathname: string, href: string): boolean {
   if (href === "/dashboard") return pathname === "/dashboard";
   return pathname === href || pathname.startsWith(`${href}/`);

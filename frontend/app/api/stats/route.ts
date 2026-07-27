@@ -1,31 +1,23 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getPlatformVolumeG } from "@/lib/onchain/volume";
 
 export const revalidate = 60;
 
 export async function GET() {
   try {
-    const [usersCount, completionsCount, gEarnedRows] = await Promise.all([
+    const [usersCount, completionsCount, gDistributed] = await Promise.all([
       supabaseAdmin.from("users").select("id", { count: "exact", head: true }),
       supabaseAdmin
         .from("module_completions")
         .select("id", { count: "exact", head: true }),
-      // Sum lifetime G$ earned across all users
-      supabaseAdmin.from("users").select("total_g_earned"),
+      getPlatformVolumeG(),
     ]);
 
-    const learners = usersCount.count ?? 0;
-    const modulesDone = completionsCount.count ?? 0;
-
-    const gDistributed = (gEarnedRows.data ?? []).reduce(
-      (sum, u) => sum + Number(u.total_g_earned ?? 0),
-      0,
-    );
-
     return NextResponse.json({
-      learners,
+      learners: usersCount.count ?? 0,
       gDistributed,
-      modulesDone,
+      modulesDone: completionsCount.count ?? 0,
     });
   } catch (err) {
     console.error("[stats]", err);
