@@ -8,7 +8,6 @@ import { awardPoints } from "@/lib/server/point";
 import { triggerReferralOnFirstActivity } from "@/lib/referral/trigger";
 import { assertModulePlayable } from "@/lib/learn/lock";
 
-
 type Body = {
   answers?: Array<{ card_index: number; answer: number | string }>;
 };
@@ -25,6 +24,7 @@ export async function POST(
   const body = (await request.json().catch(() => null)) as Body | null;
   const answers = body?.answers ?? [];
 
+  // ─── Load the module (need id + points_reward) ──────────
   const { data: module, error: modErr } = await supabaseAdmin
     .from("learn_modules")
     .select("id, slug, points_reward, status")
@@ -79,9 +79,11 @@ export async function POST(
     if (card.type === "flip") continue;
     totalGraded++;
 
-    const submitted = answers.find((a) => a.card_index === card.order_index);
+    const submitted = answers.find(
+      (a) => a.card_index === card.order_index + 1,
+    );
     if (!submitted) {
-      incorrectCards.push(card.order_index);
+      incorrectCards.push(card.order_index + 1);
       continue;
     }
 
@@ -95,7 +97,7 @@ export async function POST(
     if (submitted.answer === expected) {
       correct++;
     } else {
-      incorrectCards.push(card.order_index);
+      incorrectCards.push(card.order_index + 1);
     }
   }
 
@@ -148,7 +150,7 @@ export async function POST(
       user_id: user.id,
       module_id: module.id,
       quiz_score: totalGraded > 0 ? correct : null,
-      points_awarded: 0, // set after the points award succeeds
+      points_awarded: 0,
       badge_token_id:
         onchain.badgeTokenId !== "0" ? onchain.badgeTokenId : null,
       badge_tx_hash: onchain.badgeTxHash,
