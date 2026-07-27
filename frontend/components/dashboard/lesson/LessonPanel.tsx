@@ -10,9 +10,11 @@ import type { LessonContent } from "@/lib/lessons/lesson-data";
 export function LessonPanel({
   slug,
   onChooseNext,
+  basePath = "/api/modules",
 }: {
   slug: string | null;
   onChooseNext: () => void;
+  basePath?: string;
 }) {
   const authFetch = useAuthFetch();
 
@@ -20,7 +22,7 @@ export function LessonPanel({
     queryKey: ["lesson", slug],
     queryFn: async (): Promise<LessonContent | null> => {
       if (!slug) return null;
-      const res = await authFetch(`/api/modules/${slug}/lesson`);
+      const res = await authFetch(`${basePath}/${slug}/lesson`);
       if (res.status === 404) return null;
       if (!res.ok) throw new Error(`Status ${res.status}`);
       return res.json();
@@ -71,11 +73,12 @@ export function LessonPanel({
     );
   }
   return (
-    <LessonRunner
-      key={slug}
-      lesson={lesson}
-      badgeImageUrl={null}
-      onChooseNext={onChooseNext}
-    />
-  );
+  <LessonRunner
+    key={slug}
+    lesson={lesson}
+    badgeImageUrl={null}
+    onChooseNext={onChooseNext}
+    basePath={basePath}
+  />
+);
 }

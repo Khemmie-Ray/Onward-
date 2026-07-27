@@ -30,10 +30,12 @@ export function LessonRunner({
   lesson,
   badgeImageUrl,
   onChooseNext,
+  basePath = "/api/modules",
 }: {
   lesson: LessonContent;
   badgeImageUrl?: string | null;
   onChooseNext: () => void;
+  basePath?: string;
 }) {
   const authFetch = useAuthFetch();
   const { isVerified } = useIdentityContext();
@@ -103,13 +105,12 @@ export function LessonRunner({
       };
 
       const res = await authFetch(
-        `/api/modules/${lesson.module.slug}/complete`,
+        `${basePath}/${lesson.module.slug}/complete`,
         { method: "POST", body: JSON.stringify(payload) },
       );
 
       const data = await res.json();
 
-      // Failed the threshold — roll back to first wrong card, show error
       if (data.status === "incomplete" && data.passed === false) {
         setCompletion(null);
         setSubmissionError(
@@ -123,7 +124,6 @@ export function LessonRunner({
         return;
       }
 
-      // Success — stream in the real tx hashes
       setCompletion((prev) =>
         prev
           ? {
@@ -166,8 +166,9 @@ export function LessonRunner({
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-[24px] bg-paper/50 p-6 min-h-[500px]">
-      <div className="flex flex-col items-center gap-3 pt-1">
+    <div className="flex flex-col gap-4 rounded-[24px] bg-paper/50 p-6 h-[calc(100vh-160px)] max-h-[820px] min-h-[500px]">
+      {/* Header: fixed */}
+      <div className="flex flex-col items-center gap-3 pt-1 shrink-0">
         <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-fg-soft">
           {lesson.module.category}
         </div>
@@ -198,13 +199,14 @@ export function LessonRunner({
       </div>
 
       {submissionError && (
-        <div className="mx-auto max-w-[480px] rounded-[14px] bg-terracotta-tint p-4 text-center animate-fade-up">
+        <div className="mx-auto max-w-[480px] rounded-[14px] bg-terracotta-tint p-4 text-center animate-fade-up shrink-0">
           <div className="text-[12px] font-bold text-terracotta">
             {submissionError}
           </div>
         </div>
       )}
-      <div className="flex-1 flex items-center justify-center py-4">
+
+      <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex items-start justify-center py-4">
         {currentCard.type === "flip" && (
           <FlipCard data={currentCard} onFlip={setFlipped} />
         )}
@@ -221,7 +223,8 @@ export function LessonRunner({
           />
         )}
       </div>
-      <div className="flex items-center justify-between gap-4 pt-2">
+
+      <div className="flex items-center justify-between gap-4 pt-2 shrink-0">
         <button
           onClick={handleBack}
           disabled={isFirstCard}
