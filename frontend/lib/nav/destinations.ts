@@ -20,7 +20,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   { href: "/overview", label: "Overview", icon: Folder, tone: "indigo" },
   { href: "/learn", label: "Learn", icon: BookOpen, tone: "mustard" },
   { href: "/play", label: "Play", icon: Target, tone: "terracotta" },
-  { href: "/ecosystem", label: "Ecosystem", icon: Globe, tone: "forest" },
+  // { href: "/ecosystem", label: "Ecosystem", icon: Globe, tone: "forest" },
   { href: "/profile", label: "Profile", icon: User, tone: "aubergine" },
 ];
 
