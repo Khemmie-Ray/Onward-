@@ -22,7 +22,6 @@ import { UBIClaimCard } from "@/components/dashboard/UBIClaimCard";
 const Overview = () => {
   const authFetch = useAuthFetch();
 
-  // Award +5 daily login points on first load each UTC day (toasts on award)
   useDailyLoginBonus();
 
   const { address } = useConnection();
@@ -182,8 +181,6 @@ const Overview = () => {
           )}
         </section>
       </main>
-
-      {/* Recently earned badges */}
       {data.recentBadges.length > 0 && (
         <section className="mb-12 animate-[fade-up_0.8s_0.6s_ease_both]">
           <div className="flex items-end justify-between mb-4">
