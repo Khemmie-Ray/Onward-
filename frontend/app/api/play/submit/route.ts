@@ -104,7 +104,7 @@ export async function POST(request: Request) {
   );
   const missedScams = Math.max(0, spawnedScamsReported - correctWhacks);
 
-  const grade = gradeRound({ mode, correctWhacks, wrongWhacks });
+  const grade = gradeRound({ mode, correctWhacks, wrongWhacks, missedScams });
 
   const levelBefore = user.current_level;
   const levelAfter = nextLevel(levelBefore, grade.passed);
