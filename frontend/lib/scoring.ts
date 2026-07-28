@@ -10,7 +10,7 @@ export const SCORING = {
     minRecall: 0.5, 
   },
   premium: {
-    minPrecision: 0.75,
+    minPrecision: 0.6,
     minCorrect: 12,
     minRecall: 0.7, 
   },

@@ -208,7 +208,7 @@ export function LessonRunner({
 
       <div className="flex-1 min-h-0 overflow-y-auto no-scrollbar flex items-start justify-center py-4">
         {currentCard.type === "flip" && (
-          <FlipCard data={currentCard} onFlip={setFlipped} />
+          <FlipCard key={cardIndex} data={currentCard} onFlip={setFlipped} />
         )}
         {currentCard.type === "choice" && (
           <ChoiceCard
