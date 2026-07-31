@@ -21,6 +21,10 @@ export function PlayStage({
   isVerified,
   onStartPremium,
   onVerify,
+  resumeInfo,
+  checkingResume,
+  onResumeStake,
+  onForfeitStake,
 }: {
   activeTab: Mode;
   freeStep: FreeStep;
@@ -38,6 +42,15 @@ export function PlayStage({
   isVerified: boolean;
   onStartPremium: () => void;
   onVerify: () => void;
+  resumeInfo: {
+    resumable: boolean;
+    round_id?: string;
+    needsForfeit?: boolean;
+    message?: string;
+  } | null;
+  checkingResume: boolean;
+  onResumeStake: () => void;
+  onForfeitStake: () => void;
 }) {
   return (
     <div className="rounded-[16px] bg-paper px-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)] flex flex-col items-center justify-center py-10">
@@ -66,13 +79,16 @@ export function PlayStage({
             isVerified={isVerified}
             onStart={onStartPremium}
             onVerify={onVerify}
+            resumeInfo={resumeInfo}
+            checkingResume={checkingResume}
+            onResumeStake={onResumeStake}
+            onForfeitStake={onForfeitStake}
           />
         )}
       </div>
     </div>
   );
 }
-
 
 function PreviewBoard() {
   return (
