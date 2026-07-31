@@ -27,7 +27,7 @@ export type WhackResult = {
   missedScams: number;
   totalScams: number;
   whacks: string[];
-  spawnedScams: number;
+  appearedScams: number;
 };
 
 export type HoleState = {
@@ -78,6 +78,6 @@ export type SubmitResponse = {
 export type PlayStats = {
   current_streak: number;
   lifetime_points_from_play: number;
-  scams_whacked_today: number; 
+  scams_whacked_today: number;
   weekly_rank: number | null;
 };

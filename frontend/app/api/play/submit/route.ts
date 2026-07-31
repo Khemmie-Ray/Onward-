@@ -11,7 +11,7 @@ import { triggerReferralOnFirstActivity } from "@/lib/referral/trigger";
 type SubmitBody = {
   round_id?: string;
   whacks?: string[];
-  spawned_scams?: number;
+  missed_scams?: number;
 };
 
 const POINTS_PER_ROUND = {
@@ -98,11 +98,11 @@ export async function POST(request: Request) {
     else wrongWhacks++;
   }
 
-  const spawnedScamsReported = Math.max(
-    0,
-    Math.min(SCORING.maxSpawnedScamsReported, body.spawned_scams ?? 0),
-  );
-  const missedScams = Math.max(0, spawnedScamsReported - correctWhacks);
+  const scamsInList = items.filter((it) => it.is_scam).length;
+  const reportedMissed = Math.max(0, body.missed_scams ?? 0);
+  const maxPossibleMissed = Math.max(0, scamsInList - correctWhacks);
+  const missedScams = Math.min(reportedMissed, maxPossibleMissed);
+  const appearedScams = correctWhacks + missedScams;
 
   const grade = gradeRound({ mode, correctWhacks, wrongWhacks, missedScams });
 
@@ -119,14 +119,13 @@ export async function POST(request: Request) {
       correct_whacks: correctWhacks,
       wrong_whacks: wrongWhacks,
       missed_scams: missedScams,
+      appeared_scams: appearedScams,
       passed: grade.passed,
       reward_g_amount: rewardAmount,
       level_after: levelAfter,
     })
     .eq("id", session.id);
 
-  // ─── Referral: a completed round (pass or fail) is a qualifying first
-  // activity. Idempotent, so safe to call every round. ─────────────────
   await triggerReferralOnFirstActivity(user.id);
 
   if (grade.passed) {
@@ -220,7 +219,9 @@ export async function POST(request: Request) {
     correct_whacks: correctWhacks,
     wrong_whacks: wrongWhacks,
     missed_scams: missedScams,
+    total_scams: appearedScams,
     precision_percent: grade.precisionPercent,
+    recall_percent: grade.recallPercent,
     reward_g_amount: rewardAmount,
     points_awarded: pointsAwarded,
     new_points_balance: newPointsBalance,

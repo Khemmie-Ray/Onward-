@@ -56,7 +56,10 @@ contract WhackStake is
 
     bool public upgradeRenounced;
 
-    uint256[40] private __gap;
+    // V2: pointer to a user's single unresolved stake. 
+    mapping(address => bytes32) public activeStakeOf;
+
+    uint256[39] private __gap;
 
     // ============================================================
     // Events
@@ -101,6 +104,7 @@ contract WhackStake is
     error RoundAlreadyResolved();
     error InsufficientBonusPool();
     error UpgradeAlreadyRenounced();
+    error ActiveStakeExists(); 
 
     // ============================================================
     // Modifiers
@@ -155,8 +159,13 @@ contract WhackStake is
         bytes32 roundId
     ) external whenNotPaused nonReentrant {
         if (stakes[roundId].staker != address(0)) revert RoundAlreadyExists();
+        // V2: enforce one unresolved stake per user. 
+        if (activeStakeOf[msg.sender] != bytes32(0)) revert ActiveStakeExists();
 
         uint256 amount = stakeAmount;
+
+        // V2: record this as the user's active stake.
+        activeStakeOf[msg.sender] = roundId;
 
         stakes[roundId] = Stake({
             staker: msg.sender,
@@ -186,6 +195,8 @@ contract WhackStake is
         address staker = s.staker;
 
         s.resolved = true;
+        // V2: clear the user's active-stake pointer now that it's resolved.
+        delete activeStakeOf[staker];
 
         if (didWin) {
             totalRefunded += amount;
@@ -292,6 +303,17 @@ contract WhackStake is
         uint256 bal = gDollar.balanceOf(address(this));
         uint256 outstanding = totalStaked - totalRefunded - totalForfeited;
         return bal > outstanding ? bal - outstanding : 0;
+    }
+
+    // V2: one read for the app — the user's active unresolved stake, if any.
+    function getActiveStake(address user)
+        external
+        view
+        returns (bytes32 roundId, uint256 amount, bool exists)
+    {
+        roundId = activeStakeOf[user];
+        exists = roundId != bytes32(0);
+        amount = exists ? stakes[roundId].amount : 0;
     }
 
     // ============================================================

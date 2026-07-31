@@ -52,6 +52,14 @@ export default function PlayPage() {
   const [freeError, setFreeError] = useState<string | null>(null);
   const [premiumError, setPremiumError] = useState<string | null>(null);
 
+  const [resumeInfo, setResumeInfo] = useState<{
+    resumable: boolean;
+    round_id?: string;
+    needsForfeit?: boolean;
+    message?: string;
+  } | null>(null);
+  const [checkingResume, setCheckingResume] = useState(false);
+
   const resetToTabSelect = useCallback(() => {
     setPhase("tab-select");
     setPreview(null);
@@ -95,6 +103,29 @@ export default function PlayPage() {
   };
 
   const isPremiumTab = activeTab === "premium";
+
+  useEffect(() => {
+    if (activeTab !== "premium" || !address) return;
+    let cancelled = false;
+    (async () => {
+      setCheckingResume(true);
+      try {
+        const res = await authFetch("/api/play/premium-resume", {
+          method: "GET",
+        });
+        if (res.ok && !cancelled) {
+          setResumeInfo(await res.json());
+        }
+      } catch {
+        // non-fatal: fall back to normal stake flow
+      } finally {
+        if (!cancelled) setCheckingResume(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, address, authFetch]);
   const { stakeAmount } = useStakeAmount(isPremiumTab);
   const { balance, refetch: refetchBalance } = useGDollarBalance(
     address as Address | undefined,
@@ -242,7 +273,7 @@ export default function PlayPage() {
         body: JSON.stringify({
           round_id: roundId,
           whacks: r.whacks,
-          spawned_scams: r.spawnedScams,
+          missed_scams: r.missedScams,
         }),
       });
       if (res.ok) {
@@ -268,6 +299,48 @@ export default function PlayPage() {
       console.error("[play abandon failed]", e);
     }
     resetToTabSelect();
+  };
+
+  const handleResumeStake = async () => {
+    if (!resumeInfo?.round_id) return;
+    setPremiumError(null);
+    setPremiumStep("starting");
+    try {
+      const res = await authFetch("/api/play/start", {
+        method: "POST",
+        body: JSON.stringify({
+          mode: "premium",
+          round_id: resumeInfo.round_id,
+        }),
+      });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      const data: RoundPreview = await res.json();
+      setPreview(data);
+      setPhase("briefing");
+      setPremiumStep("idle");
+      setResumeInfo(null);
+    } catch (e) {
+      setPremiumError(
+        e instanceof Error ? e.message : "Could not resume your staked round",
+      );
+      setPremiumStep("idle");
+    }
+  };
+
+  const handleForfeitStake = async () => {
+    if (!resumeInfo?.round_id) return;
+    setPremiumError(null);
+    try {
+      await authFetch("/api/play/abandon", {
+        method: "POST",
+        body: JSON.stringify({ round_id: resumeInfo.round_id }),
+      });
+      setResumeInfo(null);
+    } catch (e) {
+      setPremiumError(
+        e instanceof Error ? e.message : "Could not recover the stake",
+      );
+    }
   };
 
   const passed = submitData?.passed ?? null;
@@ -303,6 +376,10 @@ export default function PlayPage() {
               isVerified={isVerified}
               onStartPremium={startPremiumRound}
               onVerify={startVerifying}
+              resumeInfo={resumeInfo}
+              checkingResume={checkingResume}
+              onResumeStake={handleResumeStake}
+              onForfeitStake={handleForfeitStake}
             />
           )}
 
@@ -351,6 +428,7 @@ export default function PlayPage() {
                 txPending={txPending}
                 txHash={submitData?.onchain?.rewardTxHash ?? null}
                 onPlayAgain={resetToTabSelect}
+                onClose={resetToTabSelect}
               />
             </div>
           )}

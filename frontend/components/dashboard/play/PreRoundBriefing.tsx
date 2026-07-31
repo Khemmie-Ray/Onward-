@@ -38,8 +38,8 @@ export function PreRoundBriefing({
             priority
           />
         </div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-fg-soft">
-          Whack this when you see it
+        <p className="text-[16px] font-bold uppercase tracking-[0.16em] text-fg-soft">
+          Whack only this when you see it
         </p>
       </div>
       <div className="text-center mb-6">

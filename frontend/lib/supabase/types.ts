@@ -142,6 +142,7 @@ export type DbGameSession = {
   mode: "free" | "premium";
   started_at: string;
   completed_at: string | null;
+  appeared_scams: number | null;
   score: number | null;
   correct_whacks: number | null;
   wrong_whacks: number | null;

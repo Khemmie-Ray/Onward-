@@ -32,9 +32,23 @@ contract ConfigureModuleURIs is Script {
         // badges.setModuleURI("level-100", _uri(cid_json, "level-100.json"));
 
         // -----3 New modules badges added
-        badges.setModuleURI("what-is-a-token",  _uri(cid, "what-is-a-token.json"));
-        badges.setModuleURI("who-built-gooddollar", _uri(cid, "who-built-good-dollar.json"));
-        badges.setModuleURI("why-celo-fuse-xdc", _uri(cid, "why-celo-fuse-and-xdc.json"));
+        // badges.setModuleURI("what-is-a-token",  _uri(cid, "what-is-a-token.json"));
+        // badges.setModuleURI("who-built-gooddollar", _uri(cid, "who-built-good-dollar.json"));
+        // badges.setModuleURI("why-celo-fuse-xdc", _uri(cid, "why-celo-fuse-and-xdc.json"));
+
+        badges.setModuleURI("money-on-the-internet",        _uri(cid, "money-on-the-internet.json"));
+        badges.setModuleURI("why-anyone-made-this",         _uri(cid, "why-anyone-made-this.json"));
+        badges.setModuleURI("who-runs-it",                  _uri(cid, "who-runs-it.json"));
+        badges.setModuleURI("what-you-can-do",              _uri(cid, "what-you-can-do.json"));
+        badges.setModuleURI("what-a-wallet-is",             _uri(cid, "what-a-wallet-is.json"));
+        badges.setModuleURI("what-your-wallet-holds",       _uri(cid, "what-your-wallet-holds.json"));
+        badges.setModuleURI("wallets-people-use",           _uri(cid, "wallets-people-use.json"));
+        badges.setModuleURI("setting-up-your-wallet",       _uri(cid, "setting-up-your-wallet.json"));
+        badges.setModuleURI("your-address-is-your-identity",_uri(cid, "your-address-is-your-identity.json"));
+        badges.setModuleURI("your-address-is-public",       _uri(cid, "your-address-is-public.json"));
+        badges.setModuleURI("key-you-never-share",          _uri(cid, "key-you-never-share.json"));
+        badges.setModuleURI("words-that-restore-everything",_uri(cid, "words-that-restore-everything.json"));
+        badges.setModuleURI("hot-and-cold-wallets",         _uri(cid, "hot-and-cold-wallets.json"));
 
         vm.stopBroadcast();
 
