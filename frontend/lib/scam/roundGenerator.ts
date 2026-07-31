@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { WhackIcon } from "./whackIcon";
-import { iconsForRound } from "./patternIcons";
+import { iconsForToday } from "./patternIcons";
 import type { PlayMode } from "@/lib/scoring";
 
 export type RoundItem = {
@@ -42,45 +42,31 @@ export type GeneratedRound = {
 
 export { type PlayMode };
 
-function tierConfig(mode: PlayMode, level: number) {
-  if (mode === "premium") {
-    return {
-      totalItems: 60,
-      scamRatio: 0.55,
-      popupDurationMs: 1500,
-      baseSpawnDelay: 300,
-      spawnJitter: 200,
-      boardProgression: [6],
-    };
-  }
-  if (level < 20) {
-    return {
-      totalItems: 50,
-      scamRatio: 0.6,
-      popupDurationMs: 2000,
-      baseSpawnDelay: 400,
-      spawnJitter: 250,
-      boardProgression: [6],
-    };
-  }
-  if (level < 60) {
-    return {
-      totalItems: 55,
-      scamRatio: 0.55,
-      popupDurationMs: 1800,
-      baseSpawnDelay: 350,
-      spawnJitter: 220,
-      boardProgression: [6],
-    };
-  }
-  return {
-    totalItems: 60,
-    scamRatio: 0.5,
-    popupDurationMs: 1700,
-    baseSpawnDelay: 320,
-    spawnJitter: 200,
-    boardProgression: [6],
-  };
+// ─── Uniform pacing for all modes and levels ────────────────────────────────
+// The three numbers are reconciled so the board stays full for the whole round:
+//   spawns per round ≈ total_seconds * 1000 / (base_spawn_delay + spawn_jitter/2)
+//                    ≈ 60000 / 800 ≈ 75 spawns.
+// We build a LIST BIGGER than that (LIST_SIZE) so the queue never runs dry and
+// no holes sit empty. The timer ends the round at 60s; leftover queued items
+// simply never appear, and scoring counts only scams that DID appear.
+const PACING = {
+  totalSeconds: 60,
+  popupDurationMs: 1550,
+  baseSpawnDelay: 450,
+  spawnJitter: 300,
+  boardProgression: [6],
+  listSize: 100, // fills 60s at ~600ms avg spawn (95 needed + buffer)
+  scamRatio: 0.4, // ~40 scams in list
+} as const;
+
+// ─── Daily featured family (date-based rotation) ────────────────────────────
+// Deterministic: everyone playing on the same UTC day gets the same featured
+// family. Advances by one each day, wraps at the end of the list. New families
+// added to scam_patterns extend the rotation automatically.
+function todayFeaturedIndex(familyCount: number): number {
+  const msPerDay = 86_400_000;
+  const today = Math.floor(Date.now() / msPerDay);
+  return ((today % familyCount) + familyCount) % familyCount;
 }
 
 async function pickFamily(): Promise<string> {
@@ -89,23 +75,21 @@ async function pickFamily(): Promise<string> {
     .select("family")
     .eq("is_scam", true);
 
-  const families = Array.from(new Set((data ?? []).map((r) => r.family)));
+  // Stable, sorted, de-duplicated family list so the date index is consistent.
+  const families = Array.from(
+    new Set((data ?? []).map((r) => r.family)),
+  ).sort();
   if (families.length === 0) {
     throw new Error("No scam families found — run seed script");
   }
-  return families[Math.floor(Math.random() * families.length)];
+  return families[todayFeaturedIndex(families.length)];
 }
 
-/**
- * Generates a fresh round. The previewId argument is used to derive
- * the per-round icon pair deterministically.
- */
 export async function generateRound(
-  mode: PlayMode,
-  userLevel: number,
+  _mode: PlayMode,
+  _userLevel: number,
   previewId: string,
 ): Promise<GeneratedRound> {
-  const config = tierConfig(mode, userLevel);
   const family = await pickFamily();
 
   const { data: exemplarData } = await supabaseAdmin
@@ -118,8 +102,8 @@ export async function generateRound(
   if (!exemplarData) throw new Error(`No exemplar for family ${family}`);
   const exemplar = exemplarData as PatternRow;
 
-  const numScams = Math.floor(config.totalItems * config.scamRatio);
-  const numLegits = config.totalItems - numScams;
+  const numScams = Math.floor(PACING.listSize * PACING.scamRatio);
+  const numLegits = PACING.listSize - numScams;
 
   const { data: scamVariants } = await supabaseAdmin
     .from("scam_patterns")
@@ -150,7 +134,7 @@ export async function generateRound(
     () => Math.random() - 0.5,
   );
 
-  const roundIcons = iconsForRound(previewId);
+  const roundIcons = iconsForToday();
   const sequenceWithIcons: PatternWithIcon[] = sequence.map((p) => ({
     ...p,
     icon: p.is_scam ? roundIcons.scam : roundIcons.legit,
@@ -164,11 +148,11 @@ export async function generateRound(
     exemplar_icon: roundIcons.scam,
     items: sequence.map((p) => ({ pattern_id: p.id, is_scam: p.is_scam })),
     full_patterns: sequenceWithIcons,
-    popup_duration_ms: config.popupDurationMs,
-    total_seconds: 60,
-    board_progression: config.boardProgression,
-    base_spawn_delay: config.baseSpawnDelay,
-    spawn_jitter: config.spawnJitter,
+    popup_duration_ms: PACING.popupDurationMs,
+    total_seconds: PACING.totalSeconds,
+    board_progression: [...PACING.boardProgression],
+    base_spawn_delay: PACING.baseSpawnDelay,
+    spawn_jitter: PACING.spawnJitter,
   };
 }
 
@@ -202,7 +186,7 @@ export async function rebuildRoundFromSession(session: {
   if (!patterns) throw new Error("Cannot rebuild session: patterns not found");
 
   const patternMap = new Map(patterns.map((p) => [p.id, p]));
-  const roundIcons = iconsForRound(session.id);
+  const roundIcons = iconsForToday();
 
   const sequence: PatternWithIcon[] = session.items
     .map((item) => {
@@ -216,11 +200,6 @@ export async function rebuildRoundFromSession(session: {
     })
     .filter((x): x is PatternWithIcon => x !== null);
 
-  const config =
-    session.mode === "premium"
-      ? { boardProgression: [6], baseSpawnDelay: 300, spawnJitter: 200 }
-      : { boardProgression: [6], baseSpawnDelay: 400, spawnJitter: 250 };
-
   return {
     featured_family: session.featured_family,
     family_label: (exemplar as PatternRow).family_label,
@@ -231,8 +210,8 @@ export async function rebuildRoundFromSession(session: {
     full_patterns: sequence,
     popup_duration_ms: session.popup_duration_ms,
     total_seconds: session.total_seconds,
-    board_progression: config.boardProgression,
-    base_spawn_delay: config.baseSpawnDelay,
-    spawn_jitter: config.spawnJitter,
+    board_progression: [...PACING.boardProgression],
+    base_spawn_delay: PACING.baseSpawnDelay,
+    spawn_jitter: PACING.spawnJitter,
   };
 }

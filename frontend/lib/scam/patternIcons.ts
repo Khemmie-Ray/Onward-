@@ -19,3 +19,14 @@ export function iconsForRound(roundId: string): {
     legit: LEGIT_ICONS[(h >> 8) % LEGIT_ICONS.length],
   };
 }
+
+export function iconsForToday(): {
+  scam: WhackIcon;
+  legit: WhackIcon;
+} {
+  const dayNumber = Math.floor(Date.now() / 86_400_000);
+  return {
+    scam: SCAM_ICONS[dayNumber % SCAM_ICONS.length],
+    legit: LEGIT_ICONS[(dayNumber + 3) % LEGIT_ICONS.length],
+  };
+}
