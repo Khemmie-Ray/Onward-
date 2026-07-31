@@ -23,6 +23,7 @@ export function EndRoundModal({
   txPending,
   txHash,
   onPlayAgain,
+  onClose,
 }: {
   result: WhackResult;
   passed: boolean | null;
@@ -42,6 +43,7 @@ export function EndRoundModal({
   txPending: boolean;
   txHash: string | null;
   onPlayAgain: () => void;
+  onClose: () => void;
 }) {
   const leveledUp = levelAfter > levelBefore;
   const totalWhacks = result.correctWhacks + result.wrongWhacks;
@@ -56,7 +58,14 @@ export function EndRoundModal({
   const hasPointsReward = pointsAwarded > 0;
 
   return (
-    <div className="w-full">
+    <div className="w-full relative">
+      <button
+        onClick={onClose}
+        aria-label="Close"
+        className="absolute -top-2 -right-1 inline-flex items-center justify-center w-8 h-8 rounded-full bg-canvas-warm text-fg-soft hover:text-indigo hover:bg-canvas-warm/80 transition"
+      >
+        <X size={16} strokeWidth={2.5} />
+      </button>
       <div className="text-center mb-5">
         <div className="mb-3 inline-flex items-center justify-center">
           {isWaitingForVerdict ? (
@@ -78,7 +87,7 @@ export function EndRoundModal({
               ? "Round passed"
               : "Round didn't pass"}
         </div>
-        <h1 className="display text-[32px] font-bold leading-[1.1] tracking-[-0.025em] text-indigo">
+        <h1 className="display text-[32px] font-bold leading-[1.1] tracking-tight text-indigo">
           {result.score} {result.score === 1 ? "point" : "points"}
         </h1>
       </div>
@@ -88,8 +97,6 @@ export function EndRoundModal({
         <StatTile label="Wrong" value={result.wrongWhacks} tone="terracotta" />
         <StatTile label="Missed" value={result.missedScams} tone="aubergine" />
       </div>
-
-      {/* Reward block - shows when passed with any reward */}
       {didPass && (hasPointsReward || hasGReward || leveledUp) && (
         <div className="relative w-full bg-aubergine rounded-[16px] p-4 mb-4 overflow-hidden shadow-[0_4px_16px_rgba(91,46,92,0.15)]">
           <div
@@ -124,7 +131,7 @@ export function EndRoundModal({
 
             {newPointsBalance != null && hasPointsReward && (
               <div className="border-t border-paper/15 pt-3 mt-3 flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-paper/70">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-paper/70">
                   Your points
                 </span>
                 <span className="display text-[18px] font-bold text-paper tabular-nums">
@@ -135,7 +142,7 @@ export function EndRoundModal({
 
             {hasGReward && (
               <div className="border-t border-paper/15 pt-3 mt-3 flex items-center justify-between">
-                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-mustard">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-mustard">
                   Bonus G$ paid
                 </span>
                 <span className="display text-[18px] font-bold text-mustard tabular-nums">
@@ -165,12 +172,10 @@ export function EndRoundModal({
           )}
         </div>
       )}
-
-      {/* Points → G$ note (when points-only, no immediate G$) */}
       {didPass && hasPointsReward && !hasGReward && (
         <div className="rounded-[12px] bg-mustard/10 border border-mustard/30 p-3 mb-4">
           <p className="text-[11px] text-indigo/80 leading-snug text-center">
-            Your points will convert to G$ when claims open.
+            Your can convert your points to G$ in claim.
           </p>
         </div>
       )}
@@ -183,8 +188,6 @@ export function EndRoundModal({
           </p>
         </div>
       )}
-
-      {/* Scam pattern teaching */}
       <div className="rounded-[16px] bg-canvas-warm p-4 mb-4">
         <div className="flex items-center gap-2 mb-2">
           <Eye size={12} strokeWidth={2.5} className="text-terracotta" />
@@ -204,7 +207,7 @@ export function EndRoundModal({
         </div>
 
         <div className="rounded-[10px] bg-indigo p-3">
-          <p className="text-[11px] leading-[1.5] text-paper">
+          <p className="text-[11px] leading-normal text-paper">
             {exemplar.teaching}
           </p>
         </div>
