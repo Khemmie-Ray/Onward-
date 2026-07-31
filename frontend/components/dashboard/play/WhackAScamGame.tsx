@@ -51,9 +51,11 @@ export function WhackAScam({
   const statsRef = useRef({
     correctWhacks: 0,
     wrongWhacks: 0,
-    spawnedScams: 0,
+    appearedScams: 0,
     spawnedLegits: 0,
+    missedScams: 0,
     whackedInstanceIds: new Set<number>(),
+    missedInstanceIds: new Set<number>(),
     whacks: [] as string[],
   });
 
@@ -77,18 +79,30 @@ export function WhackAScam({
   const finishGame = useCallback(() => {
     if (finishedRef.current) return;
     finishedRef.current = true;
-
     const s = statsRef.current;
-    const missedScams = Math.max(0, s.spawnedScams - s.correctWhacks);
+
+    for (const h of holesRef.current) {
+      if (
+        h &&
+        h.isScam &&
+        !s.whackedInstanceIds.has(h.id) &&
+        !s.missedInstanceIds.has(h.id)
+      ) {
+        s.missedScams++;
+        s.missedInstanceIds.add(h.id);
+      }
+    }
+    const missed = s.missedScams;
+    const appeared = s.correctWhacks + missed;
 
     onCompleteRef.current({
       score: Math.max(0, s.correctWhacks - s.wrongWhacks),
       correctWhacks: s.correctWhacks,
       wrongWhacks: s.wrongWhacks,
-      missedScams,
-      totalScams: s.spawnedScams,
+      missedScams: missed,
+      totalScams: appeared,
       whacks: s.whacks,
-      spawnedScams: s.spawnedScams,
+      appearedScams: appeared,
     });
   }, []);
 
@@ -121,8 +135,8 @@ export function WhackAScam({
 
     const nextItem = (): DisplayItem | null => {
       const queue = itemQueueRef.current;
-      if (queue.length === 0) return null;
-      const item = queue[itemCursorRef.current % queue.length];
+      if (itemCursorRef.current >= queue.length) return null;
+      const item = queue[itemCursorRef.current];
       itemCursorRef.current++;
       return item;
     };
@@ -157,7 +171,7 @@ export function WhackAScam({
       if (!item) return;
 
       lastSpawnAtRef.current[holeIdx] = now;
-      if (item.is_scam) statsRef.current.spawnedScams++;
+      if (item.is_scam) statsRef.current.appearedScams++;
       else statsRef.current.spawnedLegits++;
 
       const newHoleState: HoleState = {
@@ -205,6 +219,14 @@ export function WhackAScam({
         const next = prev.map((h) => {
           if (h && now - h.appearedAt > h.durationMs) {
             changed = true;
+            if (
+              h.isScam &&
+              !statsRef.current.whackedInstanceIds.has(h.id) &&
+              !statsRef.current.missedInstanceIds.has(h.id)
+            ) {
+              statsRef.current.missedScams++;
+              statsRef.current.missedInstanceIds.add(h.id);
+            }
             return null;
           }
           return h;
