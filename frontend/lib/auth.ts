@@ -6,7 +6,6 @@ import { authOptions } from "@/lib/auth-option";
 
 export async function getAuthedUser(): Promise<DbUser | null> {
   const session = await getServerSession(authOptions);
-  console.log("[getAuthedUser] session:", session);
   
   if (!session?.address) {
     console.log("[getAuthedUser] no session.address");
@@ -14,15 +13,12 @@ export async function getAuthedUser(): Promise<DbUser | null> {
   }
 
   const normalized = session.address.toLowerCase();
-  console.log("[getAuthedUser] looking up wallet:", normalized);
 
   const { data: existing } = await supabaseAdmin
     .from("users")
     .select("*")
     .eq("wallet_address", normalized)
     .maybeSingle();
-
-  console.log("[getAuthedUser] DB result:", existing ? "found" : "not found");
 
   if (!existing) return null;
 
@@ -34,11 +30,6 @@ export async function getAuthedUser(): Promise<DbUser | null> {
   return existing;
 }
 
-/**
- * Returns the SIWE-verified wallet address if one is present in the session,
- * without doing a DB lookup. Used by the onboarding endpoint which needs to
- * create the user row.
- */
 export async function getAuthedAddress(): Promise<string | null> {
   const session = await getServerSession(authOptions);
   return session?.address ? session.address.toLowerCase() : null;
