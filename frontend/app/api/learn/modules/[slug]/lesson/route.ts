@@ -46,8 +46,19 @@ export async function GET(
 
   const lessonCards: LessonCard[] = (cards ?? []).map((card) => {
     if (card.type === "flip") {
-      const c = card.content as { front: string; hint: string; back: string };
-      return { type: "flip", front: c.front, hint: c.hint, back: c.back };
+      const c = card.content as {
+        front: string;
+        hint: string;
+        back: string;
+        icon?: string;
+      };
+      return {
+        type: "flip",
+        front: c.front,
+        hint: c.hint,
+        back: c.back,
+        icon: c.icon,
+      };
     }
     if (card.type === "choice") {
       const c = card.content as {
@@ -65,6 +76,22 @@ export async function GET(
       };
     }
     
+    if (card.type === "visual") {
+      const c = card.content as {
+        title: string;
+        image: string;
+        caption?: string;
+        alt?: string;
+      };
+      return {
+        type: "visual",
+        title: c.title,
+        image: c.image,
+        caption: c.caption,
+        alt: c.alt,
+      };
+    }
+
     const c = card.content as {
       scenario: string;
       correct_answer: "scam" | "real";
