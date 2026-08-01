@@ -21,11 +21,19 @@ export type SpotterCardContent = {
   teaching: string;
 };
 
+export type VisualCardContent = {
+  title: string;
+  image: string;
+  caption?: string;
+  alt?: string;
+};
+
 export type CardContent =
   | FlipCardContent
   | ChoiceCardContent
+  | VisualCardContent
   | SpotterCardContent;
-export type CardType = "flip" | "choice" | "spotter";
+export type CardType = "flip" | "choice" | "spotter" | "visual";
 export type ModuleCategory =
   | "Foundations"
   | "Identity"
@@ -200,7 +208,7 @@ export type DbPointClaim = {
   error_message: string | null;
   created_at: string;
   confirmed_at: string | null;
-  claim_id: string | null; 
+  claim_id: string | null;
 };
 
 export type DbSpendEvent = {

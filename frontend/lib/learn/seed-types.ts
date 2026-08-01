@@ -12,6 +12,13 @@ export type ChoiceCardContent = {
   explanation: string;
 };
 
+export type VisualCardContent = {
+  title: string;
+  image: string; 
+  caption?: string;
+  alt?: string;
+};
+
 export type SpotterCardContent = {
   scenario: string;
   scenario_render?: {
@@ -25,6 +32,7 @@ export type SpotterCardContent = {
 export type SeedCard =
   | { type: "flip"; content: FlipCardContent }
   | { type: "choice"; content: ChoiceCardContent }
+  | { type: "visual"; content: VisualCardContent }
   | { type: "spotter"; content: SpotterCardContent };
 
 export type SeedModule = {

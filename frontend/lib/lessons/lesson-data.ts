@@ -15,6 +15,14 @@ export type ChoiceCard = {
   explanation: string;
 };
 
+export type VisualCard = {
+  type: "visual";
+  title: string;
+  image: string;
+  caption?: string;
+  alt?: string;
+};
+
 export type SpotterCard = {
   type: "spotter";
   scenario: string;
@@ -22,7 +30,7 @@ export type SpotterCard = {
   teaching: string;
 };
 
-export type LessonCard = FlipCard | ChoiceCard | SpotterCard;
+export type LessonCard = FlipCard | ChoiceCard | VisualCard | SpotterCard;
 
 export type LessonContent = {
   module: ModulePreview;
