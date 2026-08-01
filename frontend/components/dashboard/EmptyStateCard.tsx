@@ -6,7 +6,7 @@ import { MudclothPattern } from "@/components/home/motifs";
 const  EmptyStateCard = () => {
   return (
     <Link
-      href="/modules"
+      href="/learn"
       className="group relative block overflow-hidden rounded-[24px] bg-mustard-tint p-7 transition-transform hover:-translate-y-1 shadow-[0_8px_24px_rgba(31,58,110,0.08)]"
     >
       <div
