@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { VisualCard } from "../learn/VisualCard";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { FlipCard } from "./FlipCard";
 import { ChoiceCard } from "./ChoiceCard";
@@ -53,11 +54,19 @@ export function LessonRunner({
   const isLastCard = cardIndex === totalCards - 1;
   const isFirstCard = cardIndex === 0;
 
-  const canAdvance = currentCard.type === "flip" ? flipped : cardAnswered;
+  const canAdvance =
+    currentCard.type === "flip"
+      ? flipped
+      : currentCard.type === "visual"
+        ? true 
+        : cardAnswered;
 
   const recordAnswer = (answer: number | "scam" | "real", correct: boolean) => {
     setCardAnswered(true);
-    setAnswers((prev) => [...prev, { cardIndex, answer, correct }]);
+    setAnswers((prev) => [
+      ...prev.filter((a) => a.cardIndex !== cardIndex),
+      { cardIndex, answer, correct },
+    ]);
   };
 
   const handleNext = () => {
@@ -212,12 +221,17 @@ export function LessonRunner({
         )}
         {currentCard.type === "choice" && (
           <ChoiceCard
+            key={cardIndex}
             data={currentCard}
             onAnswer={(idx, correct) => recordAnswer(idx, correct)}
           />
         )}
+        {currentCard.type === "visual" && (
+          <VisualCard key={cardIndex} data={currentCard} />
+        )}
         {currentCard.type === "spotter" && (
           <SpotterCard
+            key={cardIndex}
             data={currentCard}
             onAnswer={(ans, correct) => recordAnswer(ans, correct)}
           />

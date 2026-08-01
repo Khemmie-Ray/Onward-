@@ -76,7 +76,7 @@ export async function POST(
   const incorrectCards: number[] = [];
 
   for (const card of cards) {
-    if (card.type === "flip") continue;
+    if (card.type === "flip" || card.type === "visual") continue;
     totalGraded++;
 
     const submitted = answers.find(

@@ -1,8 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { HandMetal, ArrowRight } from "lucide-react";
 import type { FlipCard as FlipCardData } from "@/lib/lessons/lesson-data";
+
+
+const CARD_ICONS: Record<string, string> = {
+  metamask: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544483/onward/metamask_efscln.png",
+  trustwallet: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544484/onward/trust-wallet_d2tcup.png",
+  phantom: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544484/onward/Phantom_Wallet_sgku1g.png",
+  rainbow: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544484/onward/rainbow_f2n9lg.png",
+  minipay: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544484/onward/minipay_xb6sao.png",
+};
 
 export function FlipCard({
   data,
@@ -12,6 +22,9 @@ export function FlipCard({
   onFlip?: (flipped: boolean) => void;
 }) {
   const [flipped, setFlipped] = useState(false);
+
+  const iconKey = (data as { icon?: string }).icon;
+  const iconUrl = iconKey ? CARD_ICONS[iconKey] : undefined;
 
   const handleClick = () => {
     const next = !flipped;
@@ -48,6 +61,20 @@ export function FlipCard({
               <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-mustard mb-auto">
                 The question
               </div>
+              {iconUrl && (
+                <div className="mb-4">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-paper/60 p-2.5 shadow-sm">
+                    <Image
+                      src={iconUrl}
+                      alt={data.front}
+                      width={48}
+                      height={48}
+                      className="object-contain"
+                      unoptimized
+                    />
+                  </div>
+                </div>
+              )}
               <div className="display text-[26px] md:text-[30px] font-bold leading-[1.15] tracking-[-0.02em] text-indigo">
                 {data.front}
               </div>
