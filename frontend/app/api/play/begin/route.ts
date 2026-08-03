@@ -16,25 +16,35 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing preview_id" }, { status: 400 });
   }
 
-  const { data: session, error } = await supabaseAdmin
+  const { data: session } = await supabaseAdmin
     .from("game_sessions")
     .update({ status: "active" })
     .eq("id", body.preview_id)
     .eq("user_id", user.id)
     .eq("status", "pending")
     .select("id")
-    .single();
+    .maybeSingle();
 
-  if (error || !session) {
-    return NextResponse.json(
-      { error: "Round not found or already started" },
-      { status: 404 }
-    );
+  if (session) {
+    await tickStreakForToday(user.id);
+    return NextResponse.json({ round_id: session.id });
   }
 
-  await tickStreakForToday(user.id);
+  const { data: existing } = await supabaseAdmin
+    .from("game_sessions")
+    .select("id, status")
+    .eq("id", body.preview_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-  return NextResponse.json({ round_id: session.id });
+  if (existing?.status === "active") {
+    return NextResponse.json({ round_id: existing.id });
+  }
+
+  return NextResponse.json(
+    { error: "Round not found or already finished" },
+    { status: 404 },
+  );
 }
 
 async function tickStreakForToday(userId: string) {

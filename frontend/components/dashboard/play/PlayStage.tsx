@@ -25,6 +25,7 @@ export function PlayStage({
   checkingResume,
   onResumeStake,
   onForfeitStake,
+  forfeiting,
 }: {
   activeTab: Mode;
   freeStep: FreeStep;
@@ -45,12 +46,14 @@ export function PlayStage({
   resumeInfo: {
     resumable: boolean;
     round_id?: string;
+    round_id_hash?: string;
     needsForfeit?: boolean;
     message?: string;
   } | null;
   checkingResume: boolean;
   onResumeStake: () => void;
   onForfeitStake: () => void;
+  forfeiting: boolean;
 }) {
   return (
     <div className="rounded-[16px] bg-paper px-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)] flex flex-col items-center justify-center py-10">
@@ -83,6 +86,7 @@ export function PlayStage({
             checkingResume={checkingResume}
             onResumeStake={onResumeStake}
             onForfeitStake={onForfeitStake}
+            forfeiting={forfeiting}
           />
         )}
       </div>

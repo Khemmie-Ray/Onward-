@@ -19,6 +19,7 @@ export function PremiumAction({
   checkingResume,
   onResumeStake,
   onForfeitStake,
+  forfeiting,
 }: {
   step: PremiumStep;
   capMessage: DailyCapMessage;
@@ -33,12 +34,14 @@ export function PremiumAction({
   resumeInfo: {
     resumable: boolean;
     round_id?: string;
+    round_id_hash?: string;
     needsForfeit?: boolean;
     message?: string;
   } | null;
   checkingResume: boolean;
   onResumeStake: () => void;
   onForfeitStake: () => void;
+  forfeiting: boolean;
 }) {
   if (!isVerified) {
     return (
@@ -77,7 +80,13 @@ export function PremiumAction({
       </div>
     );
   }
-  if (checkingResume) {
+
+  // ─── Unresolved stake: user staked previously and must resume (or, in the
+  // rare stuck case where no round exists, recover their funds). We never show
+  // a "quit" option for a playable round — the point of staking is to play. ──
+  const flowInProgress = step !== "idle";
+
+  if (checkingResume && !flowInProgress) {
     return (
       <div className="text-center w-full py-6">
         <Loader2
@@ -90,7 +99,7 @@ export function PremiumAction({
     );
   }
 
-  if (resumeInfo?.resumable && resumeInfo.round_id) {
+  if (resumeInfo?.resumable && resumeInfo.round_id && !flowInProgress) {
     const isWorkingResume = step !== "idle";
     return (
       <div className="w-full text-center">
@@ -119,7 +128,10 @@ export function PremiumAction({
       </div>
     );
   }
-  if (resumeInfo?.needsForfeit) {
+
+  // Rare: a stake exists on-chain but no playable round (interrupted mid-stake).
+  // This is fund recovery, NOT a quit option for a real round.
+  if (resumeInfo?.needsForfeit && !flowInProgress) {
     return (
       <div className="w-full text-center">
         <div className="mb-4 inline-flex items-center justify-center w-14 h-14 rounded-full bg-terracotta/15">
@@ -139,9 +151,13 @@ export function PremiumAction({
         )}
         <button
           onClick={onForfeitStake}
-          className="w-full py-4 rounded-xl bg-terracotta text-paper font-bold text-base hover:bg-terracotta/90 transition"
+          disabled={forfeiting}
+          className="w-full py-4 rounded-xl bg-terracotta text-paper font-bold text-base disabled:bg-terracotta/40 disabled:cursor-not-allowed hover:bg-terracotta/90 transition inline-flex items-center justify-center gap-2"
         >
-          Recover stuck stake
+          {forfeiting && (
+            <Loader2 size={16} strokeWidth={2.5} className="animate-spin" />
+          )}
+          {forfeiting ? "Recovering…" : "Recover stuck stake"}
         </button>
       </div>
     );

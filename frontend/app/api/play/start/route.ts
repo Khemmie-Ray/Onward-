@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       .in("status", ["active", "submitted", "expired"])
       .gte("started_at", todayStart.toISOString());
 
-    if ((count ?? 0) >= 5) {
+    if ((count ?? 0) >= 3) {
       return NextResponse.json(
         { error: "Daily premium cap reached" },
         { status: 429 },
