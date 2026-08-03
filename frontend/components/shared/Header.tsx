@@ -23,7 +23,6 @@ const INITIAL_HEADER_HEIGHT = 96;
 const Header = () => {
   const { address, isConnected, isConnecting, isReconnecting } =
     useConnection();
-  console.log(isConnected);
   const logout = useOnwardLogout();
   const pathname = usePathname();
   const authFetch = useAuthFetch();

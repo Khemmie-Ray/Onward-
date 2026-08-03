@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection } from "wagmi";
-import { type Address } from "viem";
+import { keccak256, toBytes, type Address } from "viem";
 
 import { PreRoundBriefing } from "@/components/dashboard/play/PreRoundBriefing";
 import { WhackAScam } from "@/components/dashboard/play/WhackAScamGame";
@@ -30,6 +30,51 @@ import { useIdentityContext } from "@/contexts/IdentityContext";
 
 type Phase = "tab-select" | "briefing" | "playing" | "ended";
 
+const PENDING_KEY = "premium_pending_uuid";
+const PENDING_LIST_KEY = "premium_pending_uuids";
+
+function rememberPendingUuid(uuid: string) {
+  sessionStorage.setItem(PENDING_KEY, uuid);
+  let list: string[] = [];
+  try {
+    list = JSON.parse(sessionStorage.getItem(PENDING_LIST_KEY) ?? "[]");
+  } catch {
+    list = [];
+  }
+  if (!list.includes(uuid)) list.push(uuid);
+  sessionStorage.setItem(PENDING_LIST_KEY, JSON.stringify(list.slice(-10)));
+}
+
+function getPendingUuids(): string[] {
+  const list: string[] = [];
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(PENDING_LIST_KEY) ?? "[]");
+    if (Array.isArray(parsed)) list.push(...parsed);
+  } catch {
+    // ignore malformed storage
+  }
+  const single = sessionStorage.getItem(PENDING_KEY);
+  if (single && !list.includes(single)) list.push(single);
+  return list;
+}
+
+function clearPendingUuid(uuid: string) {
+  if (sessionStorage.getItem(PENDING_KEY) === uuid) {
+    sessionStorage.removeItem(PENDING_KEY);
+  }
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(PENDING_LIST_KEY) ?? "[]");
+    if (Array.isArray(parsed)) {
+      sessionStorage.setItem(
+        PENDING_LIST_KEY,
+        JSON.stringify(parsed.filter((u: string) => u !== uuid)),
+      );
+    }
+  } catch {
+    // ignore malformed storage
+  }
+}
+
 export default function PlayPage() {
   const authFetch = useAuthFetch();
   const { address } = useConnection();
@@ -55,10 +100,12 @@ export default function PlayPage() {
   const [resumeInfo, setResumeInfo] = useState<{
     resumable: boolean;
     round_id?: string;
+    round_id_hash?: string;
     needsForfeit?: boolean;
     message?: string;
   } | null>(null);
   const [checkingResume, setCheckingResume] = useState(false);
+  const [forfeiting, setForfeiting] = useState(false);
 
   const resetToTabSelect = useCallback(() => {
     setPhase("tab-select");
@@ -113,13 +160,27 @@ export default function PlayPage() {
         const res = await authFetch("/api/play/premium-resume", {
           method: "GET",
         });
-        if (res.ok && !cancelled) {
-          setResumeInfo(await res.json());
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+
+        if (data?.needsForfeit && data?.round_id_hash) {
+          const onchainHash = String(data.round_id_hash).toLowerCase();
+          const localMatch = getPendingUuids().find(
+            (u) => keccak256(toBytes(u)).toLowerCase() === onchainHash,
+          );
+          if (localMatch) {
+            if (!cancelled) {
+              setResumeInfo({ resumable: true, round_id: localMatch });
+            }
+            return;
+          }
         }
+
+        if (!cancelled) setResumeInfo(data);
       } catch {
         // non-fatal: fall back to normal stake flow
       } finally {
-        if (!cancelled) setCheckingResume(false);
+        setCheckingResume(false);
       }
     })();
     return () => {
@@ -138,12 +199,16 @@ export default function PlayPage() {
   const { approve, stake, approveState, stakeState } = useWhackStake();
 
   const [pendingHash, setPendingHash] = useState<`0x${string}` | null>(null);
+  // Guards against acting twice on one stake, and against a previous stake's
+  // success flag firing /start before the new stake exists on chain.
+  const handledStakeTxRef = useRef<`0x${string}` | null>(null);
 
   const hasEnoughBalance = balance >= stakeAmount;
   const needsApproval = allowance < stakeAmount;
 
   const startPremiumRound = async () => {
     if (!address) return;
+    if (premiumStep !== "idle") return;
     setPremiumError(null);
     setPremiumCapMessage(null);
     setPremiumStep("init");
@@ -167,7 +232,7 @@ export default function PlayPage() {
         round_id_hash: `0x${string}`;
       };
       setPendingHash(initData.round_id_hash);
-      sessionStorage.setItem("premium_pending_uuid", initData.round_id);
+      rememberPendingUuid(initData.round_id);
 
       if (needsApproval) {
         setPremiumStep("approving");
@@ -199,9 +264,12 @@ export default function PlayPage() {
   ]);
 
   useEffect(() => {
-    if (premiumStep !== "staking" || !stakeState.isSuccess) return;
+    if (premiumStep !== "staking") return;
+    if (!stakeState.isSuccess || !stakeState.txHash) return;
+    if (handledStakeTxRef.current === stakeState.txHash) return;
+    handledStakeTxRef.current = stakeState.txHash;
 
-    const pendingUuid = sessionStorage.getItem("premium_pending_uuid");
+    const pendingUuid = sessionStorage.getItem(PENDING_KEY);
     if (!pendingUuid) {
       setPremiumError("Lost track of pending round. Try again.");
       setPremiumStep("idle");
@@ -212,27 +280,50 @@ export default function PlayPage() {
     refetchBalance();
 
     (async () => {
-      try {
-        const res = await authFetch("/api/play/start", {
-          method: "POST",
-          body: JSON.stringify({ mode: "premium", round_id: pendingUuid }),
-        });
-        if (!res.ok) throw new Error(`Status ${res.status}`);
-        const data: RoundPreview = await res.json();
-        setPreview(data);
-        setPhase("briefing");
-        setPremiumStep("idle");
-        sessionStorage.removeItem("premium_pending_uuid");
-      } catch (e) {
-        setPremiumError(
-          e instanceof Error
-            ? e.message
-            : "Stake confirmed but round failed to start",
-        );
-        setPremiumStep("idle");
+      let lastError = "";
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          const res = await authFetch("/api/play/start", {
+            method: "POST",
+            body: JSON.stringify({ mode: "premium", round_id: pendingUuid }),
+          });
+          if (res.ok) {
+            const data: RoundPreview = await res.json();
+            setPreview(data);
+            setPhase("briefing");
+            setPremiumStep("idle");
+            clearPendingUuid(pendingUuid);
+            return;
+          }
+          const d = await res.json().catch(() => ({}));
+   
+          if (res.status === 429) {
+            setPremiumCapMessage({
+              kind: "cap",
+              message: d?.error ?? "All premium rounds used today.",
+            });
+            setPremiumStep("idle");
+            return;
+          }
+          lastError = d?.error ?? `Status ${res.status}`;
+        } catch (e) {
+          lastError = e instanceof Error ? e.message : "Network error";
+        }
+        await new Promise((r) => setTimeout(r, 1500));
       }
+
+      setPremiumError(
+        `${lastError} Your stake is safe. Reopen the premium tab to resume this round.`,
+      );
+      setPremiumStep("idle");
     })();
-  }, [stakeState.isSuccess, premiumStep, authFetch, refetchBalance]);
+  }, [
+    stakeState.isSuccess,
+    stakeState.txHash,
+    premiumStep,
+    authFetch,
+    refetchBalance,
+  ]);
 
   const [isBeginning, setIsBeginning] = useState(false);
 
@@ -313,12 +404,22 @@ export default function PlayPage() {
           round_id: resumeInfo.round_id,
         }),
       });
+      if (res.status === 429) {
+        const d = await res.json().catch(() => ({}));
+        setPremiumCapMessage({
+          kind: "cap",
+          message: d?.error ?? "All premium rounds used today.",
+        });
+        setPremiumStep("idle");
+        return;
+      }
       if (!res.ok) throw new Error(`Status ${res.status}`);
       const data: RoundPreview = await res.json();
       setPreview(data);
       setPhase("briefing");
       setPremiumStep("idle");
       setResumeInfo(null);
+      if (resumeInfo.round_id) clearPendingUuid(resumeInfo.round_id);
     } catch (e) {
       setPremiumError(
         e instanceof Error ? e.message : "Could not resume your staked round",
@@ -328,18 +429,32 @@ export default function PlayPage() {
   };
 
   const handleForfeitStake = async () => {
-    if (!resumeInfo?.round_id) return;
+    const roundId = resumeInfo?.round_id;
+    const roundIdHash = resumeInfo?.round_id_hash;
+    if (!roundId && !roundIdHash) return;
+
     setPremiumError(null);
+    setForfeiting(true);
     try {
-      await authFetch("/api/play/abandon", {
+      const res = await authFetch("/api/play/premium-recover", {
         method: "POST",
-        body: JSON.stringify({ round_id: resumeInfo.round_id }),
+        body: JSON.stringify({
+          round_id: roundId,
+          round_id_hash: roundIdHash,
+        }),
       });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d?.error ?? `Status ${res.status}`);
+      }
       setResumeInfo(null);
+      refetchBalance();
     } catch (e) {
       setPremiumError(
         e instanceof Error ? e.message : "Could not recover the stake",
       );
+    } finally {
+      setForfeiting(false);
     }
   };
 
@@ -380,6 +495,7 @@ export default function PlayPage() {
               checkingResume={checkingResume}
               onResumeStake={handleResumeStake}
               onForfeitStake={handleForfeitStake}
+              forfeiting={forfeiting}
             />
           )}
 
