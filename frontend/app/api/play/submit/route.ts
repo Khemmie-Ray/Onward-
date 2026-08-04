@@ -110,7 +110,7 @@ export async function POST(request: Request) {
   const levelAfter = nextLevel(levelBefore, grade.passed);
   const rewardAmount = grade.rewardAmount;
 
-  await supabaseAdmin
+  const { error: sessionUpdateErr } = await supabaseAdmin
     .from("game_sessions")
     .update({
       status: "submitted",
@@ -125,6 +125,14 @@ export async function POST(request: Request) {
       level_after: levelAfter,
     })
     .eq("id", session.id);
+
+  if (sessionUpdateErr) {
+    console.error("[submit] session update failed", sessionUpdateErr);
+    return NextResponse.json(
+      { error: "Could not save your round. Please try again." },
+      { status: 500 },
+    );
+  }
 
   await triggerReferralOnFirstActivity(user.id);
 
