@@ -52,8 +52,6 @@ export function WalletPill({
   const handleExport = async () => {
     setOpen(false);
     try {
-      // Opens Web3Auth's wallet services UI where the user can reveal/export
-      // their private key (must be enabled in the dashboard key-export settings).
       const walletServices = web3Auth?.getPlugin?.("WALLET_SERVICES_PLUGIN");
       // Some SDK versions expose showWalletUI / showCheckout on the plugin.
       // Fall back to the wallet connect page if not available.
@@ -104,7 +102,7 @@ export function WalletPill({
             {copied ? "Copied" : "Copy address"}
           </button>
           <Link
-            href="/me"
+            href="/profile"
             onClick={() => setOpen(false)}
             className="w-full flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-left text-[13px] font-medium text-indigo hover:bg-canvas-warm"
           >
