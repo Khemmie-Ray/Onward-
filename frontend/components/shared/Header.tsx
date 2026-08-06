@@ -54,6 +54,10 @@ const Header = () => {
   }, [pathname]);
 
   useEffect(() => {
+    if (isConnected) setIsMobileMenuOpen(false);
+  }, [isConnected]);
+
+  useEffect(() => {
     if (isMobileMenuOpen) {
       document.body.style.overflow = "hidden";
     } else {
@@ -153,16 +157,26 @@ const Header = () => {
                   ))}
               </div>
 
-              <div className="md:hidden -mr-2">
-                <Hamburger
-                  toggled={isMobileMenuOpen}
-                  toggle={setIsMobileMenuOpen}
-                  size={22}
-                  color="var(--color-indigo)"
-                  rounded
-                  label="Toggle menu"
-                  duration={0.4}
-                />
+              <div className="md:hidden flex items-center justify-end">
+                {showControl && isConnected && address ? (
+                  <WalletPill
+                    address={address}
+                    avatarId={data?.avatarId ?? null}
+                    onDisconnect={handleDisconnect}
+                  />
+                ) : (
+                  <div className="-mr-2">
+                    <Hamburger
+                      toggled={isMobileMenuOpen}
+                      toggle={setIsMobileMenuOpen}
+                      size={22}
+                      color="var(--color-indigo)"
+                      rounded
+                      label="Toggle menu"
+                      duration={0.4}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </nav>
@@ -195,22 +209,14 @@ const Header = () => {
                 </Link>
               )}
 
-              {showControl && (
+              {showControl && !isConnected && (
                 <div className="pt-3 border-t border-fg-soft/10">
-                  {isConnected && address ? (
-                    <WalletPill
-                      address={address}
-                      avatarId={data?.avatarId ?? null}
-                      onDisconnect={handleDisconnect}
-                    />
-                  ) : (
-                    <button
-                      onClick={handleConnectClick}
-                      className="w-full rounded-xl px-6 py-3.5 font-semibold text-paper bg-terracotta shadow-lg hover:bg-terracotta/90 transition"
-                    >
-                      Sign in
-                    </button>
-                  )}
+                  <button
+                    onClick={handleConnectClick}
+                    className="w-full rounded-xl px-6 py-3.5 font-semibold text-paper bg-terracotta shadow-lg hover:bg-terracotta/90 transition"
+                  >
+                    Sign in
+                  </button>
                 </div>
               )}
             </div>
