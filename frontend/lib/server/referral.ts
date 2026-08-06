@@ -39,12 +39,38 @@ export async function maybeAwardReferralBonus(
 
   const { data: referredUser } = await supabaseAdmin
     .from("users")
-    .select("referred_by_user_id")
+    .select("referred_by_user_id, wallet_address, is_verified")
     .eq("id", referredUserId)
     .single();
 
   const referrerId = referredUser?.referred_by_user_id;
   if (!referrerId) return { awarded: false };
+
+  let referredIsVerified = referredUser?.is_verified === true;
+
+  if (!referredIsVerified && referredUser?.wallet_address) {
+    try {
+      const { isVerifiedOnchainSafe } = await import("@/lib/onchain/identity");
+      referredIsVerified = await isVerifiedOnchainSafe(
+        referredUser.wallet_address as `0x${string}`,
+      );
+     
+      if (referredIsVerified) {
+        await supabaseAdmin
+          .from("users")
+          .update({
+            is_verified: true,
+            verified_checked_at: new Date().toISOString(),
+          })
+          .eq("id", referredUserId);
+      }
+    } catch (err) {
+      console.error("[maybeAwardReferralBonus] verification check failed", err);
+      return { awarded: false };
+    }
+  }
+
+  if (!referredIsVerified) return { awarded: false };
 
   const { awardPoints } = await import("@/lib/server/point");
 
