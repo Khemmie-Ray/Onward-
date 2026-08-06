@@ -30,9 +30,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isAuthenticated =
     sessionStatus === "authenticated" && !!session?.address;
 
-  // Wallet hydration only blocks when there's no session yet. With a valid
-  // session, pages render fine; the wallet reconnects in the background and
-  // is only needed when the user signs a transaction.
   const isWalletHydrating =
     !isAuthenticated && !hydrationTimedOut && (isConnecting || isReconnecting);
 
@@ -57,7 +54,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   const isOnboardingPath = pathname.startsWith("/onboarding");
   const isLandingPath = pathname === "/";
 
-  // ─── Compute desired destination (pure derivation) ──────
   let desiredTarget: string | null = null;
 
   if (isMounted && !isWalletHydrating && !isSessionLoading) {
@@ -72,7 +68,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     }
   }
 
-  // ─── Fire redirect side effect ──────────────────────────
   useEffect(() => {
     if (!desiredTarget) return;
     if (lastRedirectRef.current === desiredTarget) return;
@@ -80,12 +75,9 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     router.replace(desiredTarget);
   }, [desiredTarget, router]);
 
-  // Reset dedupe ref when path actually changes
   useEffect(() => {
     lastRedirectRef.current = null;
   }, [pathname]);
-
-  // ─── Render decisions ───────────────────────────────────
 
   if (!isMounted) {
     return <AuthLoadingScreen message="Loading…" />;
