@@ -24,11 +24,6 @@ export function useIdentity() {
   isVerifyingRef.current = isVerifying;
 
   const checkVerification = useCallback(async () => {
-    // console.log("[useIdentity] checkVerification called", {
-    //   address,
-    //   hasPublicClient: !!publicClient,
-    //   hasWalletClient: !!walletClient,
-    // });
 
     if (!address || !publicClient || !walletClient) {
       console.log("[useIdentity] missing prerequisites → not_verified");
@@ -39,40 +34,16 @@ export function useIdentity() {
     try {
       if (!isVerifyingRef.current) setStatus("loading");
 
-      // console.log("[useIdentity] constructing SDK");
-      const sdk = new IdentitySDK({
-        account: address as `0x${string}`,
+      
+      const sdk = await IdentitySDK.init({
         publicClient,
         walletClient,
         env: GD_ENV,
-      } as any);
+      });
 
-      console.log("[useIdentity] calling getWhitelistedRoot");
-      const result = await sdk.getWhitelistedRoot(address as `0x${string}`);
-
-      let isWhitelisted = false;
-
-      if (typeof result === "string") {
-        isWhitelisted =
-          (result as string).toLowerCase() !==
-          "0x0000000000000000000000000000000000000000";
-      } else if (result && typeof result === "object") {
-        const obj = result as any;
-        if ("isWhitelisted" in obj) {
-          isWhitelisted = Boolean(obj.isWhitelisted);
-        } else if ("root" in obj && typeof obj.root === "string") {
-          isWhitelisted =
-            obj.root.toLowerCase() !==
-            "0x0000000000000000000000000000000000000000";
-        }
-      }
-
-      // console.log("[useIdentity] result:", {
-      //   address,
-      //   result,
-      //   resultType: typeof result,
-      //   isWhitelisted,
-      // });
+      const { isWhitelisted } = await sdk.getWhitelistedRoot(
+        address as `0x${string}`,
+      );
 
       if (isWhitelisted) {
         setStatus("verified");
@@ -85,12 +56,12 @@ export function useIdentity() {
       setStatus("error");
     }
   }, [address, publicClient, walletClient]);
-  // ─── Initial + on-change check ──────────────────────────
+
   useEffect(() => {
     checkVerification();
   }, [checkVerification]);
 
-  // ─── FV link generation ─────────────────────────────────
+
   const generateLink = useCallback(async () => {
     if (!address || !publicClient || !walletClient || isGeneratingLink) {
       return;
@@ -99,25 +70,23 @@ export function useIdentity() {
     try {
       setIsGeneratingLink(true);
 
-      const sdk = new IdentitySDK({
-        account: address as `0x${string}`,
+      const sdk = await IdentitySDK.init({
         publicClient,
         walletClient,
         env: GD_ENV,
-      } as any);
+      });
 
-      const result = await sdk.generateFVLink(
+    
+      const link = await sdk.generateFVLink(
         false,
         typeof window !== "undefined" ? window.location.href : undefined,
         celo.id,
       );
 
-      const link =
-        typeof result === "string" ? result : ((result as any)?.link ?? null);
-
       if (link) {
         setFvLink(link);
       } else {
+        console.error("[useIdentity] generateFVLink returned no link");
         setStatus("error");
       }
     } catch (err) {
@@ -128,14 +97,14 @@ export function useIdentity() {
     }
   }, [address, publicClient, walletClient, isGeneratingLink]);
 
-  // Generate link when verification starts
+
   useEffect(() => {
     if (isVerifying && !fvLink && !isGeneratingLink) {
       generateLink();
     }
   }, [isVerifying, fvLink, isGeneratingLink, generateLink]);
 
-  // Poll for verification during active flow
+ 
   useEffect(() => {
     if (!isVerifying || status === "verified") return;
     const interval = setInterval(() => {
