@@ -4,6 +4,7 @@ import {
   http,
   keccak256,
   toBytes,
+  parseEventLogs,
   type Address,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -17,7 +18,7 @@ const RPC_URL = process.env.NEXT_PUBLIC_CELO_URL!;
 const account = privateKeyToAccount(
   BACKEND_PRIVATE_KEY.startsWith("0x")
     ? (BACKEND_PRIVATE_KEY as `0x${string}`)
-    : (`0x${BACKEND_PRIVATE_KEY}` as `0x${string}`)
+    : (`0x${BACKEND_PRIVATE_KEY}` as `0x${string}`),
 );
 
 export const publicClient = createPublicClient({
@@ -33,17 +34,13 @@ export const walletClient = createWalletClient({
 
 const ZERO_HASH = ("0x" + "0".repeat(64)) as `0x${string}`;
 
-// ============================================================
-// Helpers
-// ============================================================
-
 export function slugHash(slug: string): `0x${string}` {
   return keccak256(toBytes(slug));
 }
 
 export function makeClaimId(
   userWallet: Address,
-  moduleSlug: string
+  moduleSlug: string,
 ): `0x${string}` {
   return keccak256(toBytes(`${userWallet.toLowerCase()}:${moduleSlug}`));
 }
@@ -54,10 +51,6 @@ export function ipfsToHttp(uri: string): string {
   }
   return uri;
 }
-
-// ============================================================
-// Process completion (mint + distribute|accrue)
-// ============================================================
 
 export type CompletionTxResult = {
   txHash: `0x${string}` | null;
@@ -90,21 +83,54 @@ export async function mintModuleBadge(args: {
     args: [userWallet, moduleSlug],
   });
 
-  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  const receipt = await publicClient.waitForTransactionReceipt({
+    hash: txHash,
+  });
 
-  const badgeTokenId = (await publicClient.readContract({
-    address: contract,
-    abi: onwardBadgesAbi,
-    functionName: "earnedTokenId",
-    args: [userWallet, slugHash(moduleSlug)],
-  })) as bigint;
+  let badgeTokenId = 0n;
+  try {
+    const transferLogs = parseEventLogs({
+      abi: onwardBadgesAbi,
+      eventName: "Transfer",
+      logs: receipt.logs,
+    });
+    // The mint is the Transfer from the zero address to this user.
+    const mintLog = transferLogs.find((l) => {
+      const a = l as unknown as {
+        args?: { from?: string; to?: string; tokenId?: bigint };
+      };
+      return (
+        a.args?.from?.toLowerCase() ===
+          "0x0000000000000000000000000000000000000000" &&
+        a.args?.to?.toLowerCase() === userWallet.toLowerCase()
+      );
+    }) as unknown as { args?: { tokenId?: bigint } } | undefined;
+
+    if (mintLog?.args?.tokenId !== undefined) {
+      badgeTokenId = mintLog.args.tokenId;
+    }
+  } catch (err) {
+    console.error(
+      "[mintModuleBadge] could not parse token ID from receipt",
+      err,
+    );
+  }
+
+  if (badgeTokenId === 0n) {
+    try {
+      badgeTokenId = (await publicClient.readContract({
+        address: contract,
+        abi: onwardBadgesAbi,
+        functionName: "earnedTokenId",
+        args: [userWallet, slugHash(moduleSlug)],
+      })) as bigint;
+    } catch {
+      badgeTokenId = 0n;
+    }
+  }
 
   return { txHash, badgeTokenId, alreadyMinted: false };
 }
-
-// ============================================================
-// Claim pending (signer releases user's pending balance)
-// ============================================================
 
 export type ClaimPendingResult = {
   txHash: `0x${string}`;
@@ -112,7 +138,7 @@ export type ClaimPendingResult = {
 };
 
 export async function claimPendingForUser(
-  userWallet: Address
+  userWallet: Address,
 ): Promise<ClaimPendingResult> {
   const contract = CONTRACT_ADDRESSES.onwardBadges;
 
@@ -142,13 +168,7 @@ export async function claimPendingForUser(
   };
 }
 
-// ============================================================
-// Read pending balance (used by API routes)
-// ============================================================
-
-export async function getPendingBalance(
-  userWallet: Address
-): Promise<bigint> {
+export async function getPendingBalance(userWallet: Address): Promise<bigint> {
   return (await publicClient.readContract({
     address: CONTRACT_ADDRESSES.onwardBadges,
     abi: onwardBadgesAbi,

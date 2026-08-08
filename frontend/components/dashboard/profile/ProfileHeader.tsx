@@ -3,7 +3,6 @@
 import React from "react";
 import { Award, Trophy } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { SunMotif } from "@/components/home/motifs";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 

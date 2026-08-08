@@ -36,24 +36,35 @@ contract ConfigureModuleURIs is Script {
         // badges.setModuleURI("who-built-gooddollar", _uri(cid, "who-built-good-dollar.json"));
         // badges.setModuleURI("why-celo-fuse-xdc", _uri(cid, "why-celo-fuse-and-xdc.json"));
 
-        badges.setModuleURI("money-on-the-internet",        _uri(cid, "money-on-the-internet.json"));
-        badges.setModuleURI("why-anyone-made-this",         _uri(cid, "why-anyone-made-this.json"));
-        badges.setModuleURI("who-runs-it",                  _uri(cid, "who-runs-it.json"));
-        badges.setModuleURI("what-you-can-do",              _uri(cid, "what-you-can-do.json"));
-        badges.setModuleURI("what-a-wallet-is",             _uri(cid, "what-a-wallet-is.json"));
-        badges.setModuleURI("what-your-wallet-holds",       _uri(cid, "what-your-wallet-holds.json"));
-        badges.setModuleURI("wallets-people-use",           _uri(cid, "wallets-people-use.json"));
-        badges.setModuleURI("setting-up-your-wallet",       _uri(cid, "setting-up-your-wallet.json"));
-        badges.setModuleURI("your-address-is-your-identity",_uri(cid, "your-address-is-your-identity.json"));
-        badges.setModuleURI("your-address-is-public",       _uri(cid, "your-address-is-public.json"));
-        badges.setModuleURI("key-you-never-share",          _uri(cid, "key-you-never-share.json"));
-        badges.setModuleURI("words-that-restore-everything",_uri(cid, "words-that-restore-everything.json"));
-        badges.setModuleURI("hot-and-cold-wallets",         _uri(cid, "hot-and-cold-wallets.json"));
+        // badges.setModuleURI("money-on-the-internet",        _uri(cid, "money-on-the-internet.json"));
+        // badges.setModuleURI("why-anyone-made-this",         _uri(cid, "why-anyone-made-this.json"));
+        // badges.setModuleURI("who-runs-it",                  _uri(cid, "who-runs-it.json"));
+        // badges.setModuleURI("what-you-can-do",              _uri(cid, "what-you-can-do.json"));
+        // badges.setModuleURI("what-a-wallet-is",             _uri(cid, "what-a-wallet-is.json"));
+        // badges.setModuleURI("what-your-wallet-holds",       _uri(cid, "what-your-wallet-holds.json"));
+        // badges.setModuleURI("wallets-people-use",           _uri(cid, "wallets-people-use.json"));
+        // badges.setModuleURI("setting-up-your-wallet",       _uri(cid, "setting-up-your-wallet.json"));
+        // badges.setModuleURI("your-address-is-your-identity",_uri(cid, "your-address-is-your-identity.json"));
+        // badges.setModuleURI("your-address-is-public",       _uri(cid, "your-address-is-public.json"));
+        // badges.setModuleURI("key-you-never-share",          _uri(cid, "key-you-never-share.json"));
+        // badges.setModuleURI("words-that-restore-everything",_uri(cid, "words-that-restore-everything.json"));
+        // badges.setModuleURI("hot-and-cold-wallets",         _uri(cid, "hot-and-cold-wallets.json"));
+
+
+        // ─── Networks track (8 new module badges) ─────────────
+        badges.setModuleURI("not-one-blockchain",       _uri(cid, "not-one-blockchain.json"));
+        badges.setModuleURI("bitcoin-the-original",     _uri(cid, "bitcoin-the-original.json"));
+        badges.setModuleURI("ethereum-and-apps",        _uri(cid, "ethereum-and-apps.json"));
+        badges.setModuleURI("solana-and-other-worlds",  _uri(cid, "solana-and-other-worlds.json"));
+        badges.setModuleURI("evm-shared-language",      _uri(cid, "evm-shared-language.json"));
+        badges.setModuleURI("layers-base-and-top",      _uri(cid, "layers-base-and-top.json"));
+        badges.setModuleURI("sidechains-and-bridges",   _uri(cid, "sidechains-and-bridges.json"));
+        badges.setModuleURI("wrong-network",            _uri(cid, "wrong-network.json"));
 
         vm.stopBroadcast();
 
         // console.log("Configured 11 module URIs on", badgesAddr);
-        console.log("Configured 3 module URIs on", badgesAddr);
+        console.log("Configured 8 module URIs on", badgesAddr);
 
     }
 

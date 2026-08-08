@@ -10,7 +10,7 @@ import type { ProfileData } from "@/lib/data/profile";
 import LifetimeStat from "@/components/dashboard/profile/LifetimeStat";
 import { usePendingClaim } from "@/hooks/usePendingClaim";
 import { ReferralCard } from "@/components/dashboard/profile/ReferralCard";
-import { ClaimCard } from "@/components/dashboard/profile/ClaimCard";
+import { WalletActions } from "@/components/dashboard/profile/WalletActions";
 import { OnchainBadgeCollection } from "@/components/dashboard/profile/OnchainBadgeCollection";
 
 type PointsData = {
@@ -114,9 +114,11 @@ const Profile = () => {
           />
           <LifetimeStat
             label="g$ claimed"
-            value={gClaimed.toLocaleString(undefined, {
-              maximumFractionDigits: 2,
-            }) + "g"}
+            value={
+              gClaimed.toLocaleString(undefined, {
+                maximumFractionDigits: 2,
+              }) + "g"
+            }
             tone="forest"
             icon={<Coins size={28} strokeWidth={2} />}
             sub="from point conversion"
@@ -139,7 +141,9 @@ const Profile = () => {
         </div>
       </section>
       <section className="mb-6 animate-[fade-up_0.8s_0.24s_ease_both]">
-        <ClaimCard />
+        <div className="w-full">
+          <WalletActions />
+        </div>
       </section>
       <section className="mb-10 animate-[fade-up_0.8s_0.32s_ease_both]">
         <div className="mb-1">

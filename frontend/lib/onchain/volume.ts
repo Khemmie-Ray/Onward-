@@ -21,16 +21,11 @@ function toWholeG(wei: bigint): number {
 }
 
 export async function getPlatformVolumeG(): Promise<number> {
-  const [claimed, ubi, bonus] = await Promise.all([
+  const [claimed, bonus] = await Promise.all([
     readCounter(
       CONTRACT_ADDRESSES.onwardClaims,
       onwardClaimsAbi,
       "totalClaimedG",
-    ),
-    readCounter(
-      CONTRACT_ADDRESSES.onwardClaims,
-      onwardClaimsAbi,
-      "totalUbiClaimedG",
     ),
     readCounter(
       CONTRACT_ADDRESSES.whackStake,
@@ -39,12 +34,7 @@ export async function getPlatformVolumeG(): Promise<number> {
     ),
   ]);
 
-  return (
-    PRE_PIVOT_G_DISTRIBUTED +
-    toWholeG(claimed) +
-    toWholeG(ubi) +
-    toWholeG(bonus)
-  );
+  return PRE_PIVOT_G_DISTRIBUTED + toWholeG(claimed) + toWholeG(bonus);
 }
 
 export async function getVolumeBreakdownG(): Promise<{
@@ -81,7 +71,7 @@ export async function getVolumeBreakdownG(): Promise<{
     pointsConverted,
     ubi: ubiG,
     whackstakeBonus,
-    total: PRE_PIVOT_G_DISTRIBUTED + pointsConverted + ubiG + whackstakeBonus,
+    total: PRE_PIVOT_G_DISTRIBUTED + pointsConverted + whackstakeBonus,
   };
 }
 

@@ -5,7 +5,6 @@ export type BadgeSlug = {
   deprecated?: boolean;
 };
 
-// Live module badges
 export const MODULE_BADGE_SLUGS: BadgeSlug[] = [
   {
     slug: "what-is-a-token",
@@ -137,11 +136,51 @@ export const LEARN_BADGE_SLUGS: BadgeSlug[] = [
     label: "Hot wallets and cold wallets",
     category: "Wallets",
   },
+  {
+    slug: "not-one-blockchain",
+    label: "Not one blockchain, many",
+    category: "Networks",
+  },
+  {
+    slug: "bitcoin-the-original",
+    label: "Bitcoin, the original",
+    category: "Networks",
+  },
+  {
+    slug: "ethereum-and-apps",
+    label: "Ethereum and the world of apps",
+    category: "Networks",
+  },
+  {
+    slug: "solana-and-other-worlds",
+    label: "Solana and other worlds",
+    category: "Networks",
+  },
+  {
+    slug: "evm-shared-language",
+    label: "EVM, a shared language",
+    category: "Networks",
+  },
+  {
+    slug: "layers-base-and-top",
+    label: "Layers: base and on top",
+    category: "Networks",
+  },
+  {
+    slug: "sidechains-and-bridges",
+    label: "Sidechains and bridges",
+    category: "Networks",
+  },
+  {
+    slug: "wrong-network",
+    label: "Sending to the wrong network",
+    category: "Networks",
+  },
 ];
 
 export const ALL_BADGE_SLUGS: BadgeSlug[] = [
   ...MODULE_BADGE_SLUGS,
   ...DEPRECATED_BADGE_SLUGS,
-  ...LEARN_BADGE_SLUGS, 
+  ...LEARN_BADGE_SLUGS,
   ...LEVEL_BADGE_SLUGS,
 ];

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Coins,
   Lock,
@@ -14,10 +14,18 @@ import { useIdentityContext } from "@/contexts/IdentityContext";
 import { useClaim, CLAIM_TIERS, type ClaimTier } from "@/hooks/useClaim";
 import { EXPLORER_BASE } from "@/constants/contracts/address";
 
-export function ClaimCard() {
+export function ClaimCard({ onClaimed }: { onClaimed?: () => void } = {}) {
   const { isVerified, startVerifying } = useIdentityContext();
   const { status, loadingStatus, claiming, lastTx, canClaimTier, claim } =
     useClaim();
+
+  const notifiedTxRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastTx && notifiedTxRef.current !== lastTx) {
+      notifiedTxRef.current = lastTx;
+      onClaimed?.();
+    }
+  }, [lastTx, onClaimed]);
 
   const [selectedTier, setSelectedTier] = useState<ClaimTier | null>(null);
 
@@ -30,7 +38,7 @@ export function ClaimCard() {
     if (ok) setSelectedTier(null);
   };
 
-  console.log(selectedTier)
+  console.log(selectedTier);
 
   return (
     <div className="rounded-[18px] bg-paper p-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)]">

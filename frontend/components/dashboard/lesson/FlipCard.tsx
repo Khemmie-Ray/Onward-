@@ -12,6 +12,9 @@ const CARD_ICONS: Record<string, string> = {
   phantom: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544484/onward/Phantom_Wallet_sgku1g.png",
   rainbow: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544484/onward/rainbow_f2n9lg.png",
   minipay: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544484/onward/minipay_xb6sao.png",
+  bitcoin: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1786139215/onward/btc-logo_puwtsg.webp",
+  ethereum: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1786139217/onward/Ethereum_Logo_othhcd.png",
+  solana: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1786139216/onward/solana_tdj4ld.png",
 };
 
 export function FlipCard({
@@ -44,11 +47,7 @@ export function FlipCard({
           transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
         }}
       >
-        {/* Grid stack: both faces occupy the same cell (1/1), so the cell —
-            and therefore the card — grows to the taller face. No fixed aspect
-            ratio, so nothing clips. */}
         <div className="grid" style={{ transformStyle: "preserve-3d" }}>
-          {/* FRONT */}
           <div
             className="rounded-[24px] bg-mustard-tint p-7 flex flex-col text-left shadow-[0_20px_50px_rgba(31,58,110,0.10)] min-h-[320px] max-h-[70vh] overflow-y-auto no-scrollbar"
             style={{
