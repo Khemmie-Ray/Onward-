@@ -15,15 +15,50 @@ export async function GET(request: Request) {
   const auth = await requireCompletedProfile(request);
   const user = "error" in auth ? null : auth.user;
 
+  const contestOver = Date.now() >= CONTEST_END.getTime();
+
   let standings;
-  try {
-    standings = await getContestStandings();
-  } catch (err) {
-    console.error("[contest leaderboard]", err);
-    return NextResponse.json(
-      { error: "Failed to load contest leaderboard" },
-      { status: 500 },
-    );
+  let frozen = false;
+
+  if (contestOver) {
+    const { data: snap } = await supabaseAdmin
+      .from("contest_snapshot")
+      .select("*")
+      .order("rank", { ascending: true });
+
+    if (snap && snap.length > 0) {
+      frozen = true;
+      standings = snap.map((r) => ({
+        user_id: r.user_id as string,
+        display_name: r.display_name as string,
+        wallet_address: r.wallet_address as string,
+        is_verified: true,
+        lessons: r.lessons as number,
+        rounds: r.rounds as number,
+        rounds_passed: r.rounds_passed as number,
+        claims: r.claims as number,
+        referrals: r.referrals as number,
+        verified_points: r.verified_points as number,
+        lesson_points: r.lesson_points as number,
+        round_points: r.round_points as number,
+        claim_points: r.claim_points as number,
+        referral_points: r.referral_points as number,
+        bonus_points: r.bonus_points as number,
+        total_points: r.total_points as number,
+      }));
+    }
+  }
+
+  if (!standings) {
+    try {
+      standings = await getContestStandings();
+    } catch (err) {
+      console.error("[contest leaderboard]", err);
+      return NextResponse.json(
+        { error: "Failed to load contest leaderboard" },
+        { status: 500 },
+      );
+    }
   }
 
   const top = standings.map((r, idx) => ({
@@ -65,6 +100,7 @@ export async function GET(request: Request) {
       referral: SCORE.referral,
       feedback: SCORE.feedback,
     },
+    frozen,
     total_ranked: standings.length,
     leaderboard: top,
     signed_in: Boolean(user),

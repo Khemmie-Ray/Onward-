@@ -388,6 +388,18 @@ export type Database = {
         Update: Partial<DbLearnCompletion>;
         Relationships: [];
       };
+      contest_snapshot: {
+        Row: DbContestSnapshot;
+        Insert: Partial<DbContestSnapshot> & {
+          rank: number;
+          user_id: string;
+          display_name: string;
+          wallet_address: string;
+          total_points: number;
+        };
+        Update: Partial<DbContestSnapshot>;
+        Relationships: [];
+      };
     };
     Views: {};
     Functions: {
@@ -476,4 +488,24 @@ export type DbLearnCompletion = {
   points_awarded: number;
   badge_token_id: string | null;
   badge_tx_hash: string | null;
+};
+
+export type DbContestSnapshot = {
+  rank: number;
+  user_id: string;
+  display_name: string;
+  wallet_address: string;
+  lessons: number;
+  rounds: number;
+  rounds_passed: number;
+  claims: number;
+  referrals: number;
+  verified_points: number;
+  lesson_points: number;
+  round_points: number;
+  claim_points: number;
+  referral_points: number;
+  bonus_points: number;
+  total_points: number;
+  snapshot_at: string;
 };
