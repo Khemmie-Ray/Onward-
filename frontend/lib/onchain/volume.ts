@@ -16,12 +16,22 @@ const WHACKSTAKE_VOLUME_ABI = [
   },
 ] as const;
 
+const CONTEST_VOLUME_ABI = [
+  {
+    name: "totalContestPaidG",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
 function toWholeG(wei: bigint): number {
   return Number(wei / WEI);
 }
 
 export async function getPlatformVolumeG(): Promise<number> {
-  const [claimed, bonus] = await Promise.all([
+  const [claimed, bonus, contest] = await Promise.all([
     readCounter(
       CONTRACT_ADDRESSES.onwardClaims,
       onwardClaimsAbi,
@@ -32,9 +42,19 @@ export async function getPlatformVolumeG(): Promise<number> {
       WHACKSTAKE_VOLUME_ABI,
       "totalBonusPaid",
     ),
+    readCounter(
+      CONTRACT_ADDRESSES.onwardClaims,
+      CONTEST_VOLUME_ABI,
+      "totalContestPaidG",
+    ),
   ]);
 
-  return PRE_PIVOT_G_DISTRIBUTED + toWholeG(claimed) + toWholeG(bonus);
+  return (
+    PRE_PIVOT_G_DISTRIBUTED +
+    toWholeG(claimed) +
+    toWholeG(bonus) +
+    toWholeG(contest)
+  );
 }
 
 export async function getVolumeBreakdownG(): Promise<{
@@ -42,9 +62,10 @@ export async function getVolumeBreakdownG(): Promise<{
   pointsConverted: number;
   ubi: number;
   whackstakeBonus: number;
+  contestPaid: number;
   total: number;
 }> {
-  const [claimed, ubi, bonus] = await Promise.all([
+  const [claimed, ubi, bonus, contest] = await Promise.all([
     readCounter(
       CONTRACT_ADDRESSES.onwardClaims,
       onwardClaimsAbi,
@@ -60,18 +81,26 @@ export async function getVolumeBreakdownG(): Promise<{
       WHACKSTAKE_VOLUME_ABI,
       "totalBonusPaid",
     ),
+    readCounter(
+      CONTRACT_ADDRESSES.onwardClaims,
+      CONTEST_VOLUME_ABI,
+      "totalContestPaidG",
+    ),
   ]);
 
   const pointsConverted = toWholeG(claimed);
   const ubiG = toWholeG(ubi);
   const whackstakeBonus = toWholeG(bonus);
+  const contestPaid = toWholeG(contest);
 
   return {
     prePivot: PRE_PIVOT_G_DISTRIBUTED,
     pointsConverted,
     ubi: ubiG,
     whackstakeBonus,
-    total: PRE_PIVOT_G_DISTRIBUTED + pointsConverted + whackstakeBonus,
+    contestPaid,
+    total:
+      PRE_PIVOT_G_DISTRIBUTED + pointsConverted + whackstakeBonus + contestPaid,
   };
 }
 
