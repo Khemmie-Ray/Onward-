@@ -72,6 +72,9 @@ export async function maybeAwardReferralBonus(
 
   if (!referredIsVerified) return { awarded: false };
 
+  const hasActivity = await referredUserHasActivity(referredUserId);
+  if (!hasActivity) return { awarded: false };
+
   const { awardPoints } = await import("@/lib/server/point");
 
   try {
@@ -87,4 +90,24 @@ export async function maybeAwardReferralBonus(
     console.error("[maybeAwardReferralBonus] failed", err);
     return { awarded: false };
   }
+}
+
+async function referredUserHasActivity(userId: string): Promise<boolean> {
+  const [lesson, round] = await Promise.all([
+    supabaseAdmin
+      .from("learn_completions")
+      .select("id", { head: true, count: "exact" })
+      .eq("user_id", userId)
+      .limit(1),
+    supabaseAdmin
+      .from("game_sessions")
+      .select("id", { head: true, count: "exact" })
+      .eq("user_id", userId)
+      .eq("status", "submitted")
+      .limit(1),
+  ]);
+
+  const lessonCount = lesson.count ?? 0;
+  const roundCount = round.count ?? 0;
+  return lessonCount > 0 || roundCount > 0;
 }
