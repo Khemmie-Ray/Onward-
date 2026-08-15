@@ -44,6 +44,7 @@ export function WalletDetails({ onBack }: { onBack: () => void }) {
         );
         return;
       }
+    
       const key = (await provider.request({
         method: "private_key",
       })) as string;
@@ -57,8 +58,11 @@ export function WalletDetails({ onBack }: { onBack: () => void }) {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[key export] failed:", msg);
+      const isExternalWallet = /not been authorized|not authorized/i.test(msg);
       setError(
-        "Key export isn't available right now. If this keeps happening, contact support.",
+        isExternalWallet
+          ? "You're using your own connected wallet, so your key stays in that wallet. Key export is only for wallets created with Onward."
+          : "Key export isn't available right now. If this keeps happening, contact support.",
       );
     } finally {
       setLoading(false);
@@ -113,6 +117,7 @@ export function WalletDetails({ onBack }: { onBack: () => void }) {
           <WarnRow text="Onward can never see it or recover it for you." />
           <WarnRow text="Never share it, never type it into any website, and never send it to anyone who asks, even if they say they're support." />
           <WarnRow text="Only use it to import your wallet into an app you trust, like MetaMask." />
+          <WarnRow text="This only works for wallets created with Onward (email or social sign-in). If you connected your own wallet like MetaMask, you already hold your key in that wallet." />
         </div>
 
         {error && (
@@ -149,8 +154,7 @@ export function WalletDetails({ onBack }: { onBack: () => void }) {
       </div>
     );
   }
-
-  // ── Revealed stage ──
+  
   return (
     <div className="flex flex-1 flex-col px-4 py-4 sm:px-5">
       <BackRow onBack={wipeAndBack} label="Your private key" />
@@ -230,14 +234,14 @@ export function WalletDetails({ onBack }: { onBack: () => void }) {
 
 function BackRow({ onBack, label }: { onBack: () => void; label: string }) {
   return (
-    <div className="my-4 flex items-center justify-between border-b border-shadow/60 px-1 pb-4">
+    <div className="mb-2 flex items-center justify-between border-b border-shadow/60 my-4 pb-4">
       <button
         onClick={onBack}
         className="text-[12px] font-semibold text-fg-soft hover:text-indigo"
       >
-     &larr; Back
+        &larr; Back
       </button>
-      <span className="text-[12px] font-medium uppercase tracking-wider text-fg-soft">
+      <span className="text-[10px] font-bold uppercase tracking-wider text-fg-soft">
         {label}
       </span>
     </div>
