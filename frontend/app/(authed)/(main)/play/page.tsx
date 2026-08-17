@@ -26,6 +26,7 @@ import {
   useStakeAllowance,
   useGDollarBalance,
 } from "@/hooks/useWhackState";
+import { useCeloBalance } from "@/hooks/useCeloBalance";
 import { useIdentityContext } from "@/contexts/IdentityContext";
 
 type Phase = "tab-select" | "briefing" | "playing" | "ended";
@@ -196,19 +197,35 @@ export default function PlayPage() {
     address as Address | undefined,
     isPremiumTab,
   );
+  const { celoWei, refetch: refetchCelo } = useCeloBalance(
+    address as Address | undefined,
+    isPremiumTab,
+  );
   const { approve, stake, approveState, stakeState } = useWhackStake();
 
   const [pendingHash, setPendingHash] = useState<`0x${string}` | null>(null);
-  // Guards against acting twice on one stake, and against a previous stake's
-  // success flag firing /start before the new stake exists on chain.
+  
   const handledStakeTxRef = useRef<`0x${string}` | null>(null);
 
   const hasEnoughBalance = balance >= stakeAmount;
   const needsApproval = allowance < stakeAmount;
+ 
+  const MIN_GAS_CELO_WEI = 10_000_000_000_000_000n; 
+  const hasEnoughGas = celoWei >= MIN_GAS_CELO_WEI;
 
   const startPremiumRound = async () => {
     if (!address) return;
     if (premiumStep !== "idle") return;
+
+    const freshCelo = await refetchCelo();
+    const freshCeloWei = freshCelo?.data?.value ?? celoWei;
+    if (freshCeloWei < MIN_GAS_CELO_WEI) {
+      setPremiumError(
+        "You need a small amount of CELO to cover the network fee for staking. Top up a little CELO, then try again.",
+      );
+      return;
+    }
+
     setPremiumError(null);
     setPremiumCapMessage(null);
     setPremiumStep("init");
@@ -250,13 +267,30 @@ export default function PlayPage() {
   };
 
   useEffect(() => {
-    if (premiumStep === "approving" && approveState.isSuccess && pendingHash) {
+    if (premiumStep !== "approving") return;
+
+    if (approveState.isSuccess && pendingHash) {
       refetchAllowance();
       setPremiumStep("staking");
       stake(pendingHash);
+      return;
+    }
+
+    // Error or rejection -> release the user instead of spinning forever.
+    if (approveState.error) {
+      const msg = approveState.errorMessage ?? "";
+      setPremiumError(
+        /user rejected|denied|rejected the request/i.test(msg)
+          ? "You cancelled the approval. Tap to try again when you're ready."
+          : `Approval failed: ${msg || "please try again"}. No stake was placed.`,
+      );
+      setPremiumStep("idle");
+      approveState.reset();
     }
   }, [
     approveState.isSuccess,
+    approveState.error,
+    approveState.errorMessage,
     premiumStep,
     pendingHash,
     stake,
@@ -265,6 +299,21 @@ export default function PlayPage() {
 
   useEffect(() => {
     if (premiumStep !== "staking") return;
+
+    if (stakeState.error) {
+      const msg = stakeState.errorMessage ?? "";
+      setPremiumError(
+        /user rejected|denied|rejected the request/i.test(msg)
+          ? "You cancelled the stake. Tap to try again when you're ready."
+          : /insufficient|gas|funds|exceeds balance/i.test(msg)
+            ? "The stake couldn't go through. This is usually not enough CELO for the network fee. Top up a little CELO and try again."
+            : `Stake failed: ${msg || "please try again"}.`,
+      );
+      setPremiumStep("idle");
+      stakeState.reset();
+      return;
+    }
+
     if (!stakeState.isSuccess || !stakeState.txHash) return;
     if (handledStakeTxRef.current === stakeState.txHash) return;
     handledStakeTxRef.current = stakeState.txHash;
@@ -296,7 +345,7 @@ export default function PlayPage() {
             return;
           }
           const d = await res.json().catch(() => ({}));
-   
+
           if (res.status === 429) {
             setPremiumCapMessage({
               kind: "cap",
@@ -320,6 +369,8 @@ export default function PlayPage() {
   }, [
     stakeState.isSuccess,
     stakeState.txHash,
+    stakeState.error,
+    stakeState.errorMessage,
     premiumStep,
     authFetch,
     refetchBalance,
