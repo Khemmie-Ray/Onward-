@@ -19,22 +19,22 @@ export function useIdentity() {
   const [fvLink, setFvLink] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isVerifyingRef = useRef(isVerifying);
   isVerifyingRef.current = isVerifying;
 
-  const checkVerification = useCallback(async () => {
+  const isGeneratingRef = useRef(false);
 
+  const checkVerification = useCallback(async () => {
     if (!address || !publicClient || !walletClient) {
-      console.log("[useIdentity] missing prerequisites → not_verified");
-      setStatus("not_verified");
+      setStatus("loading");
       return;
     }
 
     try {
       if (!isVerifyingRef.current) setStatus("loading");
 
-      
       const sdk = await IdentitySDK.init({
         publicClient,
         walletClient,
@@ -53,6 +53,9 @@ export function useIdentity() {
       }
     } catch (err) {
       console.error("[useIdentity] check failed", err);
+      setErrorMessage(
+        err instanceof Error ? err.message : "Verification check failed",
+      );
       setStatus("error");
     }
   }, [address, publicClient, walletClient]);
@@ -63,46 +66,75 @@ export function useIdentity() {
 
 
   const generateLink = useCallback(async () => {
-    if (!address || !publicClient || !walletClient || isGeneratingLink) {
-      return;
-    }
+    // Guard via ref, not state, so this callback is stable and isn't recreated
+    // every time the generating flag flips.
+    if (!address || !publicClient || !walletClient) return;
+    if (isGeneratingRef.current) return;
+
+    isGeneratingRef.current = true;
+    setIsGeneratingLink(true);
+    setErrorMessage(null);
 
     try {
-      setIsGeneratingLink(true);
-
       const sdk = await IdentitySDK.init({
         publicClient,
         walletClient,
         env: GD_ENV,
       });
 
-    
-      const link = await sdk.generateFVLink(
-        false,
-        typeof window !== "undefined" ? window.location.href : undefined,
-        celo.id,
-      );
+      const link = await Promise.race<string | null>([
+        sdk.generateFVLink(
+          false,
+          typeof window !== "undefined" ? window.location.href : undefined,
+          celo.id,
+        ),
+        new Promise<null>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Link generation timed out")),
+            20000,
+          ),
+        ),
+      ]);
 
       if (link) {
         setFvLink(link);
       } else {
         console.error("[useIdentity] generateFVLink returned no link");
+        setErrorMessage("Verification link came back empty. Please try again.");
         setStatus("error");
       }
     } catch (err) {
       console.error("[useIdentity] generateLink failed", err);
+      setErrorMessage(
+        err instanceof Error ? err.message : "Could not start verification",
+      );
       setStatus("error");
     } finally {
+      isGeneratingRef.current = false;
       setIsGeneratingLink(false);
     }
-  }, [address, publicClient, walletClient, isGeneratingLink]);
-
+  }, [address, publicClient, walletClient]);
 
   useEffect(() => {
-    if (isVerifying && !fvLink && !isGeneratingLink) {
+    if (
+      isVerifying &&
+      !fvLink &&
+      !isGeneratingLink &&
+      address &&
+      publicClient &&
+      walletClient
+    ) {
       generateLink();
     }
-  }, [isVerifying, fvLink, isGeneratingLink, generateLink]);
+  }, [
+    isVerifying,
+    fvLink,
+    isGeneratingLink,
+    address,
+    publicClient,
+    walletClient,
+    generateLink,
+  ]);
 
  
   useEffect(() => {
@@ -112,6 +144,13 @@ export function useIdentity() {
     }, 5000);
     return () => clearInterval(interval);
   }, [isVerifying, status, checkVerification]);
+
+  const retry = useCallback(() => {
+    setErrorMessage(null);
+    setFvLink(null);
+    setStatus("loading");
+    setIsVerifying(true);
+  }, []);
 
   const startVerifying = useCallback(() => setIsVerifying(true), []);
   const stopVerifying = useCallback(() => setIsVerifying(false), []);
@@ -126,5 +165,7 @@ export function useIdentity() {
     stopVerifying,
     isVerifying,
     isGeneratingLink,
+    errorMessage,
+    retry,
   };
 }

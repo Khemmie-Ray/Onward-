@@ -1,7 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Check, Loader2, ShieldCheck, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Check,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import { useIdentityContext } from "@/contexts/IdentityContext";
 
 export function VerificationBanner() {
@@ -13,13 +21,15 @@ export function VerificationBanner() {
     stopVerifying,
     isVerifying,
     status,
+    errorMessage,
+    retry,
   } = useIdentityContext();
 
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   if (isVerified || isLoading || dismissed) return null;
-  if (status === "error" && !isVerifying) return null;
+  if (status === "error" && !isVerifying && !expanded) return null;
 
   if (!expanded) {
     return (
@@ -68,8 +78,8 @@ export function VerificationBanner() {
           </h3>
           <p className="text-[12.5px] text-fg-soft mt-1 leading-relaxed">
             GoodDollar uses face verification to prove you're a unique human.
-            One-time process. After verifying, your accrued G$ becomes
-            claimable and you can claim daily UBI too.
+            One-time process. After verifying, your accrued G$ becomes claimable
+            and you can claim daily UBI too.
           </p>
         </div>
         <button
@@ -84,7 +94,32 @@ export function VerificationBanner() {
         </button>
       </div>
 
-      {!fvLink ? (
+      {status === "error" ? (
+        <div className="space-y-3">
+          <div className="flex items-start gap-2.5 rounded-xl bg-terracotta/10 border border-terracotta/30 p-3">
+            <AlertTriangle
+              size={16}
+              strokeWidth={2.5}
+              className="text-terracotta flex-shrink-0 mt-0.5"
+            />
+            <div className="min-w-0">
+              <p className="text-[12.5px] font-bold text-indigo leading-tight">
+                Couldn&apos;t start verification
+              </p>
+              <p className="text-[11.5px] text-fg-soft mt-0.5 leading-snug break-words">
+                {errorMessage ?? "Something went wrong. Please try again."}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={retry}
+            className="flex items-center justify-center gap-2 w-full rounded-xl bg-indigo px-4 py-3 text-[13px] font-bold text-paper hover:bg-indigo/90 transition-all"
+          >
+            <RefreshCw size={13} strokeWidth={2.8} />
+            Try again
+          </button>
+        </div>
+      ) : !fvLink ? (
         <div className="flex items-center justify-center gap-2 py-3 text-[12px] text-fg-soft">
           <Loader2 size={14} strokeWidth={2.5} className="animate-spin" />
           Preparing verification link…
@@ -121,7 +156,11 @@ export function VerificationBanner() {
 function BulletPoint({ text }: { text: string }) {
   return (
     <div className="flex items-start gap-2">
-      <Check size={12} strokeWidth={3} className="text-forest mt-0.5 flex-shrink-0" />
+      <Check
+        size={12}
+        strokeWidth={3}
+        className="text-forest mt-0.5 flex-shrink-0"
+      />
       <span className="text-[11.5px] text-fg-soft leading-tight">{text}</span>
     </div>
   );
