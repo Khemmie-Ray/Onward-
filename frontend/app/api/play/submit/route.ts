@@ -3,7 +3,7 @@ import { type Address } from "viem";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resolveRoundOnchain } from "@/lib/onchain/play";
-import { isVerifiedOnchainSafe } from "@/lib/onchain/identity";
+import { isVerifiedCached } from "@/lib/server/verification-cache";
 import { gradeRound, nextLevel, SCORING, type PlayMode } from "@/lib/scoring";
 import { awardPoints } from "@/lib/server/point";
 import { triggerReferralOnFirstActivity } from "@/lib/referral/trigger";
@@ -34,7 +34,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const isVerified = await isVerifiedOnchainSafe(
+  // Cached: only hits the chain when the stored value has aged out.
+  const isVerified = await isVerifiedCached(
+    user.id,
     user.wallet_address as Address,
   );
 
@@ -210,7 +212,12 @@ export async function POST(request: Request) {
     await supabaseAdmin
       .from("game_sessions")
       .update({
-        reward_tx_hash: r.rewardTxHash,
+        // For premium rounds the payout happens in WhackStake.resolve, so
+        // rewardTxHash is always null there and the resolve hash is what
+        // matters. Persist whichever we got, otherwise the DB can never tell a
+        // settled premium round from an unresolved one.
+        reward_tx_hash: r.rewardTxHash ?? r.stakeResolveTxHash,
+        stake_resolve_tx_hash: r.stakeResolveTxHash,
         level_badge_tx_hash: r.levelBadgeTxHash,
       })
       .eq("id", session.id);
