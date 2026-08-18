@@ -4,7 +4,11 @@ import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { whackStakeAbi } from "@/constants/abis";
 import { CONTRACT_ADDRESSES } from "@/constants/contracts/address";
-import { publicClient, walletClient } from "@/lib/onchain/badges";
+import {
+  publicClient,
+  walletClient,
+  waitForReceipt,
+} from "@/lib/onchain/badges";
 
 type RecoverBody = {
   round_id?: string;
@@ -54,7 +58,8 @@ export async function POST(request: Request) {
       .limit(30);
 
     const match = (sessions ?? []).find(
-      (s) => keccak256(toBytes(s.id)).toLowerCase() === activeHash.toLowerCase(),
+      (s) =>
+        keccak256(toBytes(s.id)).toLowerCase() === activeHash.toLowerCase(),
     );
 
     if (match && (match.status === "pending" || match.status === "active")) {
@@ -95,7 +100,7 @@ export async function POST(request: Request) {
       functionName: "resolve",
       args: [activeHash, false],
     });
-    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    await waitForReceipt(txHash);
 
     if (match) {
       await supabaseAdmin
