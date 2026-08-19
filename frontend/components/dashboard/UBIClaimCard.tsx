@@ -1,13 +1,20 @@
 "use client";
 
-import { ArrowRight, Clock, Coins, Loader2, Lock, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  Clock,
+  Coins,
+  Loader2,
+  Lock,
+  Sparkles,
+} from "lucide-react";
 import { formatUnits } from "viem";
 import { MudclothPattern, SunMotif } from "@/components/home/motifs";
 import { useGoodDollarClaim } from "@/hooks/useGoodDollarClaim";
 import { useIdentityContext } from "@/contexts/IdentityContext";
 
 export function UBIClaimCard() {
-  const { state, entitlement, nextClaimTime, claim, isClaiming } =
+  const { state, entitlement, nextClaimTime, claim, isClaiming, isPreparing } =
     useGoodDollarClaim();
   const { isVerified, startVerifying } = useIdentityContext();
 
@@ -15,7 +22,11 @@ export function UBIClaimCard() {
     return (
       <div className="rounded-[20px] bg-paper p-5 mb-4 shadow-[0_6px_20px_rgba(31,58,110,0.06)]">
         <div className="flex items-center gap-3">
-          <Loader2 size={16} strokeWidth={2.5} className="text-indigo animate-spin" />
+          <Loader2
+            size={16}
+            strokeWidth={2.5}
+            className="text-indigo animate-spin"
+          />
           <span className="text-[12px] text-fg-soft">
             Checking your UBI entitlement…
           </span>
@@ -81,7 +92,7 @@ export function UBIClaimCard() {
   }
 
   const entitlementDisplay = parseFloat(
-    formatUnits(entitlement, 18)
+    formatUnits(entitlement, 18),
   ).toLocaleString(undefined, { maximumFractionDigits: 2 });
 
   return (
@@ -111,7 +122,8 @@ export function UBIClaimCard() {
             <span className="text-[14px] text-mustard ml-1">g$</span>
           </div>
           <p className="text-[11.5px] text-paper/70 mt-1.5 leading-tight">
-            Daily basic income from GoodDollar. You pay gas; UBI lands in your wallet.
+            Daily basic income from GoodDollar. We cover the network fee for
+            you, so the first step can take a few seconds.
           </p>
         </div>
         <button
@@ -122,7 +134,7 @@ export function UBIClaimCard() {
           {isClaiming ? (
             <>
               <Loader2 size={12} strokeWidth={2.5} className="animate-spin" />
-              Claiming…
+              {isPreparing ? "Preparing…" : "Claiming…"}
             </>
           ) : (
             <>
