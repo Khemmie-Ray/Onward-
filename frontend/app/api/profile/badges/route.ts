@@ -5,6 +5,7 @@ import { publicClient } from "@/lib/onchain/badges";
 import { onwardBadgesAbi } from "@/constants/abis";
 import { CONTRACT_ADDRESSES } from "@/constants/contracts/address";
 import { ALL_BADGE_SLUGS } from "@/lib/badges/badge-slugs";
+import { getCachedBadges, setCachedBadges } from "@/lib/server/badge-cache";
 
 type OnchainBadge = {
   slug: string;
@@ -37,6 +38,11 @@ export async function GET(request: Request) {
   const { user } = auth;
 
   const userWallet = user.wallet_address as Address;
+
+  const cached = getCachedBadges(userWallet);
+  if (cached) {
+    return NextResponse.json(cached);
+  }
 
   const results = await Promise.all(
     ALL_BADGE_SLUGS.map(async (badge): Promise<OnchainBadge> => {
@@ -105,9 +111,13 @@ export async function GET(request: Request) {
   const owned = results.filter((b) => b.owned);
   const unearned = results.filter((b) => !b.owned && !b.deprecated);
 
-  return NextResponse.json({
+  const payload = {
     owned,
     unearned,
     total_owned: owned.length,
-  });
+  };
+
+  setCachedBadges(userWallet, payload);
+
+  return NextResponse.json(payload);
 }
