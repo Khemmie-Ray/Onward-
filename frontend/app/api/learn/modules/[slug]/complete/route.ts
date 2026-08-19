@@ -3,6 +3,7 @@ import type { Address } from "viem";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { mintModuleBadge } from "@/lib/onchain/badges";
+import { invalidateBadges } from "@/lib/server/badge-cache";
 import { markStreakDay } from "@/lib/streak";
 import { awardPoints } from "@/lib/server/point";
 import { triggerReferralOnFirstActivity } from "@/lib/referral/trigger";
@@ -58,6 +59,14 @@ export async function POST(
       status: "complete",
       already_completed: true,
       completion: existing,
+      onchain: {
+        badgeTxHash: existing.badge_tx_hash ?? null,
+        badgeTokenId: existing.badge_token_id
+          ? String(existing.badge_token_id)
+          : "0",
+        alreadyMinted: true,
+        onchainError: null,
+      },
     });
   }
 
@@ -132,6 +141,9 @@ export async function POST(
       userWallet: user.wallet_address as Address,
       moduleSlug: slug,
     });
+ 
+    invalidateBadges(user.wallet_address as string);
+
     onchain = {
       badgeTxHash: result.txHash,
       badgeTokenId: result.badgeTokenId.toString(),

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import type { ModulePreview } from "@/lib/modules/types";
@@ -62,6 +62,7 @@ export default function TrackDetailPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const authFetch = useAuthFetch();
+  const queryClient = useQueryClient();
 
   const trackSlug = params.track as string;
   const slugFromUrl = searchParams.get("lesson");
@@ -95,7 +96,26 @@ export default function TrackDetailPage() {
     router.replace(`/learn/${trackSlug}?lesson=${slug}`);
   };
 
-  const handleChooseNext = () => {
+  const handleChooseNext = async () => {
+    const fresh = await queryClient.fetchQuery({
+      queryKey: ["learn", "track", trackSlug],
+      queryFn: async () => {
+        const res = await authFetch(`/api/learn/tracks/${trackSlug}`);
+        if (!res.ok) throw new Error("Failed to load track");
+        return res.json() as Promise<TrackDetail>;
+      },
+    });
+
+    const nextUnlocked = fresh.modules
+      .filter((m) => m.lock_state === "current")
+      .sort((a, b) => a.order_in_track - b.order_in_track)[0];
+
+    if (nextUnlocked) {
+      setChooseNextMode(false);
+      router.replace(`/learn/${trackSlug}?lesson=${nextUnlocked.slug}`);
+      return;
+    }
+
     setChooseNextMode(true);
     router.replace(`/learn/${trackSlug}`);
   };

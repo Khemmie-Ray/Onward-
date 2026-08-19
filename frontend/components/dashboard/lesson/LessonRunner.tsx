@@ -6,6 +6,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { FlipCard } from "./FlipCard";
 import { ChoiceCard } from "./ChoiceCard";
 import { SpotterCard } from "./SpotterCard";
+import { useQueryClient } from "@tanstack/react-query";
 import { CompletionScreen } from "./CompletionScreen";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import type { LessonContent } from "@/lib/lessons/lesson-data";
@@ -23,7 +24,8 @@ type CompletionState = {
   totalQuestions: number;
   badgeImageUrl: string | null;
   badgeTxHash: string | null;
-  rewardTxHash: string | null;
+  badgeTokenId: string | null;
+  alreadyMinted: boolean;
   onchainError: string | null;
 };
 
@@ -46,6 +48,7 @@ export function LessonRunner({
   const [cardAnswered, setCardAnswered] = useState(false);
   const [flipped, setFlipped] = useState(false);
 
+  const queryClient = useQueryClient();
   const [completion, setCompletion] = useState<CompletionState | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
 
@@ -58,7 +61,7 @@ export function LessonRunner({
     currentCard.type === "flip"
       ? flipped
       : currentCard.type === "visual"
-        ? true 
+        ? true
         : cardAnswered;
 
   const recordAnswer = (answer: number | "scam" | "real", correct: boolean) => {
@@ -100,7 +103,8 @@ export function LessonRunner({
       totalQuestions: gradedLocal.length,
       badgeImageUrl: badgeImageUrl ?? null,
       badgeTxHash: null,
-      rewardTxHash: null,
+      badgeTokenId: null,
+      alreadyMinted: false,
       onchainError: null,
     });
 
@@ -138,11 +142,16 @@ export function LessonRunner({
           ? {
               ...prev,
               badgeTxHash: data.onchain?.badgeTxHash ?? null,
-              rewardTxHash: data.onchain?.rewardTxHash ?? null,
+              badgeTokenId: data.onchain?.badgeTokenId ?? null,
+              alreadyMinted: data.onchain?.alreadyMinted === true,
               onchainError: data.onchain?.onchainError ?? null,
             }
           : prev,
       );
+
+      queryClient.invalidateQueries({ queryKey: ["me", "status"] });
+      queryClient.invalidateQueries({ queryKey: ["learn"] });
+      queryClient.invalidateQueries({ queryKey: ["modules"] });
     } catch (err) {
       console.error("[submitCompletion]", err);
       setCompletion((prev) =>
@@ -167,7 +176,8 @@ export function LessonRunner({
         totalQuestions={completion.totalQuestions}
         badgeImageUrl={completion.badgeImageUrl}
         badgeTxHash={completion.badgeTxHash}
-        rewardTxHash={completion.rewardTxHash}
+        badgeTokenId={completion.badgeTokenId}
+        alreadyMinted={completion.alreadyMinted}
         onchainError={completion.onchainError}
         onNext={onChooseNext}
       />
@@ -176,7 +186,6 @@ export function LessonRunner({
 
   return (
     <div className="flex flex-col gap-4 rounded-[24px] bg-paper/50 p-6 h-[calc(100vh-160px)] max-h-[820px] min-h-[500px]">
-      {/* Header: fixed */}
       <div className="flex flex-col items-center gap-3 pt-1 shrink-0">
         <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-fg-soft">
           {lesson.module.category}

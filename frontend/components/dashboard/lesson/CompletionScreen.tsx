@@ -19,7 +19,8 @@ export function CompletionScreen({
   totalQuestions,
   badgeImageUrl,
   badgeTxHash,
-  rewardTxHash,
+  badgeTokenId,
+  alreadyMinted,
   onchainError,
   onNext,
 }: {
@@ -30,7 +31,8 @@ export function CompletionScreen({
   totalQuestions: number;
   badgeImageUrl?: string | null;
   badgeTxHash?: string | null;
-  rewardTxHash?: string | null;
+  badgeTokenId?: string | null;
+  alreadyMinted?: boolean;
   onchainError?: string | null;
   onNext: () => void;
 }) {
@@ -64,13 +66,15 @@ export function CompletionScreen({
   const isRealHash = (h?: string | null): h is string =>
     !!h && h !== ZERO_HASH && h.length > 10;
 
-  const badgeReady = isRealHash(badgeTxHash);
-  const rewardReady = isRealHash(rewardTxHash);
-  const txPending = !badgeReady || !rewardReady;
+  const badgeReady =
+    isRealHash(badgeTxHash) ||
+    alreadyMinted === true ||
+    (!!badgeTokenId && badgeTokenId !== "0");
+
+  const txPending = !badgeReady;
 
   return (
     <div className="relative rounded-[24px] bg-canvas px-6 py-10 flex flex-col items-center text-center overflow-hidden min-h-[500px] shadow-[0_2px_8px_rgba(31,58,110,0.05)]">
-      {/* Ambient glows scoped to the panel */}
       <div
         aria-hidden
         className="pointer-events-none absolute top-[8%] left-[10%] h-[280px] w-[280px] rounded-full opacity-50 blur-[80px] bg-[radial-gradient(circle,rgba(230,180,72,0.6)_0%,transparent_70%)]"
@@ -81,7 +85,6 @@ export function CompletionScreen({
       />
 
       <div className="relative w-full max-w-[440px] flex flex-col items-center animate-[fade-up_0.8s_ease_both]">
-        {/* Badge image + rotating sun */}
         <div className="relative mb-6">
           <div
             aria-hidden
@@ -128,8 +131,6 @@ export function CompletionScreen({
           A soulbound badge is on its way to your wallet. Yours forever,
           onchain, on Celo.
         </p>
-
-        {/* G$ reward counter */}
         <div className="relative w-full bg-aubergine rounded-[18px] p-5 mb-3 overflow-hidden shadow-[0_8px_24px_rgba(91,46,92,0.20)]">
           <div
             aria-hidden

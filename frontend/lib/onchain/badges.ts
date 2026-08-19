@@ -1,6 +1,7 @@
 import {
   createPublicClient,
   createWalletClient,
+  fallback,
   http,
   keccak256,
   toBytes,
@@ -13,7 +14,9 @@ import { onwardBadgesAbi } from "@/constants/abis";
 import { CONTRACT_ADDRESSES } from "@/constants/contracts/address";
 
 const BACKEND_PRIVATE_KEY = process.env.BACKEND_SIGNER_PRIVATE_KEY!;
-const RPC_URL = process.env.NEXT_PUBLIC_CELO_URL!;
+
+const RPC_URL = process.env.CELO_RPC_URL ?? process.env.NEXT_PUBLIC_CELO_URL!;
+const PUBLIC_FALLBACK_RPC = "https://forno.celo.org";
 
 const account = privateKeyToAccount(
   BACKEND_PRIVATE_KEY.startsWith("0x")
@@ -21,16 +24,35 @@ const account = privateKeyToAccount(
     : (`0x${BACKEND_PRIVATE_KEY}` as `0x${string}`),
 );
 
+const transport = fallback(
+  [
+    http(RPC_URL, { retryCount: 1, timeout: 10_000 }),
+    http(PUBLIC_FALLBACK_RPC, { retryCount: 1, timeout: 10_000 }),
+  ],
+  { rank: false },
+);
+
 export const publicClient = createPublicClient({
   chain: celo,
-  transport: http(RPC_URL),
+  transport,
+  batch: { multicall: true },
+  pollingInterval: 12_000,
 });
 
 export const walletClient = createWalletClient({
   account,
   chain: celo,
-  transport: http(RPC_URL),
+  transport,
 });
+
+export async function waitForReceipt(hash: `0x${string}`) {
+  return publicClient.waitForTransactionReceipt({
+    hash,
+    timeout: 90_000,
+    pollingInterval: 12_000,
+    retryCount: 1,
+  });
+}
 
 const ZERO_HASH = ("0x" + "0".repeat(64)) as `0x${string}`;
 
@@ -83,9 +105,7 @@ export async function mintModuleBadge(args: {
     args: [userWallet, moduleSlug],
   });
 
-  const receipt = await publicClient.waitForTransactionReceipt({
-    hash: txHash,
-  });
+  const receipt = await waitForReceipt(txHash);
 
   let badgeTokenId = 0n;
   try {
@@ -160,7 +180,7 @@ export async function claimPendingForUser(
     args: [userWallet],
   });
 
-  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  await waitForReceipt(txHash);
 
   return {
     txHash,

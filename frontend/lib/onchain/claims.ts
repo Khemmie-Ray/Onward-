@@ -1,5 +1,5 @@
 import { keccak256, toBytes, type Address } from "viem";
-import { publicClient, walletClient } from "@/lib/onchain/badges";
+import { publicClient, walletClient, waitForReceipt } from "@/lib/onchain/badges";
 import { onwardClaimsAbi } from "@/constants/abis";
 import { CONTRACT_ADDRESSES } from "@/constants/contracts/address";
 
@@ -29,7 +29,7 @@ export async function settleClaim(args: {
   });
 
   const txHash = await walletClient.writeContract(request);
-  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  await waitForReceipt(txHash);
 
   const gAmount = (await publicClient.readContract({
     address: contract,
@@ -63,7 +63,7 @@ export async function recordUbiClaim(args: {
     args: [args.userWallet, args.amount, args.txRef],
   });
   const txHash = await walletClient.writeContract(request);
-  await publicClient.waitForTransactionReceipt({ hash: txHash });
+  await waitForReceipt(txHash);
   return txHash;
 }
 

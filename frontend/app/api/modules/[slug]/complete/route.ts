@@ -3,6 +3,7 @@ import type { Address } from "viem";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { mintModuleBadge } from "@/lib/onchain/badges";
+import { invalidateBadges } from "@/lib/server/badge-cache";
 import { markStreakDay } from "@/lib/streak";
 import { isModuleLocked } from "@/lib/modules/lock-check";
 import { awardPoints } from "@/lib/server/point";
@@ -36,7 +37,6 @@ export async function POST(
     return NextResponse.json({ error: "Module not found" }, { status: 404 });
   }
 
-  // ─── Category + order based lock check ─────────────────
   const locked = await isModuleLocked(
     user.id,
     module.category,
@@ -50,7 +50,6 @@ export async function POST(
     );
   }
 
-  // ─── Idempotency: if already completed, return existing ─
   const { data: existing } = await supabaseAdmin
     .from("module_completions")
     .select("*")
@@ -63,10 +62,17 @@ export async function POST(
       status: "complete",
       already_completed: true,
       completion: existing,
+      onchain: {
+        badgeTxHash: existing.reward_tx_hash ?? null,
+        badgeTokenId: existing.badge_token_id
+          ? String(existing.badge_token_id)
+          : "0",
+        alreadyMinted: true,
+        onchainError: null,
+      },
     });
   }
 
-  // ─── Validate answers ───────────────────────────────────
   const { data: cards } = await supabaseAdmin
     .from("module_cards")
     .select("id, order_index, type, content")
@@ -120,11 +126,6 @@ export async function POST(
     });
   }
 
-  // Badge only — no G$ moves on module completion. Modules award POINTS; G$
-  // moves only when a verified user claims. The contract's processCompletion()
-  // bundles the mint with a G$ transfer, so an underfunded reserve reverted
-  // with InsufficientReserve() and silently killed the badge too. mint() has
-  // no reserve dependency.
   let onchainResult: {
     badgeTxHash: string | null;
     badgeTokenId: string;
@@ -142,6 +143,7 @@ export async function POST(
       userWallet: user.wallet_address as Address,
       moduleSlug: slug,
     });
+    invalidateBadges(user.wallet_address as string);
 
     onchainResult = {
       badgeTxHash: result.txHash,

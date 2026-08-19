@@ -17,6 +17,7 @@ export type ClaimState =
   | "available"
   | "claimed_today"
   | "not_verified"
+  | "preparing"
   | "claiming"
   | "error";
 
@@ -118,10 +119,10 @@ export function useGoodDollarClaim() {
 
     const claimedAmount = entitlement;
 
-    const loadingToast = toast.loading("Confirming UBI claim…");
+    const loadingToast = toast.loading("Preparing your wallet…");
 
     try {
-      setState("claiming");
+      setState("preparing");
       setError(null);
 
       const sdk = buildSDK();
@@ -132,12 +133,42 @@ export function useGoodDollarClaim() {
         return;
       }
 
-      await authFetch("/api/ubi/prepare", { method: "POST" }).catch((e) => {
-        console.warn(
-          "[useGoodDollarClaim] gas prepare failed, claiming anyway",
-          e,
-        );
-      });
+      let gasReady = false;
+      try {
+        const prepRes = await authFetch("/api/gas/prepare", { method: "POST" });
+        const prep = (await prepRes.json()) as { ready?: boolean };
+        gasReady = prep?.ready === true;
+      } catch (e) {
+        console.error("[useGoodDollarClaim] gas prepare failed", e);
+      }
+
+      if (!gasReady) {
+        toast.dismiss(loadingToast);
+        toast.error("Couldn't prepare your wallet for gas", {
+          description:
+            "We couldn't set up the small network fee needed to claim. Please try again in a moment.",
+        });
+        setState("available");
+        return;
+      }
+
+      if (publicClient && address) {
+        const MIN_GAS = 150_000_000_000_000_000n; 
+        for (let i = 0; i < 12; i++) {
+          try {
+            const bal = await publicClient.getBalance({
+              address: address as `0x${string}`,
+            });
+            if (bal >= MIN_GAS) break;
+          } catch {
+            // transient read failure, keep waiting
+          }
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
+
+      setState("claiming");
+      toast.loading("Confirming UBI claim…", { id: loadingToast });
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const claimResult = (await sdk.claim()) as any;
@@ -186,6 +217,7 @@ export function useGoodDollarClaim() {
     claim,
     refetch,
     canClaim: state === "available" && isVerified && entitlement > 0n,
-    isClaiming: state === "claiming",
+    isClaiming: state === "claiming" || state === "preparing",
+    isPreparing: state === "preparing",
   };
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useConnection } from "wagmi";
 import { keccak256, toBytes, type Address } from "viem";
@@ -90,6 +92,7 @@ export default function PlayPage() {
   const [preview, setPreview] = useState<RoundPreview | null>(null);
   const [roundId, setRoundId] = useState<string | null>(null);
   const [result, setResult] = useState<WhackResult | null>(null);
+  const queryClient = useQueryClient();
   const [submitData, setSubmitData] = useState<SubmitResponse | null>(null);
 
   const [freeCapMessage, setFreeCapMessage] = useState<DailyCapMessage>(null);
@@ -204,31 +207,43 @@ export default function PlayPage() {
   const { approve, stake, approveState, stakeState } = useWhackStake();
 
   const [pendingHash, setPendingHash] = useState<`0x${string}` | null>(null);
-  
+
   const handledStakeTxRef = useRef<`0x${string}` | null>(null);
 
   const hasEnoughBalance = balance >= stakeAmount;
   const needsApproval = allowance < stakeAmount;
- 
-  const MIN_GAS_CELO_WEI = 10_000_000_000_000_000n; 
+
+  const MIN_GAS_CELO_WEI = 10_000_000_000_000_000n;
   const hasEnoughGas = celoWei >= MIN_GAS_CELO_WEI;
 
   const startPremiumRound = async () => {
     if (!address) return;
     if (premiumStep !== "idle") return;
 
-    const freshCelo = await refetchCelo();
-    const freshCeloWei = freshCelo?.data?.value ?? celoWei;
-    if (freshCeloWei < MIN_GAS_CELO_WEI) {
+    setPremiumStep("init");
+    try {
+      const gasRes = await authFetch("/api/gas/prepare", { method: "POST" });
+      const gas = (await gasRes.json()) as { ready?: boolean; reason?: string };
+      if (!gas?.ready) {
+        setPremiumError(
+          gas?.reason === "faucet_declined"
+            ? "We couldn't top up the network fee for you right now (daily limit reached). Please try again later."
+            : "We couldn't set up the small network fee needed to stake. Please try again in a moment.",
+        );
+        setPremiumStep("idle");
+        return;
+      }
+    } catch {
       setPremiumError(
-        "You need a small amount of CELO to cover the network fee for staking. Top up a little CELO, then try again.",
+        "We couldn't set up the small network fee needed to stake. Please try again in a moment.",
       );
+      setPremiumStep("idle");
       return;
     }
+    await refetchCelo();
 
     setPremiumError(null);
     setPremiumCapMessage(null);
-    setPremiumStep("init");
 
     try {
       const initRes = await authFetch("/api/play/stake-init", {
@@ -269,6 +284,7 @@ export default function PlayPage() {
   useEffect(() => {
     if (premiumStep !== "approving") return;
 
+    // Success -> move to staking.
     if (approveState.isSuccess && pendingHash) {
       refetchAllowance();
       setPremiumStep("staking");
@@ -421,6 +437,12 @@ export default function PlayPage() {
       if (res.ok) {
         const data: SubmitResponse = await res.json();
         setSubmitData(data);
+
+        // A submitted round changes the points balance, play stats and any
+        // activity lists. Invalidate so the UI reflects it immediately.
+        queryClient.invalidateQueries({ queryKey: ["me", "status"] });
+        queryClient.invalidateQueries({ queryKey: ["play", "stats"] });
+        queryClient.invalidateQueries({ queryKey: ["modules"] });
       }
     } catch (e) {
       console.error("[play submit failed]", e);
@@ -510,7 +532,14 @@ export default function PlayPage() {
   };
 
   const passed = submitData?.passed ?? null;
-  const txPending = passed === true && !submitData?.onchain?.rewardTxHash;
+
+  const settleTxHash =
+    submitData?.onchain?.rewardTxHash ??
+    submitData?.onchain?.stakeResolveTxHash ??
+    null;
+
+  const txPending =
+    passed === true && !settleTxHash && !submitData?.onchain?.onchainError;
 
   return (
     <div className="px-4 py-2 w-full bg-canvas">
@@ -593,7 +622,7 @@ export default function PlayPage() {
                 levelBefore={submitData?.level_before ?? 0}
                 levelAfter={submitData?.level_after ?? 0}
                 txPending={txPending}
-                txHash={submitData?.onchain?.rewardTxHash ?? null}
+                txHash={settleTxHash}
                 onPlayAgain={resetToTabSelect}
                 onClose={resetToTabSelect}
               />

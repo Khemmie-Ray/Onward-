@@ -1,7 +1,7 @@
 import { keccak256, toBytes, parseUnits, type Address } from "viem";
 import { onwardBadgesAbi, whackStakeAbi } from "@/constants/abis";
 import { CONTRACT_ADDRESSES } from "@/constants/contracts/address";
-import { publicClient, walletClient } from "./badges";
+import { publicClient, walletClient, waitForReceipt } from "./badges";
 
 export type PlayResolutionResult = {
   rewardTxHash: `0x${string}` | null;
@@ -45,8 +45,6 @@ export async function resolveRoundOnchain(args: {
     wasAccrued: false,
   };
 
-  // ─── Free mode reward distribution ────────────────────────
-  // Skipped entirely when rewardAmountG is 0 (points-only mode).
   if (mode === "free" && passed && rewardAmountG > 0) {
     const claimId = keccak256(
       toBytes(`${userWallet.toLowerCase()}:round:${roundId}`),
@@ -67,7 +65,7 @@ export async function resolveRoundOnchain(args: {
         functionName: "distribute",
         args: [userWallet, amount, claimId, WHACK_REWARD_SLUG, isVerified],
       });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      await waitForReceipt(txHash);
       result.rewardTxHash = txHash;
       if (isVerified) {
         result.wasPaidDirect = true;
@@ -79,9 +77,6 @@ export async function resolveRoundOnchain(args: {
     }
   }
 
-  // ─── Premium mode stake resolution (always runs) ──────────
-  // Stake resolve must run regardless of bonus amount to release the
-  // user's stake (refund on pass, forfeit on fail).
   if (mode === "premium") {
     const roundIdHash = keccak256(toBytes(roundId));
 
@@ -102,12 +97,11 @@ export async function resolveRoundOnchain(args: {
         functionName: "resolve",
         args: [roundIdHash, passed],
       });
-      await publicClient.waitForTransactionReceipt({ hash: txHash });
+      await waitForReceipt(txHash);
       result.stakeResolveTxHash = txHash;
     }
   }
 
-  // ─── Level badge mint (if milestone crossed) ──────────────
   const milestone = findMilestoneCrossed(levelBefore, levelAfter);
   if (milestone) {
     const slug = `level-${milestone}`;
@@ -130,7 +124,7 @@ export async function resolveRoundOnchain(args: {
           functionName: "mint",
           args: [userWallet, slug],
         });
-        await publicClient.waitForTransactionReceipt({ hash: txHash });
+        await waitForReceipt(txHash);
         result.levelBadgeTxHash = txHash;
         result.levelBadgeTokenId = (await publicClient.readContract({
           address: CONTRACT_ADDRESSES.onwardBadges,

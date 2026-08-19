@@ -79,9 +79,6 @@ export type DbUser = {
   current_level: number;
   referral_code: string | null;
   referred_by_user_id: string | null;
-  // Cached GoodDollar verification, refreshed by the verification sync script.
-  // Authoritative status is always the on-chain check; this is for counting,
-  // filtering and display.
   is_verified: boolean | null;
   verified_checked_at: string | null;
 };
@@ -164,6 +161,7 @@ export type DbGameSession = {
   passed: boolean | null;
   reward_g_amount: number;
   reward_tx_hash: string | null;
+  stake_resolve_tx_hash: string | null;
   level_badge_tx_hash: string | null;
   level_before: number | null;
   level_after: number | null;
