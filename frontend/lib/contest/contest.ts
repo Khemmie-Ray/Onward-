@@ -1,241 +1,195 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 
-export const CONTEST_START = new Date("2026-08-03T00:00:00Z");
-export const CONTEST_END = new Date("2026-08-09T23:59:59Z");
+export const CONTEST_SLUG = "2026-08-17";
+export const CONTEST_START = new Date("2026-08-17T00:00:00Z");
+export const CONTEST_END = new Date("2026-08-23T23:59:59Z");
 
-export const SCORE = {
-  verifiedBonus: 1000,
-  lesson: 200,
-  lessonsTotalCap: 5,
-  roundPlayed: 100,
-  claim: 500,
-  claimsTotalCap: 1,
-  referral: 500,
-  feedback: 1000,
+export const BOARDS = ["play"] as const;
+export type Board = (typeof BOARDS)[number];
+
+export const PLAY_SCORE = {
+  premiumRound: 100, // per premium round submitted
+  premiumPassed: 50, // extra when the round was passed
 } as const;
 
-export type ContestRow = {
+const startIso = () => CONTEST_START.toISOString();
+const endIso = () => CONTEST_END.toISOString();
+
+export type PlayRow = {
   user_id: string;
   display_name: string;
   wallet_address: string;
-  is_verified: boolean;
-  lessons: number;
-  rounds: number;
-  rounds_passed: number;
-  claims: number;
-  referrals: number;
-  verified_points: number;
-  lesson_points: number;
-  round_points: number;
-  claim_points: number;
-  referral_points: number;
-  bonus_points: number;
-  total_points: number;
+  premium_rounds: number;
+  premium_passed: number;
+  free_rounds: number;
+  points: number;
 };
 
-type DayBucket = {
-  lessons: number;
-  rounds: number;
-  passed: number;
-  claims: number;
+type UserRow = {
+  id: string;
+  display_name: string | null;
+  wallet_address: string | null;
+  is_verified: boolean | null;
 };
 
-function dayKey(iso: string): string {
-  return iso.slice(0, 10); 
+type SessionRow = {
+  user_id: string;
+  mode: string | null;
+  passed: boolean | null;
+};
+
+async function fetchAll<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: unknown }>,
+): Promise<T[]> {
+  const PAGE = 1000;
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const res = await build(from, from + PAGE - 1);
+    const rows = (res?.data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+    if (out.length > 500_000) break;
+  }
+  return out;
 }
 
-function emptyDay(): DayBucket {
-  return { lessons: 0, rounds: 0, passed: 0, claims: 0 };
-}
+// ─────────────────────────── THE BOARD ───────────────────────────
 
-export async function getContestStandings(): Promise<ContestRow[]> {
-  const startIso = CONTEST_START.toISOString();
-  const endIso = CONTEST_END.toISOString();
-
-  const [lessons, sessions, claims, referrals, users, bonuses] =
-    await Promise.all([
-      supabaseAdmin
-        .from("learn_completions")
-        .select("user_id, completed_at")
-        .gte("completed_at", startIso)
-        .lte("completed_at", endIso),
-
-      supabaseAdmin
-        .from("game_sessions")
-        .select("user_id, completed_at, passed")
-        .eq("status", "submitted")
-        .gte("completed_at", startIso)
-        .lte("completed_at", endIso),
-
-      supabaseAdmin
-        .from("point_claims")
-        .select("user_id, created_at")
-        .eq("status", "confirmed")
-        .gte("created_at", startIso)
-        .lte("created_at", endIso),
-
-      supabaseAdmin
-        .from("point_transactions")
-        .select("user_id, created_at")
-        .eq("source", "referral")
-        .gte("created_at", startIso)
-        .lte("created_at", endIso),
-
+export async function getPlayStandings(): Promise<PlayRow[]> {
+  const [users, sessions] = await Promise.all([
+    fetchAll<UserRow>((from, to) =>
       supabaseAdmin
         .from("users")
-        .select("id, display_name, wallet_address, is_verified"),
-
+        .select("id, display_name, wallet_address, is_verified")
+        .range(from, to),
+    ),
+    fetchAll<SessionRow>((from, to) =>
       supabaseAdmin
-        .from("point_transactions")
-        .select("user_id, delta, reference_id")
-        .eq("source", "manual_adjustment")
-        .gte("created_at", startIso)
-        .lte("created_at", endIso),
-    ]);
+        .from("game_sessions")
+        .select("user_id, mode, passed")
+        .eq("status", "submitted")
+        .gte("completed_at", startIso())
+        .lte("completed_at", endIso())
+        .range(from, to),
+    ),
+  ]);
 
-  const userMap = new Map((users.data ?? []).map((u) => [u.id as string, u]));
+  const userMap = new Map<string, UserRow>(users.map((u) => [u.id, u]));
 
-  const perUserDay = new Map<string, Map<string, DayBucket>>();
-  const totals = new Map<
-    string,
-    {
-      lessons: number;
-      rounds: number;
-      passed: number;
-      claims: number;
-      referrals: number;
-    }
-  >();
-
-  const bump = (userId: string, iso: string | null, field: keyof DayBucket) => {
-    if (!iso) return;
-    const days = perUserDay.get(userId) ?? new Map<string, DayBucket>();
-    const key = dayKey(iso);
-    const bucket = days.get(key) ?? emptyDay();
-    bucket[field] += 1;
-    days.set(key, bucket);
-    perUserDay.set(userId, days);
-
-    const t = totals.get(userId) ?? {
-      lessons: 0,
-      rounds: 0,
-      passed: 0,
-      claims: 0,
-      referrals: 0,
-    };
-    if (field === "lessons") t.lessons += 1;
-    if (field === "rounds") t.rounds += 1;
-    if (field === "passed") t.passed += 1;
-    if (field === "claims") t.claims += 1;
-    totals.set(userId, t);
+  type Tally = { premium: number; premiumPassed: number; free: number };
+  const tally = new Map<string, Tally>();
+  const get = (id: string): Tally => {
+    const existing = tally.get(id);
+    if (existing) return existing;
+    const t: Tally = { premium: 0, premiumPassed: 0, free: 0 };
+    tally.set(id, t);
+    return t;
   };
 
-  for (const row of lessons.data ?? []) {
-    bump(row.user_id as string, row.completed_at as string | null, "lessons");
-  }
-
-  for (const row of sessions.data ?? []) {
-    const uid = row.user_id as string;
-    const iso = row.completed_at as string | null;
-    bump(uid, iso, "rounds");
-    if (row.passed) bump(uid, iso, "passed");
-  }
-
-  for (const row of claims.data ?? []) {
-    bump(row.user_id as string, row.created_at as string | null, "claims");
-  }
-
-  for (const row of referrals.data ?? []) {
-    const uid = row.user_id as string;
-    const t = totals.get(uid) ?? {
-      lessons: 0,
-      rounds: 0,
-      passed: 0,
-      claims: 0,
-      referrals: 0,
-    };
-    t.referrals += 1;
-    totals.set(uid, t);
-  }
-
-  const bonusByUser = new Map<string, number>();
-  for (const row of bonuses.data ?? []) {
-    const ref = String(row.reference_id ?? "");
-    if (!ref.toLowerCase().startsWith("contest")) continue;
-    const uid = row.user_id as string;
-    bonusByUser.set(uid, (bonusByUser.get(uid) ?? 0) + Number(row.delta ?? 0));
-  }
-
-  for (const u of users.data ?? []) {
-    if (u.is_verified && !totals.has(u.id as string)) {
-      totals.set(u.id as string, {
-        lessons: 0,
-        rounds: 0,
-        passed: 0,
-        claims: 0,
-        referrals: 0,
-      });
+  for (const s of sessions) {
+    const t = get(s.user_id);
+    if (s.mode === "premium") {
+      t.premium += 1;
+      if (s.passed) t.premiumPassed += 1;
+    } else {
+      t.free += 1;
     }
   }
 
-  const rows: ContestRow[] = [];
+  const rows: PlayRow[] = [];
 
-  for (const [userId, t] of totals) {
+  for (const [userId, t] of tally) {
     const user = userMap.get(userId);
     if (!user) continue;
 
-    if (!user.is_verified) continue;
+    if (user.is_verified !== true) continue;
 
-    const lessonPoints =
-      Math.min(t.lessons, SCORE.lessonsTotalCap) * SCORE.lesson;
+    if (t.premium < 1) continue;
 
-    const roundPoints = t.rounds * SCORE.roundPlayed;
-
-    const claimPoints = Math.min(t.claims, SCORE.claimsTotalCap) * SCORE.claim;
-
-    const referralPoints = t.referrals * SCORE.referral;
-    const verifiedPoints = SCORE.verifiedBonus;
-    const bonusPoints = bonusByUser.get(userId) ?? 0;
+    const points =
+      t.premium * PLAY_SCORE.premiumRound +
+      t.premiumPassed * PLAY_SCORE.premiumPassed;
 
     rows.push({
       user_id: userId,
-      display_name: (user.display_name as string) ?? "Unknown",
-      wallet_address: (user.wallet_address as string) ?? "",
-      is_verified: true,
-      lessons: t.lessons,
-      rounds: t.rounds,
-      rounds_passed: t.passed,
-      claims: t.claims,
-      referrals: t.referrals,
-      verified_points: verifiedPoints,
-      lesson_points: lessonPoints,
-      round_points: roundPoints,
-      claim_points: claimPoints,
-      referral_points: referralPoints,
-      bonus_points: bonusPoints,
-      total_points:
-        verifiedPoints +
-        lessonPoints +
-        roundPoints +
-        claimPoints +
-        referralPoints +
-        bonusPoints,
+      display_name: user.display_name ?? "Unknown",
+      wallet_address: user.wallet_address ?? "",
+      premium_rounds: t.premium,
+      premium_passed: t.premiumPassed,
+      free_rounds: t.free,
+      points,
     });
   }
 
   return rows.sort((a, b) => {
-    if (b.total_points !== a.total_points) {
-      return b.total_points - a.total_points;
+    if (b.points !== a.points) return b.points - a.points;
+    if (b.premium_passed !== a.premium_passed) {
+      return b.premium_passed - a.premium_passed;
     }
-    if (b.referrals !== a.referrals) return b.referrals - a.referrals;
-    return b.rounds - a.rounds;
+    return b.premium_rounds - a.premium_rounds;
   });
 }
 
-export function findContestRank(
-  rows: ContestRow[],
+// ─────────────────────────── HELPERS ───────────────────────────
+
+export function findRank<T extends { user_id: string }>(
+  rows: T[],
   userId: string,
 ): number | null {
   const idx = rows.findIndex((r) => r.user_id === userId);
   return idx >= 0 ? idx + 1 : null;
+}
+
+export function contestIsOver(): boolean {
+  return Date.now() >= CONTEST_END.getTime();
+}
+
+// ─────────────────────────── FREEZING ───────────────────────────
+
+export async function freezeContest(): Promise<{ play: number }> {
+  const play = await getPlayStandings();
+
+  const rows = play.map((r, i) => ({
+    contest_slug: CONTEST_SLUG,
+    board: "play",
+    rank: i + 1,
+    user_id: r.user_id,
+    display_name: r.display_name,
+    wallet_address: r.wallet_address,
+    rounds: r.premium_rounds,
+    rounds_passed: r.premium_passed,
+    total_points: r.points,
+  }));
+
+  // Clears only this contest's rows: earlier contests are untouched.
+  await supabaseAdmin
+    .from("contest_snapshot")
+    .delete()
+    .eq("contest_slug", CONTEST_SLUG);
+
+  if (rows.length > 0) {
+    const { error } = await supabaseAdmin.from("contest_snapshot").insert(rows);
+    if (error) throw new Error(`freeze failed: ${error.message}`);
+  }
+
+  return { play: rows.length };
+}
+
+export async function getFrozenBoard(board: Board = "play") {
+  const { data } = await supabaseAdmin
+    .from("contest_snapshot")
+    .select("*")
+    .eq("contest_slug", CONTEST_SLUG)
+    .eq("board", board)
+    .order("rank", { ascending: true });
+  return data ?? [];
+}
+
+export async function alreadyPaid(board: Board = "play"): Promise<boolean> {
+  const { count } = await supabaseAdmin
+    .from("contest_payouts")
+    .select("id", { count: "exact", head: true })
+    .eq("contest_slug", CONTEST_SLUG)
+    .eq("board", board);
+  return (count ?? 0) > 0;
 }
