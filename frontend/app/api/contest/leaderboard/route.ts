@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
-  getContestStandings,
-  findContestRank,
+  getPlayStandings,
+  findRank,
+  contestIsOver,
+  CONTEST_SLUG,
   CONTEST_START,
   CONTEST_END,
-  SCORE,
+  PLAY_SCORE,
+  type PlayRow,
 } from "@/lib/contest/contest";
 
 export const revalidate = 60;
@@ -15,110 +18,66 @@ export async function GET(request: Request) {
   const auth = await requireCompletedProfile(request);
   const user = "error" in auth ? null : auth.user;
 
-  const contestOver = Date.now() >= CONTEST_END.getTime();
-
-  let standings;
+  let rows: PlayRow[];
   let frozen = false;
 
-  if (contestOver) {
-    const { data: snap } = await supabaseAdmin
-      .from("contest_snapshot")
-      .select("*")
-      .order("rank", { ascending: true });
+  try {
+    if (contestIsOver()) {
+      const { data } = await supabaseAdmin
+        .from("contest_snapshot")
+        .select("*")
+        .eq("contest_slug", CONTEST_SLUG)
+        .eq("board", "play")
+        .order("rank", { ascending: true });
 
-    if (snap && snap.length > 0) {
-      frozen = true;
-      standings = snap.map((r) => ({
-        user_id: r.user_id as string,
-        display_name: r.display_name as string,
-        wallet_address: r.wallet_address as string,
-        is_verified: true,
-        lessons: r.lessons as number,
-        rounds: r.rounds as number,
-        rounds_passed: r.rounds_passed as number,
-        claims: r.claims as number,
-        referrals: r.referrals as number,
-        verified_points: r.verified_points as number,
-        lesson_points: r.lesson_points as number,
-        round_points: r.round_points as number,
-        claim_points: r.claim_points as number,
-        referral_points: r.referral_points as number,
-        bonus_points: r.bonus_points as number,
-        total_points: r.total_points as number,
-      }));
+      if (data && data.length > 0) {
+        frozen = true;
+        rows = data.map((r) => ({
+          user_id: r.user_id as string,
+          display_name: r.display_name as string,
+          wallet_address: r.wallet_address as string,
+          premium_rounds: (r.rounds as number) ?? 0,
+          premium_passed: (r.rounds_passed as number) ?? 0,
+          free_rounds: 0,
+          points: (r.total_points as number) ?? 0,
+        }));
+      } else {
+        rows = await getPlayStandings();
+      }
+    } else {
+      rows = await getPlayStandings();
     }
-  }
-
-  if (!standings) {
-    try {
-      standings = await getContestStandings();
-    } catch (err) {
-      console.error("[contest leaderboard]", err);
-      return NextResponse.json(
-        { error: "Failed to load contest leaderboard" },
-        { status: 500 },
-      );
-    }
-  }
-
-  const top = standings.map((r, idx) => ({
-    rank: idx + 1,
-    display_name: r.display_name,
-    lessons: r.lessons,
-    rounds: r.rounds,
-    referrals: r.referrals,
-    total_points: r.total_points,
-    is_me: user ? r.user_id === user.id : false,
-  }));
-
-  const myRank = user ? findContestRank(standings, user.id) : null;
-  const mine = user
-    ? (standings.find((r) => r.user_id === user.id) ?? null)
-    : null;
-
-  let meIsVerified = false;
-  if (user) {
-    const { data: me } = await supabaseAdmin
-      .from("users")
-      .select("is_verified")
-      .eq("id", user.id)
-      .maybeSingle();
-    meIsVerified = me?.is_verified === true;
+  } catch (err) {
+    console.error("[contest leaderboard]", err);
+    return NextResponse.json(
+      { error: "Failed to load contest leaderboard" },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({
-    period: {
+    contest_slug: CONTEST_SLUG,
+    board: "play",
+    window: {
       start: CONTEST_START.toISOString(),
       end: CONTEST_END.toISOString(),
-    },
-    scoring: {
-      verified_bonus: SCORE.verifiedBonus,
-      lesson: SCORE.lesson,
-      lessons_total_cap: SCORE.lessonsTotalCap,
-      round_played: SCORE.roundPlayed,
-      claim: SCORE.claim,
-      referral: SCORE.referral,
-      feedback: SCORE.feedback,
+      is_over: contestIsOver(),
     },
     frozen,
-    total_ranked: standings.length,
-    leaderboard: top,
+    scoring: PLAY_SCORE,
     signed_in: Boolean(user),
-    me: {
-      rank: myRank,
-      is_verified: meIsVerified,
-      lessons: mine?.lessons ?? 0,
-      rounds: mine?.rounds ?? 0,
-      rounds_passed: mine?.rounds_passed ?? 0,
-      claims: mine?.claims ?? 0,
-      referrals: mine?.referrals ?? 0,
-      verified_points: mine?.verified_points ?? 0,
-      lesson_points: mine?.lesson_points ?? 0,
-      round_points: mine?.round_points ?? 0,
-      claim_points: mine?.claim_points ?? 0,
-      referral_points: mine?.referral_points ?? 0,
-      bonus_points: mine?.bonus_points ?? 0,
-      total_points: mine?.total_points ?? 0,
-    },
+    total_entrants: rows.length,
+    my_rank: user ? findRank(rows, user.id) : null,
+    my_points: user
+      ? (rows.find((r) => r.user_id === user.id)?.points ?? 0)
+      : 0,
+    leaderboard: rows.slice(0, 50).map((r, i) => ({
+      rank: i + 1,
+      display_name: r.display_name,
+      premium_rounds: r.premium_rounds,
+      premium_passed: r.premium_passed,
+      points: r.points,
+      is_me: user ? r.user_id === user.id : false,
+    })),
   });
 }

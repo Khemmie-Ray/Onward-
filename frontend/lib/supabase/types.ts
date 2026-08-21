@@ -386,9 +386,23 @@ export type Database = {
         Update: Partial<DbLearnCompletion>;
         Relationships: [];
       };
+      contest_payouts: {
+        Row: DbContestPayout;
+        Insert: Partial<DbContestPayout> & {
+          contest_slug: string;
+          board: string;
+          wallet_address: string;
+          amount_g: string;
+          batch_ref: string;
+        };
+        Update: Partial<DbContestPayout>;
+        Relationships: [];
+      };
       contest_snapshot: {
         Row: DbContestSnapshot;
         Insert: Partial<DbContestSnapshot> & {
+          contest_slug: string;
+          board: string;
           rank: number;
           user_id: string;
           display_name: string;
@@ -488,11 +502,29 @@ export type DbLearnCompletion = {
   badge_tx_hash: string | null;
 };
 
+export type DbContestPayout = {
+  id: string;
+  contest_slug: string;
+  board: string;
+  user_id: string | null;
+  wallet_address: string;
+  rank: number | null;
+  amount_g: string;
+  batch_ref: string;
+  tx_hash: string | null;
+  paid_at: string;
+  created_at: string;
+};
+
 export type DbContestSnapshot = {
+  contest_slug: string;
+  board: string;
   rank: number;
   user_id: string;
   display_name: string;
   wallet_address: string;
+  quality_referrals: number;
+  total_invited: number;
   lessons: number;
   rounds: number;
   rounds_passed: number;
