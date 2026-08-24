@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Target } from "lucide-react";
+import { ExternalLink, Loader2, Target } from "lucide-react";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 
 type Row = {
@@ -11,6 +11,16 @@ type Row = {
   premium_passed: number;
   points: number;
   is_me: boolean;
+  wallet_address: string | null;
+  payout_g: number | null;
+  tx_hash: string | null;
+};
+
+type Payout = {
+  published: boolean;
+  recipients: number;
+  total_g: number;
+  tx_hash: string | null;
 };
 
 type Response = {
@@ -19,6 +29,7 @@ type Response = {
   total_entrants: number;
   my_rank: number | null;
   my_points: number;
+  payout: Payout;
   leaderboard: Row[];
 };
 
@@ -91,6 +102,39 @@ export function ContestBoard() {
         </div>
       )}
 
+      {data.payout.published && (
+        <div className="rounded-2xl border border-forest/30 bg-forest-tint px-4 py-3.5">
+          <div className="flex items-baseline justify-between gap-3">
+            <div>
+              <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-forest">
+                Rewards paid
+              </div>
+              <div className="display mt-0.5 text-[19px] font-bold text-indigo tabular-nums">
+                {data.payout.total_g.toLocaleString()} G$
+              </div>
+            </div>
+            <div className="text-right text-[11.5px] text-fg-soft">
+              to {data.payout.recipients} players
+            </div>
+          </div>
+          {data.payout.tx_hash && (
+            <a
+              href={`https://celoscan.io/tx/${data.payout.tx_hash}`}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-indigo underline"
+            >
+              Verify every payment on Celoscan
+              <ExternalLink size={11} strokeWidth={2.5} />
+            </a>
+          )}
+          <p className="mt-1.5 text-[11px] leading-relaxed text-fg-soft">
+            Every payment is in one transaction. You don&apos;t have to take our
+            word for it, open the link and check any wallet on this board.
+          </p>
+        </div>
+      )}
+
       <div className="flex items-start gap-2.5 rounded-2xl bg-canvas-warm px-4 py-3">
         <Target
           size={15}
@@ -124,9 +168,14 @@ export function ContestBoard() {
                 <th className="px-2 py-2.5 text-right text-[9px] font-bold uppercase tracking-[0.12em] text-fg-soft">
                   Rounds
                 </th>
-                <th className="px-3 py-2.5 text-right text-[9px] font-bold uppercase tracking-[0.12em] text-fg-soft">
+                <th className="px-2 py-2.5 text-right text-[9px] font-bold uppercase tracking-[0.12em] text-fg-soft">
                   Points
                 </th>
+                {data.payout.published && (
+                  <th className="px-3 py-2.5 text-right text-[9px] font-bold uppercase tracking-[0.12em] text-forest">
+                    Paid
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -139,6 +188,8 @@ export function ContestBoard() {
                       : row.rank === 3
                         ? "🥉"
                         : null;
+                
+                const rowTx = row.tx_hash ?? data.payout.tx_hash;
                 return (
                   <tr
                     key={`${row.rank}-${row.display_name}`}
@@ -161,15 +212,45 @@ export function ContestBoard() {
                       <div className="text-[10.5px] text-fg-soft">
                         {row.premium_passed} of {row.premium_rounds} passed
                       </div>
+                      {data.payout.published &&
+                        row.wallet_address &&
+                        (rowTx ? (
+                          <a
+                            href={`https://celoscan.io/tx/${rowTx}#eventlog`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-0.5 inline-flex items-center gap-1 font-mono text-[9.5px] text-fg-soft/80 underline decoration-fg-soft/30 hover:text-indigo"
+                          >
+                            {row.wallet_address.slice(0, 6)}…
+                            {row.wallet_address.slice(-4)}
+                            <ExternalLink size={9} strokeWidth={2.5} />
+                          </a>
+                        ) : (
+                          <div className="mt-0.5 font-mono text-[9.5px] text-fg-soft/80">
+                            {row.wallet_address.slice(0, 6)}…
+                            {row.wallet_address.slice(-4)}
+                          </div>
+                        ))}
                     </td>
                     <td className="px-2 py-3 text-right text-[13px] font-semibold text-indigo tabular-nums">
                       {row.premium_rounds}
                     </td>
-                    <td className="px-3 py-3 text-right">
+                    <td className="px-2 py-3 text-right">
                       <span className="display text-[15px] font-bold text-terracotta tabular-nums">
                         {row.points.toLocaleString()}
                       </span>
                     </td>
+                    {data.payout.published && (
+                      <td className="px-3 py-3 text-right">
+                        {row.payout_g !== null ? (
+                          <span className="display text-[15px] font-bold text-forest tabular-nums">
+                            {row.payout_g.toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-fg-soft">—</span>
+                        )}
+                      </td>
+                    )}
                   </tr>
                 );
               })}
