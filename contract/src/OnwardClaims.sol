@@ -68,7 +68,14 @@ contract OnwardClaims is
 
     bool public upgradeRenounced;
 
-    uint256[40] private __gap;
+    /// @notice Cumulative G$ paid out as contest rewards via batchContestReward.
+    /// @dev Tracked separately from totalClaimedG so contest payouts can be
+    ///      counted or excluded from volume independently. Added in the V2
+    ///      upgrade: it consumes one slot from the original __gap, which is why
+    ///      __gap went from [40] to [39].
+    uint256 public totalContestPaidG;
+
+    uint256[39] private __gap;
 
     uint256 public constant RATE_SCALE = 1e18;
     uint256 private constant DAY = 1 days;
@@ -97,6 +104,12 @@ contract OnwardClaims is
         uint256 globalDailyCapG
     );
     event UpgradeRenounced();
+    /// @notice Emitted once per recipient in a contest payout batch.
+    event ContestRewardPaid(
+        address indexed user,
+        uint256 amount,
+        bytes32 indexed batchRef
+    );
 
     error NotSigner();
     error ZeroAddress();
@@ -110,6 +123,8 @@ contract OnwardClaims is
     error AlreadySettled();
     error InvalidRate();
     error UpgradeAlreadyRenounced();
+    error LengthMismatch();
+    error EmptyBatch();
 
     modifier onlySigner() {
         if (msg.sender != signer) revert NotSigner();
@@ -200,6 +215,44 @@ contract OnwardClaims is
         gDollar.safeTransfer(user, gAmount);
 
         emit Claimed(user, points, gAmount, claimId);
+    }
+
+    /**
+     * @notice Pay contest rewards to many winners in one transaction.
+     * @dev Owner-only (not signer): this moves large sums and bypasses the
+     *      per-user settle() caps, so it is gated to the most privileged key.
+     *      No on-chain idempotency: running the same batch twice pays twice.
+     *      batchRef only tags a batch for off-chain tracking.
+     *
+     * @param recipients Winner wallets.
+     * @param amounts    G$ (wei) for each recipient, index-aligned.
+     * @param batchRef   Opaque tag for this batch, emitted per payment.
+     */
+    function batchContestReward(
+        address[] calldata recipients,
+        uint256[] calldata amounts,
+        bytes32 batchRef
+    ) external onlyOwner whenNotPaused nonReentrant {
+        uint256 n = recipients.length;
+        if (n == 0) revert EmptyBatch();
+        if (n != amounts.length) revert LengthMismatch();
+
+        uint256 total;
+        for (uint256 i; i < n; ++i) {
+            if (recipients[i] == address(0)) revert ZeroAddress();
+            if (amounts[i] == 0) revert ZeroAmount();
+            total += amounts[i];
+        }
+        if (gDollar.balanceOf(address(this)) < total) {
+            revert InsufficientReserve();
+        }
+
+        totalContestPaidG += total;
+
+        for (uint256 i; i < n; ++i) {
+            gDollar.safeTransfer(recipients[i], amounts[i]);
+            emit ContestRewardPaid(recipients[i], amounts[i], batchRef);
+        }
     }
 
     /**
