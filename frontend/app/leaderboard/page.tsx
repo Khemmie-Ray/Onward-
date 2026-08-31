@@ -5,7 +5,7 @@ import { PublicGuard } from "@/components/auth/PublicGuard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import MainLeaderboard from "@/components/dashboard/leaderboard/MainLeaderboard";
-import { ContestBoard } from "@/components/contest/ContestBoard";
+import { ActiveContest } from "@/components/contest/ContestRegistry";
 
 export default function Leaderboard() {
   return (
@@ -23,7 +23,7 @@ export default function Leaderboard() {
 
           <div className="pb-12">
             <TabsContent value="contest" className="mt-0">
-              <ContestBoard />
+              <ActiveContest />
             </TabsContent>
             <TabsContent value="main" className="mt-0">
               <MainLeaderboard />
