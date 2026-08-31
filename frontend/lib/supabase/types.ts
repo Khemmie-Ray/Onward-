@@ -81,6 +81,9 @@ export type DbUser = {
   referred_by_user_id: string | null;
   is_verified: boolean | null;
   verified_checked_at: string | null;
+   verified_on_onward: boolean | null;
+  onward_verified_at: string | null;
+  onward_verify_checked_at: string | null;
 };
 
 export type DbModule = {
@@ -137,6 +140,7 @@ export type DbScamPattern = {
   difficulty: number;
   kind: "dm" | "tweet" | "wallet_popup" | "page";
   content: Record<string, unknown>;
+  icon_id: string | null;
   teaching: string;
   created_at: string;
 };
@@ -412,6 +416,19 @@ export type Database = {
         Update: Partial<DbContestSnapshot>;
         Relationships: [];
       };
+      contest_config: {
+        Row: DbContestConfig;
+        Insert: Partial<DbContestConfig> & {
+          slug: string;
+          seq: number;
+          type: string;
+          title: string;
+          starts_at: string;
+          ends_at: string;
+        };
+        Update: Partial<DbContestConfig>;
+        Relationships: [];
+      };
     };
     Views: {};
     Functions: {
@@ -538,4 +555,18 @@ export type DbContestSnapshot = {
   bonus_points: number;
   total_points: number;
   snapshot_at: string;
+};
+
+export type DbContestConfig = {
+  id: string;
+  slug: string;
+  seq: number;
+  type: string;
+  title: string;
+  subtitle: string | null;
+  starts_at: string;
+  ends_at: string;
+  status: string;
+  settings: Record<string, unknown>;
+  created_at: string;
 };
