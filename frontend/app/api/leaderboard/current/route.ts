@@ -30,19 +30,14 @@ type LeaderboardEntry = {
 
 async function getOptionalUser() {
   const session = await getServerSession(authOptions);
-  if (!session?.user) return null;
-
-  const sub = (session as { sub?: string }).sub;
-  if (!sub) return null;
-  const parts = sub.split(":");
-  if (parts.length !== 3) return null;
-  const address = parts[2]?.toLowerCase();
+  const address = (session as { address?: string })?.address;
   if (!address) return null;
 
+  const normalized = address.toLowerCase();
   const { data: dbUser } = await supabaseAdmin
     .from("users")
     .select("id, wallet_address, display_name, current_level, current_streak")
-    .ilike("wallet_address", address)
+    .eq("wallet_address", normalized)
     .maybeSingle();
 
   return dbUser ?? null;
@@ -139,9 +134,23 @@ export async function GET(request: Request) {
     };
   }
 
+  let viewerTotalWon = 0;
+  if (currentUser) {
+    const { data: won } = await supabaseAdmin
+      .from("point_transactions")
+      .select("delta")
+      .eq("user_id", currentUser.id)
+      .eq("source", "leaderboard_weekly");
+    viewerTotalWon = (won ?? []).reduce(
+      (sum, r) => sum + (Number(r.delta) || 0),
+      0,
+    );
+  }
+
   return NextResponse.json({
     entries,
     viewer,
+    viewer_total_won: viewerTotalWon,
     pagination: {
       limit,
       offset,
