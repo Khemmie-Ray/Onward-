@@ -1,6 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { WhackIcon } from "./whackIcon";
-import { iconsForToday } from "./patternIcons";
+import { iconById } from "./whackIcon";
 import type { PlayMode } from "@/lib/scoring";
 
 export type RoundItem = {
@@ -19,6 +19,7 @@ export type PatternRow = {
   kind: string;
   content: Record<string, unknown>;
   teaching: string;
+  icon_id: string | null;
 };
 
 export type PatternWithIcon = PatternRow & {
@@ -42,27 +43,16 @@ export type GeneratedRound = {
 
 export { type PlayMode };
 
-// ─── Uniform pacing for all modes and levels ────────────────────────────────
-// The three numbers are reconciled so the board stays full for the whole round:
-//   spawns per round ≈ total_seconds * 1000 / (base_spawn_delay + spawn_jitter/2)
-//                    ≈ 60000 / 800 ≈ 75 spawns.
-// We build a LIST BIGGER than that (LIST_SIZE) so the queue never runs dry and
-// no holes sit empty. The timer ends the round at 60s; leftover queued items
-// simply never appear, and scoring counts only scams that DID appear.
 const PACING = {
   totalSeconds: 60,
   popupDurationMs: 1550,
   baseSpawnDelay: 450,
   spawnJitter: 300,
   boardProgression: [6],
-  listSize: 100, // fills 60s at ~600ms avg spawn (95 needed + buffer)
-  scamRatio: 0.4, // ~40 scams in list
+  listSize: 100, 
+  scamRatio: 0.4,
 } as const;
 
-// ─── Daily featured family (date-based rotation) ────────────────────────────
-// Deterministic: everyone playing on the same UTC day gets the same featured
-// family. Advances by one each day, wraps at the end of the list. New families
-// added to scam_patterns extend the rotation automatically.
 function todayFeaturedIndex(familyCount: number): number {
   const msPerDay = 86_400_000;
   const today = Math.floor(Date.now() / msPerDay);
@@ -134,10 +124,9 @@ export async function generateRound(
     () => Math.random() - 0.5,
   );
 
-  const roundIcons = iconsForToday();
   const sequenceWithIcons: PatternWithIcon[] = sequence.map((p) => ({
     ...p,
-    icon: p.is_scam ? roundIcons.scam : roundIcons.legit,
+    icon: iconById(p.icon_id, p.is_scam),
   }));
 
   return {
@@ -145,7 +134,7 @@ export async function generateRound(
     family_label: exemplar.family_label,
     family_description: exemplar.family_description,
     exemplar,
-    exemplar_icon: roundIcons.scam,
+    exemplar_icon: iconById((exemplar as PatternRow).icon_id, true),
     items: sequence.map((p) => ({ pattern_id: p.id, is_scam: p.is_scam })),
     full_patterns: sequenceWithIcons,
     popup_duration_ms: PACING.popupDurationMs,
@@ -186,7 +175,6 @@ export async function rebuildRoundFromSession(session: {
   if (!patterns) throw new Error("Cannot rebuild session: patterns not found");
 
   const patternMap = new Map(patterns.map((p) => [p.id, p]));
-  const roundIcons = iconsForToday();
 
   const sequence: PatternWithIcon[] = session.items
     .map((item) => {
@@ -195,7 +183,7 @@ export async function rebuildRoundFromSession(session: {
       const row = p as PatternRow;
       return {
         ...row,
-        icon: row.is_scam ? roundIcons.scam : roundIcons.legit,
+        icon: iconById(row.icon_id, row.is_scam),
       };
     })
     .filter((x): x is PatternWithIcon => x !== null);
@@ -205,7 +193,7 @@ export async function rebuildRoundFromSession(session: {
     family_label: (exemplar as PatternRow).family_label,
     family_description: (exemplar as PatternRow).family_description,
     exemplar: exemplar as PatternRow,
-    exemplar_icon: roundIcons.scam,
+    exemplar_icon: iconById((exemplar as PatternRow).icon_id, true),
     items: session.items,
     full_patterns: sequence,
     popup_duration_ms: session.popup_duration_ms,
