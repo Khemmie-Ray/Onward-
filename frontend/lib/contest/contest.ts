@@ -8,8 +8,8 @@ export const BOARDS = ["play"] as const;
 export type Board = (typeof BOARDS)[number];
 
 export const PLAY_SCORE = {
-  premiumRound: 100, // per premium round submitted
-  premiumPassed: 50, // extra when the round was passed
+  premiumRound: 100,
+  premiumPassed: 50, 
 } as const;
 
 const startIso = () => CONTEST_START.toISOString();

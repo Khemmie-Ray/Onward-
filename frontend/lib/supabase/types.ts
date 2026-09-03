@@ -84,6 +84,8 @@ export type DbUser = {
    verified_on_onward: boolean | null;
   onward_verified_at: string | null;
   onward_verify_checked_at: string | null;
+  contest_qualified: boolean;         
+  contest_qualified_at: string | null;
 };
 
 export type DbModule = {

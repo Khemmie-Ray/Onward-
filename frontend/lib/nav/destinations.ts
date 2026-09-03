@@ -1,4 +1,4 @@
-import { Folder, BookOpen, Target, Globe, User } from "lucide-react";
+import { Folder, BookOpen, Target, Trophy, User } from "lucide-react";
 import type { Tone } from "../themes/tones";
 
 export type NavBadge = {
@@ -22,6 +22,7 @@ export const NAV_DESTINATIONS: NavDestination[] = [
   { href: "/play", label: "Play", icon: Target, tone: "terracotta" },
   // { href: "/ecosystem", label: "Ecosystem", icon: Globe, tone: "forest" },
   { href: "/profile", label: "Profile", icon: User, tone: "aubergine" },
+  { href: "/board", label: "Leaderboard", icon: Trophy, tone: "forest" },
 ];
 
 export function isActiveDestination(pathname: string, href: string): boolean {

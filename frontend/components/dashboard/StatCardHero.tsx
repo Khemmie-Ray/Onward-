@@ -39,25 +39,32 @@ const StatCardHero = ({
 
   return (
     <div
-      className={`rounded-[20px] p-5 sm:p-6 w-full md:w-[47%] ${t.bg} ${t.shadow}`}
+      className={`overflow-hidden rounded-[20px] lg:p-5 md:p-5 p-6 w-full mb-4 lg:w-[48%] md:w-[48%] ${t.bg} ${t.shadow}`}
     >
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between gap-2 mb-3">
         <span
-          className={`text-[10px] font-bold uppercase tracking-[0.14em] ${t.subFg}`}
+          className={`truncate text-[10px] font-bold uppercase tracking-[0.14em] ${t.subFg}`}
         >
           {label}
         </span>
-        <div className={`${t.fg} opacity-50`}>{iconForTone(toneName)}</div>
+        <div className={`shrink-0 ${t.fg} opacity-50`}>
+          {iconForTone(toneName)}
+        </div>
       </div>
-      <div className="mb-1.5 flex items-baseline gap-2">
+      <div className="mb-1.5 flex items-baseline gap-2 min-w-0">
         <span
-          className={`display text-[44px] sm:text-[52px] font-bold leading-none tabular-nums ${t.fg}`}
+          className={`display font-bold leading-none tabular-nums truncate ${t.fg}`}
+          style={{ fontSize: "clamp(28px, 8vw, 52px)" }}
         >
           {value}
         </span>
-        <span className={`text-[14px] font-medium ${t.subFg}`}>{unit}</span>
+        <span className={`shrink-0 text-[14px] font-medium ${t.subFg}`}>
+          {unit}
+        </span>
       </div>
-      <div className={`text-[11px] font-medium ${t.subSubFg}`}>{sub}</div>
+      <div className={`text-[11px] font-medium wrap-break-word ${t.subSubFg}`}>
+        {sub}
+      </div>
     </div>
   );
 };

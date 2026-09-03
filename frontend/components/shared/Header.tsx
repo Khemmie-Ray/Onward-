@@ -95,10 +95,12 @@ const Header = () => {
     setLoginOpen(true);
   };
 
+ 
+  const navPillWrap = "rounded-2xl bg-canvas-warm p-2";
   const navPillBase =
-    "px-5 py-2.5 rounded-xl font-semibold text-[14px] border border-fg-soft/25 transition";
-  const navPillActive = "bg-mustard/30";
-  const navPillInactive = "hover:bg-canvas-warm";
+    "block px-6 py-2 rounded-xl font-semibold text-[14px] transition-all";
+  const navPillActive = "bg-indigo text-cream shadow-sm";
+  const navPillInactive = "bg-transparent text-indigo hover:bg-indigo/5";
 
   return (
     <>
@@ -127,14 +129,16 @@ const Header = () => {
 
             <div className="hidden md:flex justify-self-center">
               {!isConnected && (
-                <Link
-                  href="/leaderboard"
-                  className={`${navPillBase} text-indigo ${
-                    isLeaderboardActive ? navPillActive : navPillInactive
-                  }`}
-                >
-                  Leaderboard
-                </Link>
+                <div className={navPillWrap}>
+                  <Link
+                    href="/leaderboard"
+                    className={`${navPillBase} ${
+                      isLeaderboardActive ? navPillActive : navPillInactive
+                    }`}
+                  >
+                    Leaderboard
+                  </Link>
+                </div>
               )}
             </div>
 
@@ -150,7 +154,7 @@ const Header = () => {
                   ) : (
                     <button
                       onClick={handleConnectClick}
-                      className="rounded-xl px-8 py-2.5 font-semibold text-paper transition-transform hover:-translate-y-0.5 active:translate-y-0 bg-terracotta shadow-lg"
+                      className="rounded-xl px-8 py-2.5 font-semibold text-paper transition-all bg-terracotta shadow-lg hover:bg-[#a84730] hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0"
                     >
                       Sign in
                     </button>
@@ -192,10 +196,10 @@ const Header = () => {
                 <Link
                   href="/leaderboard"
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center justify-between py-3 px-4 rounded-xl font-semibold border border-fg-soft/25 transition ${
+                  className={`flex items-center justify-between py-3 px-4 rounded-xl font-semibold transition-all ${
                     isLeaderboardActive
-                      ? "bg-mustard/30 text-indigo"
-                      : "text-indigo hover:bg-canvas-warm"
+                      ? "bg-indigo text-cream shadow-md"
+                      : "bg-transparent text-indigo hover:bg-indigo/10"
                   }`}
                 >
                   Leaderboard

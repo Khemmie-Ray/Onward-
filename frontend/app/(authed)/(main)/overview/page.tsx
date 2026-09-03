@@ -92,11 +92,9 @@ const Overview = () => {
 
   return (
     <>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute right-[10%] top-[8%] h-[400px] w-[400px] rounded-full opacity-60 blur-[80px] bg-[radial-gradient(circle,rgba(230,180,72,0.45)_0%,transparent_70%)]"
-      />
+     <div className="mt-4">
       <VerificationBanner />
+      </div>
       <section className="flex flex-wrap items-end justify-between gap-4 mb-8 animate-[fade-up_0.8s_0.05s_ease_both]">
         <div>
           <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-terracotta mb-2">
@@ -125,8 +123,8 @@ const Overview = () => {
           </span>
         </div>
       </section>
-      <main className="flex flex-col lg:flex-row md:flex-row justify-between  mb-8">
-        <section className="flex flex-wrap justify-between gap-y-4 w-full lg:w-[48%] md:w-[48%] animate-[fade-up_0.8s_0.18s_ease_both]">
+      <main className="flex flex-col lg:flex-row md:flex-row justify-between mb-8">
+        <section className="flex flex-wrap justify-between w-full lg:w-[48%] md:w-[48%] animate-[fade-up_0.8s_0.18s_ease_both]">
           <StatCardHero
             label="Streak"
             value={String(data.currentStreak)}
@@ -167,7 +165,7 @@ const Overview = () => {
           />
         </section>
 
-        <section className="flex flex-col gap-4 w-full lg:w-[48%] animate-[fade-up_0.8s_0.25s_ease_both]">
+        <section className="flex flex-col gap-4 w-full lg:w-[48%] animate-[fade-up_0.8s_0.25s_ease_both] mt-6 lg:mt-0 md:mt-0">
           <UBIClaimCard />
           {data.currentModule ? (
             <NextActionCard module={data.currentModule} />

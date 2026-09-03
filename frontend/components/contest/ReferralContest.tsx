@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { Gift, UserPlus, ShieldCheck, Flame, Trophy } from "lucide-react";
 import type { ActiveContest } from "@/components/contest/ContestRegistry";
+import { ReferralStandings } from "@/components/contest/ReferralStandings";
+import { PastReferralStandings } from "@/components/contest/PastReferralStandings";
 
 type Remaining = {
   days: number;
@@ -32,7 +34,7 @@ export function ReferralContest({ contest }: { contest: ActiveContest }) {
   const end = new Date(contest.ends_at);
   const rewardPer = num(contest.settings, "reward_per_referral", 5000);
   const maxRefs = num(contest.settings, "max_referrals", 5);
-  const streakDays = num(contest.settings, "streak_days_required", 3);
+  const streakDays = num(contest.settings, "streak_days_required", 2);
   const maxReward = rewardPer * maxRefs;
 
   const [, tick] = useState(0);
@@ -155,6 +157,9 @@ export function ReferralContest({ contest }: { contest: ActiveContest }) {
           </div>
         </div>
       </div>
+
+      <ReferralStandings maxRefs={maxRefs} />
+      <PastReferralStandings />
     </div>
   );
 }
