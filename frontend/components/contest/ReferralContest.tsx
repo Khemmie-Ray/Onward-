@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Gift, UserPlus, ShieldCheck, Flame, Trophy } from "lucide-react";
 import type { ActiveContest } from "@/components/contest/ContestRegistry";
 import { ReferralStandings } from "@/components/contest/ReferralStandings";
+
+const EXTENDED = true;
 import { PastReferralStandings } from "@/components/contest/PastReferralStandings";
 
 type Remaining = {
@@ -53,7 +55,13 @@ export function ReferralContest({ contest }: { contest: ActiveContest }) {
     <div className="space-y-5">
       <header className="text-center">
         <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-terracotta">
-          {ended ? "Contest closed" : started ? "Contest live" : "Starts soon"}
+          {ended
+            ? "Contest closed"
+            : started
+              ? EXTENDED
+                ? "Contest extended"
+                : "Contest live"
+              : "Starts soon"}
         </span>
         <h2 className="display mt-1 text-[26px] font-bold text-indigo">
           {contest.title}
@@ -77,7 +85,9 @@ export function ReferralContest({ contest }: { contest: ActiveContest }) {
           {ended
             ? "This contest has ended"
             : started
-              ? "Time left to earn"
+              ? EXTENDED
+                ? "Extended — time left to earn"
+                : "Time left to earn"
               : "Kicks off in"}
         </div>
         {remaining ? (
