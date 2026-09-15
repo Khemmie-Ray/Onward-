@@ -8,10 +8,12 @@ export function Hole({
   state,
   onWhack,
   size = 100,
+  fluid = false,
 }: {
   state: HoleState | null;
   onWhack: () => void;
   size?: number;
+  fluid?: boolean;
 }) {
   const [feedback, setFeedback] = useState<"correct" | "wrong" | null>(null);
   const [floatNum, setFloatNum] = useState<1 | -1 | null>(null);
@@ -35,8 +37,10 @@ export function Hole({
 
   return (
     <div
-      className="relative rounded-[14px] overflow-hidden bg-indigo/95 border border-indigo/40 shadow-inner"
-      style={{ width: size, height: size }}
+      className={`relative rounded-[14px] overflow-hidden bg-indigo/95 border border-indigo/40 shadow-inner ${
+        fluid ? "w-full h-full" : ""
+      }`}
+      style={fluid ? undefined : { width: size, height: size }}
     >
       <div
         aria-hidden
@@ -56,17 +60,26 @@ export function Hole({
         <button
           onClick={handleClick}
           aria-label={`Whack ${state.icon.label}`}
-          className="absolute inset-0 flex items-end justify-center pb-1 cursor-pointer animate-pop-up"
+          className="absolute inset-0 flex items-center justify-center cursor-pointer animate-pop-up"
         >
-          <Image
-            src={state.icon.src}
-            alt={state.icon.label}
-            width={size * 0.8}
-            height={size * 0.8}
-            className="object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.30)]"
-            priority
-            unoptimized
-          />
+          <div
+            className="relative flex items-center justify-center"
+            style={
+              fluid
+                ? { width: "72%", height: "72%" }
+                : { width: size * 0.72, height: size * 0.72 }
+            }
+          >
+            <Image
+              src={state.icon.src}
+              alt={state.icon.label}
+              fill
+              sizes={`${Math.round(size)}px`}
+              className="object-contain drop-shadow-[0_4px_8px_rgba(0,0,0,0.30)]"
+              priority
+              unoptimized
+            />
+          </div>
         </button>
       )}
 

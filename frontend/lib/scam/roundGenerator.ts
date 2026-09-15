@@ -49,7 +49,7 @@ const PACING = {
   baseSpawnDelay: 450,
   spawnJitter: 300,
   boardProgression: [6],
-  listSize: 100, 
+  listSize: 100,
   scamRatio: 0.4,
 } as const;
 
@@ -65,7 +65,6 @@ async function pickFamily(): Promise<string> {
     .select("family")
     .eq("is_scam", true);
 
-  // Stable, sorted, de-duplicated family list so the date index is consistent.
   const families = Array.from(
     new Set((data ?? []).map((r) => r.family)),
   ).sort();
@@ -124,9 +123,12 @@ export async function generateRound(
     () => Math.random() - 0.5,
   );
 
+  const featuredScamIconId = (exemplar as PatternRow).icon_id;
   const sequenceWithIcons: PatternWithIcon[] = sequence.map((p) => ({
     ...p,
-    icon: iconById(p.icon_id, p.is_scam),
+    icon: p.is_scam
+      ? iconById(featuredScamIconId, true)
+      : iconById(p.icon_id, false),
   }));
 
   return {
@@ -176,6 +178,7 @@ export async function rebuildRoundFromSession(session: {
 
   const patternMap = new Map(patterns.map((p) => [p.id, p]));
 
+  const featuredScamIconId = (exemplar as PatternRow).icon_id;
   const sequence: PatternWithIcon[] = session.items
     .map((item) => {
       const p = patternMap.get(item.pattern_id);
@@ -183,7 +186,9 @@ export async function rebuildRoundFromSession(session: {
       const row = p as PatternRow;
       return {
         ...row,
-        icon: iconById(row.icon_id, row.is_scam),
+        icon: row.is_scam
+          ? iconById(featuredScamIconId, true)
+          : iconById(row.icon_id, false),
       };
     })
     .filter((x): x is PatternWithIcon => x !== null);

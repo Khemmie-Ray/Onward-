@@ -1,10 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Trophy, Gift } from "lucide-react";
 import { LeaderboardWidget } from "@/components/dashboard/leaderboard/LeaderboardWidget";
 import { ContestRewards } from "@/components/dashboard/leaderboard/ContestRewards";
 import { ReferralBoard } from "@/components/contest/ReferralBoard";
+import { NoContest } from "@/components/contest/NoContest";
+import { useAuthFetch } from "@/hooks/useAuthFetch";
 
 type Tab = "play" | "contest";
 
@@ -40,22 +43,7 @@ export default function BoardPage() {
         <LeaderboardWidget />
       ) : (
         <div className="space-y-4 w-full lg:w-[70%] mx-auto md:w-[80%]">
-          <div className="w-full rounded-3xl bg-paper p-5 sm:p-6 shadow-[0_8px_28px_rgba(31,58,110,0.06)]">
-            <div className="mb-3 flex items-start justify-between">
-              <div>
-                <h2 className="display text-[20px] font-bold text-indigo">
-                  Current contest
-                </h2>
-                <p className="text-[11px] text-fg-soft mt-0.5">
-                  Referrers ranked by qualified friends this week.
-                </p>
-              </div>
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-mustard/15">
-                <Trophy size={16} strokeWidth={2.5} className="text-mustard" />
-              </div>
-            </div>
-            <ReferralBoard />
-          </div>
+          <CurrentContestSection />
           <div className="w-full rounded-3xl bg-paper p-5 sm:p-6 shadow-[0_8px_28px_rgba(31,58,110,0.06)]">
             <div className="mb-1">
               <h2 className="display text-[20px] font-bold text-indigo">
@@ -69,6 +57,42 @@ export default function BoardPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function CurrentContestSection() {
+  const authFetch = useAuthFetch();
+  const { data, isLoading } = useQuery<{ contest: { type: string } | null }>({
+    queryKey: ["contest", "active"],
+    queryFn: async () => {
+      const res = await authFetch("/api/contest/active");
+      if (!res.ok) throw new Error("Failed to load contest");
+      return res.json();
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  if (isLoading) return null;
+  if (!data?.contest) return <NoContest />;
+
+  return (
+    <div className="w-full rounded-3xl bg-paper p-5 sm:p-6 shadow-[0_8px_28px_rgba(31,58,110,0.06)]">
+      <div className="mb-3 flex items-start justify-between">
+        <div>
+          <h2 className="display text-[20px] font-bold text-indigo">
+            Current contest
+          </h2>
+          <p className="text-[11px] text-fg-soft mt-0.5">
+            Referrers ranked by qualified friends this week.
+          </p>
+        </div>
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-mustard/15">
+          <Trophy size={16} strokeWidth={2.5} className="text-mustard" />
+        </div>
+      </div>
+      <ReferralBoard />
     </div>
   );
 }
