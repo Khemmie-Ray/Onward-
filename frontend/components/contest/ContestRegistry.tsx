@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import { ContestBoard } from "@/components/contest/ContestBoard";
 import { ReferralContest } from "@/components/contest/ReferralContest";
+import { NoContest } from "@/components/contest/NoContest";
 
 export type ActiveContest = {
   slug: string;
@@ -52,15 +53,12 @@ export function ActiveContest() {
 
   const contest = data?.contest;
   if (!contest) {
-    return (
-      <div className="rounded-[20px] bg-paper p-8 text-center text-[13px] text-fg-soft">
-        No contest is running right now. Check back soon.
-      </div>
-    );
+    return <NoContest />;
   }
 
   const render = REGISTRY[contest.type];
   if (!render) {
+    // A DB row referenced a type we don't have a component for yet.
     return (
       <div className="rounded-[20px] bg-paper p-8 text-center text-[13px] text-fg-soft">
         This contest isn&apos;t available to view yet.

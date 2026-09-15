@@ -37,20 +37,6 @@ export async function GET(request: Request) {
       });
     }
 
-    const pastRes = await supabaseAdmin
-      .from("contest_config")
-      .select(cols)
-      .neq("status", "draft")
-      .lt("ends_at", nowIso)
-      .order("ends_at", { ascending: false })
-      .limit(1);
-    if (pastRes.error) throw pastRes.error;
-    if (pastRes.data && pastRes.data[0]) {
-      return NextResponse.json({
-        contest: { ...pastRes.data[0], phase: "closed" },
-      });
-    }
-
     if (debug) {
       const all = await supabaseAdmin
         .from("contest_config")
