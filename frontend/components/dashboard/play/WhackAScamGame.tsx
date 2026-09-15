@@ -288,17 +288,21 @@ export function WhackAScam({
         onAbandonClick={() => setShowAbandonConfirm(true)}
       />
 
-      <div
-        className={`grid ${gridCols} gap-4 p-6 rounded-[24px] bg-aubergine/95 shadow-[0_12px_32px_rgba(91,46,92,0.30)]`}
-      >
-        {Array.from({ length: activeHoleCount }).map((_, idx) => (
-          <Hole
-            key={idx}
-            state={holes[idx]}
-            onWhack={() => handleWhack(idx)}
-            size={activeHoleCount === 6 ? 96 : 110}
-          />
-        ))}
+      <div className="w-full max-w-130 px-2 sm:px-0">
+        <div
+          className={`grid ${gridCols} gap-3 sm:gap-4 p-4 sm:p-6 rounded-[24px] bg-aubergine/95 shadow-[0_12px_32px_rgba(91,46,92,0.30)]`}
+        >
+          {Array.from({ length: activeHoleCount }).map((_, idx) => (
+            <div key={idx} className="aspect-square w-full">
+              <Hole
+                state={holes[idx]}
+                onWhack={() => handleWhack(idx)}
+                size={activeHoleCount === 6 ? 96 : 110}
+                fluid
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       {showAbandonConfirm && (
