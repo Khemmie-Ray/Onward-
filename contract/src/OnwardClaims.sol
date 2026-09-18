@@ -281,7 +281,7 @@ contract OnwardClaims is
     /// @notice Whether a wallet is GoodDollar-verified, read on-chain.
     function isVerified(address user) public view returns (bool) {
         try identity.getWhitelistedRoot(user) returns (address root) {
-            return root != address(0);
+            return root != address(0) && root == user;
         } catch {
             return false;
         }
