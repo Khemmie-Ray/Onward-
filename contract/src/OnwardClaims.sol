@@ -25,7 +25,6 @@ interface IIdentity {
     ) external view returns (address);
 }
 
-
 contract OnwardClaims is
     Initializable,
     OwnableUpgradeable,
@@ -69,13 +68,35 @@ contract OnwardClaims is
     bool public upgradeRenounced;
 
     /// @notice Cumulative G$ paid out as contest rewards via batchContestReward.
-    /// @dev Tracked separately from totalClaimedG so contest payouts can be
-    ///      counted or excluded from volume independently. Added in the V2
-    ///      upgrade: it consumes one slot from the original __gap, which is why
-    ///      __gap went from [40] to [39].
     uint256 public totalContestPaidG;
 
-    uint256[39] private __gap;
+    /// @dev Added in the streak-rewards upgrade. Consumes one former __gap slot.
+    mapping(uint256 => uint256) public streakRewards;
+
+    /// @dev Added in the streak-rewards upgrade. Consumes one former __gap slot.
+    mapping(address => mapping(uint256 => bool)) public streakClaimed;
+
+    /// @notice Cumulative G$ paid out as streak rewards.
+    uint256 public totalStreakPaidG;
+
+    // ── Streak protection: freeze (preventive) + restore (reactive) ──
+
+    /// @notice Price to buy one streak freeze (G$ wei). 0 = freeze disabled.
+    uint256 public freezePrice;
+    /// @notice Price for a user's FIRST streak restore ever (G$ wei).
+    uint256 public restoreFirstPrice;
+    /// @notice Price for every subsequent streak restore (G$ wei).
+    uint256 public restoreSubsequentPrice;
+
+    /// @notice How many unused streak freezes a user holds.
+    mapping(address => uint256) public freezesOwned;
+    /// @notice How many times a user has restored (drives first-vs-subsequent price).
+    mapping(address => uint256) public restoreCount;
+
+    /// @notice Cumulative G$ taken in from freeze + restore purchases.
+    uint256 public totalStreakProtectionCollectedG;
+
+    uint256[30] private __gap;
 
     uint256 public constant RATE_SCALE = 1e18;
     uint256 private constant DAY = 1 days;
@@ -105,6 +126,30 @@ contract OnwardClaims is
     );
     event UpgradeRenounced();
     /// @notice Emitted once per recipient in a contest payout batch.
+    event StreakRewardSet(
+        uint256 indexed day,
+        uint256 previous,
+        uint256 current
+    );
+    event StreakRewardClaimed(
+        address indexed user,
+        uint256 indexed day,
+        uint256 amount
+    );
+    event FreezePriceSet(uint256 previous, uint256 current);
+    event RestorePricesSet(uint256 firstPrice, uint256 subsequentPrice);
+    event FreezePurchased(
+        address indexed user,
+        uint256 price,
+        uint256 nowOwned
+    );
+    event FreezeConsumed(address indexed user, uint256 remaining);
+    event StreakRestorePaid(
+        address indexed user,
+        uint256 price,
+        uint256 restoreNumber
+    );
+
     event ContestRewardPaid(
         address indexed user,
         uint256 amount,
@@ -125,6 +170,11 @@ contract OnwardClaims is
     error UpgradeAlreadyRenounced();
     error LengthMismatch();
     error EmptyBatch();
+    error MilestoneNotConfigured();
+    error StreakAlreadyClaimed();
+    error FreezeDisabled();
+    error RestoreNotPriced();
+    error NoFreezeToConsume();
 
     modifier onlySigner() {
         if (msg.sender != signer) revert NotSigner();
@@ -165,7 +215,7 @@ contract OnwardClaims is
         globalDailyCapG = 20000e18;
     }
 
-   /**
+    /**
      * @notice Convert a user's points into G$ and send it to them.
      * @dev Verification is read on-chain here, never trusted from the caller.
      * @param user Recipient wallet.
@@ -362,6 +412,120 @@ contract OnwardClaims is
         }
         gDollar.safeTransfer(to, amount);
         emit ReserveWithdrawn(to, amount);
+    }
+
+    // ── Streak rewards ──────────────────────────────────────────────────────
+
+    /// @notice Set (or change, or disable) the G$ reward for a streak milestone.
+    /// @dev Owner-only: changing payout amounts is high-privilege.
+    /// @param day    The streak-day milestone (e.g. 7, 14, 30, 60).
+    /// @param amount G$ (wei) to pay when this milestone is claimed.
+    function setStreakReward(uint256 day, uint256 amount) external onlyOwner {
+        if (day == 0) revert ZeroAmount();
+        uint256 previous = streakRewards[day];
+        streakRewards[day] = amount;
+        emit StreakRewardSet(day, previous, amount);
+    }
+
+    /// @notice Pay a user their reward for reaching a streak milestone.
+    /// @dev Signer-gated: the backend attests the user qualifies (their streak,
+    ///      which lives off-chain, has reached `day`).
+    /// @param user The wallet to pay (their qualification is attested off-chain).
+    /// @param day  The milestone being claimed.
+    function streakClaim(
+        address user,
+        uint256 day
+    ) external onlySigner whenNotPaused nonReentrant returns (uint256 amount) {
+        if (user == address(0)) revert ZeroAddress();
+        if (!isVerified(user)) revert NotVerified();
+
+        amount = streakRewards[day];
+        if (amount == 0) revert MilestoneNotConfigured();
+        if (streakClaimed[user][day]) revert StreakAlreadyClaimed();
+        if (gDollar.balanceOf(address(this)) < amount) {
+            revert InsufficientReserve();
+        }
+
+        streakClaimed[user][day] = true;
+        totalStreakPaidG += amount;
+
+        gDollar.safeTransfer(user, amount);
+
+        emit StreakRewardClaimed(user, day, amount);
+    }
+
+    // ── Streak protection: freeze (preventive) + restore (reactive) ───────────
+
+    /// @notice Owner sets the freeze price (G$ wei). 0 disables buying freezes.
+    function setFreezePrice(uint256 price) external onlyOwner {
+        emit FreezePriceSet(freezePrice, price);
+        freezePrice = price;
+    }
+
+    /// @notice Owner sets restore prices: first-ever and every subsequent (G$ wei).
+    function setRestorePrices(
+        uint256 firstPrice,
+        uint256 subsequentPrice
+    ) external onlyOwner {
+        restoreFirstPrice = firstPrice;
+        restoreSubsequentPrice = subsequentPrice;
+        emit RestorePricesSet(firstPrice, subsequentPrice);
+    }
+
+    /// @notice The restore price the caller would pay right now (first vs later).
+    function restorePriceFor(address user) public view returns (uint256) {
+        return
+            restoreCount[user] == 0
+                ? restoreFirstPrice
+                : restoreSubsequentPrice;
+    }
+
+    /// @notice Buy one streak freeze. Caller pays `freezePrice` G$ (must have
+    ///         approved this contract first). Freezes accumulate; the backend
+    ///         consumes one (via consumeFreeze) when the user misses a day.
+    function buyFreeze() external whenNotPaused nonReentrant {
+        uint256 price = freezePrice;
+        if (price == 0) revert FreezeDisabled();
+
+        // Pull the user's G$ (requires prior approve). CEI: effects first.
+        freezesOwned[msg.sender] += 1;
+        totalStreakProtectionCollectedG += price;
+
+        gDollar.safeTransferFrom(msg.sender, address(this), price);
+
+        emit FreezePurchased(msg.sender, price, freezesOwned[msg.sender]);
+    }
+
+    /// @notice Consume one of a user's freezes (called by the backend/signer when
+    ///         it detects a missed day, to protect the streak instead of breaking
+    ///         it).
+    function consumeFreeze(
+        address user
+    ) external onlySigner returns (uint256 remaining) {
+        if (freezesOwned[user] == 0) revert NoFreezeToConsume();
+        freezesOwned[user] -= 1;
+        remaining = freezesOwned[user];
+        emit FreezeConsumed(user, remaining);
+    }
+
+    /// @notice Pay to restore a lapsed streak. Caller pays the current restore
+    ///         price (first-ever vs subsequent), which they must have approved.
+    function restoreStreak()
+        external
+        whenNotPaused
+        nonReentrant
+        returns (uint256 price)
+    {
+        price = restorePriceFor(msg.sender);
+        if (price == 0) revert RestoreNotPriced();
+
+        // CEI: effects before the external token pull.
+        restoreCount[msg.sender] += 1;
+        totalStreakProtectionCollectedG += price;
+
+        gDollar.safeTransferFrom(msg.sender, address(this), price);
+
+        emit StreakRestorePaid(msg.sender, price, restoreCount[msg.sender]);
     }
 
     function setSigner(address _signer) external onlyOwner {
