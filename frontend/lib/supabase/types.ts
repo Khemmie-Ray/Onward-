@@ -81,10 +81,10 @@ export type DbUser = {
   referred_by_user_id: string | null;
   is_verified: boolean | null;
   verified_checked_at: string | null;
-   verified_on_onward: boolean | null;
+  verified_on_onward: boolean | null;
   onward_verified_at: string | null;
   onward_verify_checked_at: string | null;
-  contest_qualified: boolean;         
+  contest_qualified: boolean;
   contest_qualified_at: string | null;
 };
 
@@ -232,6 +232,25 @@ export type DbSpendEvent = {
   created_at: string;
 };
 
+export type StreakClaimStatus = "pending" | "paid" | "failed";
+
+export type DbStreakRewardClaim = {
+  id: string;
+  user_id: string;
+  milestone_day: number;
+  amount_g: number;
+  status: StreakClaimStatus;
+  tx_hash: string | null;
+  claimed_at: string;
+  paid_at: string | null;
+};
+
+export type DbStreakRewardCache = {
+  milestone_day: number;
+  amount_g: number;
+  refreshed_at: string;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -340,6 +359,25 @@ export type Database = {
           category: SpendCategory;
         };
         Update: Partial<DbSpendEvent>;
+        Relationships: [];
+      };
+      streak_reward_claims: {
+        Row: DbStreakRewardClaim;
+        Insert: Partial<DbStreakRewardClaim> & {
+          user_id: string;
+          milestone_day: number;
+          amount_g: number;
+        };
+        Update: Partial<DbStreakRewardClaim>;
+        Relationships: [];
+      };
+      streak_reward_cache: {
+        Row: DbStreakRewardCache;
+        Insert: Partial<DbStreakRewardCache> & {
+          milestone_day: number;
+          amount_g: number;
+        };
+        Update: Partial<DbStreakRewardCache>;
         Relationships: [];
       };
       learn_tracks: {
