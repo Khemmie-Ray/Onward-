@@ -75,7 +75,14 @@ export function useFreezesOwned(user: Address | undefined, enabled = true) {
     abi: onwardClaimsAbi,
     functionName: "freezesOwned",
     args: user ? [user] : undefined,
-    query: { enabled: shouldRun },
+
+    query: {
+      enabled: shouldRun,
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+      refetchInterval: 60_000,
+      staleTime: 0,
+    },
   });
   return {
     freezesOwned: (data as bigint | undefined) ?? 0n,
