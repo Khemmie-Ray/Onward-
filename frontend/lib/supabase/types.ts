@@ -173,11 +173,14 @@ export type DbGameSession = {
   level_after: number | null;
 };
 
+export type StreakDaySource = "played" | "freeze" | "restore" | "manual";
+
 export type DbStreakDay = {
   user_id: string;
   day: string;
   passed: boolean;
   rounds_played: number;
+  source: StreakDaySource;
 };
 
 export type DbLeaderboardPeriod = {

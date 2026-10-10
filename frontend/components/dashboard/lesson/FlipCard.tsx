@@ -4,18 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import { HandMetal, ArrowRight } from "lucide-react";
 import type { FlipCard as FlipCardData } from "@/lib/lessons/lesson-data";
-
-
-const CARD_ICONS: Record<string, string> = {
-  metamask: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544483/onward/metamask_efscln.png",
-  trustwallet: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544484/onward/trust-wallet_d2tcup.png",
-  phantom: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544484/onward/Phantom_Wallet_sgku1g.png",
-  rainbow: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544484/onward/rainbow_f2n9lg.png",
-  minipay: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1785544484/onward/minipay_xb6sao.png",
-  bitcoin: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1786139215/onward/btc-logo_puwtsg.webp",
-  ethereum: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1786139217/onward/Ethereum_Logo_othhcd.png",
-  solana: "https://res.cloudinary.com/dy7el0ucd/image/upload/v1786139216/onward/solana_tdj4ld.png",
-};
+import { resolveCardIcon } from "@/lib/lessons/card-icons";
 
 export function FlipCard({
   data,
@@ -26,8 +15,7 @@ export function FlipCard({
 }) {
   const [flipped, setFlipped] = useState(false);
 
-  const iconKey = (data as { icon?: string }).icon;
-  const iconUrl = iconKey ? CARD_ICONS[iconKey] : undefined;
+  const icon = resolveCardIcon((data as { icon?: string }).icon);
 
   const handleClick = () => {
     const next = !flipped;
@@ -36,7 +24,7 @@ export function FlipCard({
   };
 
   return (
-    <div className="lg:w-[60%] md:w-[60%] w-full mx-auto p-4">
+    <div className="w-full max-w-[900px] lg:w-[85%] md:w-[90%] mx-auto p-4">
       <button
         onClick={handleClick}
         aria-label={flipped ? "Show question" : "Reveal answer"}
@@ -60,17 +48,26 @@ export function FlipCard({
               <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-mustard mb-auto">
                 The question
               </div>
-              {iconUrl && (
+              {icon && (
                 <div className="mb-4">
                   <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-paper/60 p-2.5 shadow-sm">
-                    <Image
-                      src={iconUrl}
-                      alt={data.front}
-                      width={48}
-                      height={48}
-                      className="object-contain"
-                      unoptimized
-                    />
+                    {icon.kind === "brand" ? (
+                      <Image
+                        src={icon.url}
+                        alt={data.front}
+                        width={48}
+                        height={48}
+                        className="object-contain"
+                        unoptimized
+                      />
+                    ) : (
+                      <icon.Icon
+                        size={34}
+                        strokeWidth={1.9}
+                        className="text-indigo"
+                        aria-hidden
+                      />
+                    )}
                   </div>
                 </div>
               )}
