@@ -15,7 +15,8 @@ const RESTORE_EVENT = parseAbiItem(
 const FIRST_PRICE = 100;
 const SUBSEQUENT_PRICE = 200;
 const GD_DECIMALS = 18n;
-const RESTORE_WINDOW_DAYS = 2;
+
+const RESTORE_WINDOW_DAYS = 1;
 
 function dayStr(d: Date): string {
   const c = new Date(d);
@@ -23,12 +24,19 @@ function dayStr(d: Date): string {
   return c.toISOString().slice(0, 10);
 }
 
+function parseDayParam(v: unknown): string | null {
+  if (typeof v !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const d = new Date(v + "T00:00:00Z");
+  if (Number.isNaN(d.getTime())) return null;
+  return dayStr(d);
+}
+
 export async function POST(request: Request) {
   const auth = await requireCompletedProfile(request);
   if ("error" in auth) return auth.error;
   const { user } = auth;
 
-  let body: { txHash?: string };
+  let body: { txHash?: string; day?: string };
   try {
     body = await request.json();
   } catch {
@@ -39,8 +47,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing txHash" }, { status: 400 });
   }
 
+  const claimedDay = parseDayParam(body.day);
+  if (!claimedDay) {
+    return NextResponse.json(
+      { error: "Missing or invalid day" },
+      { status: 400 },
+    );
+  }
+
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
+  const todayStr = dayStr(today);
   const windowStart = new Date(today);
   windowStart.setUTCDate(today.getUTCDate() - (RESTORE_WINDOW_DAYS + 1));
 
@@ -54,19 +71,30 @@ export async function POST(request: Request) {
 
   const passedSet = new Set((recentDays ?? []).map((r) => r.day as string));
 
-  const missedDays: string[] = [];
-  for (let i = 1; i <= RESTORE_WINDOW_DAYS; i++) {
-    const d = new Date(today);
-    d.setUTCDate(today.getUTCDate() - i);
-    const ds = dayStr(d);
-    if (!passedSet.has(ds)) missedDays.push(ds);
-  }
-  if (missedDays.length === 0) {
+  if (claimedDay >= todayStr || claimedDay < dayStr(windowStart)) {
     return NextResponse.json(
-      { error: "No restorable gap in the last 2 days" },
+      { error: "That day is outside the restore window." },
       { status: 400 },
     );
   }
+  if (passedSet.has(claimedDay)) {
+    return NextResponse.json(
+      { error: "That day is already covered." },
+      { status: 400 },
+    );
+  }
+  const before = new Date(claimedDay + "T00:00:00Z");
+  before.setUTCDate(before.getUTCDate() - 1);
+  if (!passedSet.has(dayStr(before))) {
+    return NextResponse.json(
+      {
+        error: "Your streak gap is more than one day, so it can't be restored.",
+      },
+      { status: 400 },
+    );
+  }
+
+  const missedDays = [claimedDay];
 
   const { count: priorRestores } = await supabaseAdmin
     .from("spend_events")
@@ -132,12 +160,16 @@ export async function POST(request: Request) {
   }
 
   for (const ds of missedDays) {
-    await supabaseAdmin
-      .from("streak_days")
-      .upsert(
-        { user_id: user.id, day: ds, passed: true, rounds_played: 0 },
-        { onConflict: "user_id,day" },
-      );
+    await supabaseAdmin.from("streak_days").upsert(
+      {
+        user_id: user.id,
+        day: ds,
+        passed: true,
+        rounds_played: 0,
+        source: "restore",
+      },
+      { onConflict: "user_id,day" },
+    );
   }
 
   await supabaseAdmin.from("spend_events").insert({
