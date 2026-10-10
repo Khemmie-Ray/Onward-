@@ -42,7 +42,7 @@ export function LeaderboardRow({
             >
               {entry.display_name}
               {isViewer && (
-                <span className="ml-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-mustard">
+                <span className="ml-1.5 text-[10px] font-bold uppercase tracking-widest text-mustard">
                   You
                 </span>
               )}
