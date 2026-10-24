@@ -122,7 +122,7 @@ function Segment({
       {icon}
       <span className="min-w-0 leading-none">
         {loading ? (
-          <span className="block h-[15px] w-6 animate-pulse rounded bg-canvas-warm" />
+          <span className="block h-3.75 w-6 animate-pulse rounded bg-canvas-warm" />
         ) : (
           <span className="display block truncate text-[15px] font-bold tabular-nums text-indigo">
             {value}

@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { PlayRightPanel } from "./panels/PlayRightPanel";
 import { GameRightPanel } from "./panels/GameRightPanel";
 import { BoardRightPanel } from "./panels/BoardRightPanel";
+import { ProfileRightPanel } from "./panels/ProfileRightPanel";
+import { WalletRightPanel } from "./panels/WalletRightPanel";
 import { StatBar } from "./StatBar";
 
 type PanelEntry = {
@@ -18,6 +20,14 @@ const RIGHT_PANELS: PanelEntry[] = [
   {
     match: (p) => p === "/board" || p.startsWith("/board/"),
     Panel: BoardRightPanel,
+  },
+  {
+    match: (p) => p === "/profile" || p.startsWith("/profile/"),
+    Panel: ProfileRightPanel,
+  },
+  {
+    match: (p) => p === "/wallet" || p.startsWith("/wallet/"),
+    Panel: WalletRightPanel,
   },
 ];
 
