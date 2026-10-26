@@ -31,11 +31,26 @@ const RIGHT_PANELS: PanelEntry[] = [
   },
 ];
 
+export function getRightPanel(pathname: string): ComponentType | null {
+  return RIGHT_PANELS.find((e) => e.match(pathname))?.Panel ?? null;
+}
+
+export function RightPanelContent() {
+  const pathname = usePathname();
+  const Panel = getRightPanel(pathname);
+  if (!Panel) return null;
+  return (
+    <>
+      <StatBar />
+      <Panel />
+    </>
+  );
+}
+
 export function RightPanelOutlet() {
   const pathname = usePathname();
-  const entry = RIGHT_PANELS.find((e) => e.match(pathname));
-  if (!entry) return null;
-  const { Panel } = entry;
+  const Panel = getRightPanel(pathname);
+  if (!Panel) return null;
 
   return (
     <aside className="no-scrollbar hidden h-full w-full flex-col gap-3 overflow-y-auto py-6 px-4 xl:flex">
