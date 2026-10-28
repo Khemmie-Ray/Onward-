@@ -1,5 +1,3 @@
-import type { WhackIcon } from "@/lib/scam/whackIcon";
-
 export type Mode = "free" | "premium";
 
 export type FreeStep = "idle" | "starting";
@@ -15,7 +13,6 @@ export type DailyCapMessage = { kind: "cap"; message: string } | null;
 
 export type DisplayItem = {
   pattern_id: string;
-  icon: WhackIcon;
   is_scam: boolean;
   kind: string;
 };
@@ -33,7 +30,6 @@ export type WhackResult = {
 export type HoleState = {
   id: number;
   patternId: string;
-  icon: WhackIcon | null;
   isScam: boolean;
   appearedAt: number;
   durationMs: number;
@@ -44,12 +40,12 @@ export type RoundPreview = {
   mode: Mode;
   family_label: string;
   family_description: string;
+  difficulty: number;
   exemplar: {
     kind: string;
     content: Record<string, unknown>;
     teaching: string;
   };
-  exemplar_icon: WhackIcon;
   display_items: DisplayItem[];
   popup_duration_ms: number;
   total_seconds: number;
