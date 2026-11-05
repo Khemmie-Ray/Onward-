@@ -1,85 +1,85 @@
 "use client";
 
-import React from "react";
-import { Award, Trophy } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { Check, Copy } from "lucide-react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
-import { useAuthFetch } from "@/hooks/useAuthFetch";
+import { LoopSigil } from "@/components/home/motifs";
 
 interface ProfileHeaderProps {
   displayName: string;
   avatarId: string | null;
   walletAddress: string;
   daysOnOnward: number;
+  level: number;
+  flagshipLabel: string;
 }
-
-type PlayStats = {
-  current_streak: number;
-  lifetime_points_from_play: number;
-  scams_whacked_today: number;
-  weekly_rank: number | null;
-};
 
 const ProfileHeader = ({
   displayName,
   avatarId,
   walletAddress,
   daysOnOnward,
+  level,
+  flagshipLabel,
 }: ProfileHeaderProps) => {
-  const authFetch = useAuthFetch();
-  const truncatedAddress = `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`;
+  const truncated = `${walletAddress.slice(0, 6)}…${walletAddress.slice(-4)}`;
+  const [copied, setCopied] = useState(false);
 
-  const { data } = useQuery({
-    queryKey: ["play", "stats"],
-    queryFn: async () => {
-      const res = await authFetch("/api/play/stats");
-      if (!res.ok) return { stats: null };
-      return res.json() as Promise<{ stats: PlayStats }>;
-    },
-    staleTime: 30_000,
-  });
-
-  const rank = data?.stats?.weekly_rank ?? null;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(walletAddress);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard can be blocked (insecure context, denied permission). Nothing
+      // to recover; the address stays visible for manual copy.
+    }
+  };
 
   return (
-    <section className="mb-10 animate-[fade-up_0.8s_0.05s_ease_both]">
-      <div className="flex flex-col items-start gap-5 md:flex-row md:flex-wrap md:items-center md:justify-between md:gap-4">
-        <div className="flex items-center gap-3 md:gap-4">
-          <div className="relative shadow-[0_8px_20px_rgba(199,93,63,0.30)] rounded-full">
-            <UserAvatar
-              avatarId={avatarId}
-              size={80}
-              priority
-              className="border-2 border-paper"
-            />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-terracotta mb-2">
-              <Award size={13} strokeWidth={2.5} />
-              Your profile
-            </div>
-            <h1 className="display text-[26px] sm:text-[32px] md:text-[44px] font-semibold leading-[1.1] tracking-tight text-indigo break-words">
+    <section className="mb-7 animate-[fade-up_0.8s_0.05s_ease_both]">
+      <div className="relative overflow-hidden rounded-[26px] bg-[linear-gradient(135deg,#271d4e_0%,#3a2a6b_55%,#48307a_100%)] px-5 py-6 sm:px-8 sm:py-7">
+        <LoopSigil
+          size={190}
+          color="var(--color-cream)"
+          className="pointer-events-none absolute -right-8 -top-10 opacity-[0.06]"
+        />
+
+        <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
+          <UserAvatar
+            avatarId={avatarId}
+            size={76}
+            priority
+            className="ring-4 ring-cream/15"
+          />
+
+          <div className="min-w-0 flex-1">
+            <h1 className="display truncate text-[26px] font-bold leading-tight text-cream sm:text-[30px]">
               {displayName}
             </h1>
-            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] md:text-[12px] text-fg-soft">
-              <span className="font-mono">{truncatedAddress}</span>
-              <span className="text-fg-faint">·</span>
-              <span>
-                Joined {daysOnOnward} day{daysOnOnward === 1 ? "" : "s"} ago
+            <p className="mt-0.5 text-[13px] text-cream/70">
+              On Onward for {daysOnOnward} day{daysOnOnward === 1 ? "" : "s"}
+            </p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-forest/80 px-2.5 py-1 text-[11px] font-bold text-cream">
+                Level {level}
               </span>
-            </div>
-          </div>
-        </div>
-        <div className="flex w-full items-center gap-3 rounded-2xl bg-mustard/15 px-4 py-3 md:w-auto">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-mustard/25">
-            <Trophy size={16} strokeWidth={2.5} className="text-mustard" />
-          </div>
-          <div>
-            <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-fg-soft leading-none mb-1">
-              Weekly rank
-            </div>
-            <div className="display text-[20px] font-bold text-indigo leading-none tabular-nums">
-              {rank ? `#${rank}` : "Unranked"}
+              <span className="rounded-full bg-mustard/25 px-2.5 py-1 text-[11px] font-bold text-cream">
+                {flagshipLabel}
+              </span>
+              <button
+                onClick={copy}
+                aria-label="Copy wallet address"
+                className="inline-flex items-center gap-1.5 rounded-full bg-cream/10 px-2.5 py-1 text-[11px] font-semibold text-cream/80 transition hover:bg-cream/20"
+              >
+                <span className="font-mono">{truncated}</span>
+                {copied ? (
+                  <Check size={12} strokeWidth={2.5} className="text-forest" />
+                ) : (
+                  <Copy size={12} strokeWidth={2.5} />
+                )}
+              </button>
             </div>
           </div>
         </div>
