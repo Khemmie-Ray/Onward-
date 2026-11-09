@@ -11,7 +11,7 @@ export function Milestones({ items }: { items: ResolvedMilestone[] }) {
         </h2>
         <Link
           href="/profile/milestones"
-          className="text-[12px] font-bold uppercase tracking-[0.1em] text-forest transition hover:text-indigo"
+          className="text-[12px] font-bold uppercase tracking-widest text-forest transition hover:text-indigo"
         >
           View all
         </Link>

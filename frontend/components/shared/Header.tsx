@@ -1,5 +1,6 @@
 "use client";
 
+import { HOME_ROUTE } from "@/lib/nav/routes";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
@@ -95,7 +96,6 @@ const Header = () => {
     setLoginOpen(true);
   };
 
- 
   const navPillWrap = "rounded-2xl bg-canvas-warm p-2";
   const navPillBase =
     "block px-6 py-2 rounded-xl font-semibold text-[14px] transition-all";
@@ -115,7 +115,7 @@ const Header = () => {
           >
             <div className="justify-self-start">
               <Link
-                href={isConnected ? "/overview" : "/"}
+                href={isConnected ? HOME_ROUTE : "/"}
                 className="flex items-center gap-2.5"
               >
                 <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-indigo">

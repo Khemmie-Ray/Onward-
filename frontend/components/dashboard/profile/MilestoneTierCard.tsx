@@ -12,7 +12,6 @@ const EARNED_BG: Record<MilestoneTone, string> = {
   aubergine: "bg-aubergine-tint",
 };
 
-// Subtle dotted texture, matching the design.
 const DOTS =
   "[background-image:radial-gradient(rgba(31,58,110,0.06)_1px,transparent_1px)] [background-size:11px_11px]";
 

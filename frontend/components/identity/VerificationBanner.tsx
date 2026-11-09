@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -27,6 +27,13 @@ export function VerificationBanner() {
 
   const [expanded, setExpanded] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    if (isVerifying) {
+      setExpanded(true);
+      setDismissed(false);
+    }
+  }, [isVerifying]);
 
   if (isVerified || isLoading || dismissed) return null;
   if (status === "error" && !isVerifying && !expanded) return null;

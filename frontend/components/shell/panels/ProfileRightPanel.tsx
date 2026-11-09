@@ -2,6 +2,7 @@ import { Check, Gamepad2 } from "lucide-react";
 import { PanelCard, PanelCardHeader } from "../PanelCard";
 import { UBIClaimCard } from "@/components/dashboard/UBIClaimCard";
 import { ReferralCard } from "@/components/dashboard/profile/ReferralCard";
+import { MobileSignOut } from "@/components/dashboard/nav/MobileSignout";
 
 const MOCK_QUESTS = {
   resetsIn: "5h 42m",
@@ -53,6 +54,7 @@ export function ProfileRightPanel() {
         </ul>
       </PanelCard>
       <ReferralCard />
+      <MobileSignOut />
     </>
   );
 }

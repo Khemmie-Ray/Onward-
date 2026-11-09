@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Snowflake, Loader2, ShieldCheck, Check } from "lucide-react";
+import { Snowflake, Loader2, Check } from "lucide-react";
 import { formatUnits } from "viem";
 import { useConnection } from "wagmi";
 import { toast } from "sonner";
@@ -88,10 +88,10 @@ export function StreakFreezeCard() {
     }
   }, [step, freezeState.isPending, freezeState.isConfirming]);
 
-
   useEffect(() => {
     if (freezeState.isSuccess && step === "buying") {
       refetchOwned();
+      authFetch("/api/streak/freeze-armed", { method: "POST" }).catch(() => {});
       setStep("idle");
       setBusy(false);
       toast.success("Streak freeze active", {
@@ -119,7 +119,7 @@ export function StreakFreezeCard() {
   }, [approveState.error, freezeState.error]);
 
   const handleBuy = () => {
-    if (alreadyOwns) return; 
+    if (alreadyOwns) return;
     setBusy(true);
     if (allowance < freezePrice) {
       setStep("approving");
@@ -130,6 +130,7 @@ export function StreakFreezeCard() {
     }
   };
 
+  const priceLabel = priceDisabled ? "[price]" : formatUnits(freezePrice, 18);
   const label =
     step === "approving"
       ? "Approve G$…"
@@ -137,54 +138,47 @@ export function StreakFreezeCard() {
         ? "Buying…"
         : priceDisabled
           ? "Coming soon"
-          : `Buy · ${formatUnits(freezePrice, 18)} G$`;
+          : `Buy a freeze · ${priceLabel} G$`;
 
   return (
-    <div className="mt-4 rounded-2xl bg-paper p-4 shadow-[0_2px_10px_rgba(31,58,110,0.05)]">
-      <div className="flex items-center gap-3">
-        <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
-            alreadyOwns
-              ? "bg-forest/10 text-forest"
-              : "bg-indigo/10 text-indigo"
-          }`}
-        >
+    <div className="rounded-2xl bg-paper p-4 shadow-[0_2px_10px_rgba(31,58,110,0.05)]">
+      <div className="mb-2 flex items-center gap-2.5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-aubergine-tint text-aubergine">
           <Snowflake size={18} strokeWidth={2.5} />
         </div>
-
-        <div className="min-w-0 flex-1">
-          <div
-            className={`text-[14px] font-bold leading-tight ${
-              alreadyOwns ? "text-forest" : "text-indigo"
-            }`}
-          >
-            Streak freeze
-          </div>
-          <div className="text-[11.5px] text-fg-soft leading-snug">
-            {alreadyOwns
-              ? "You're protected. A missed day won't break your streak."
-              : "Protect your streak. A freeze covers one missed day."}
+        <div className="min-w-0">
+          <div className="text-[14px] font-bold text-indigo">Freeze streak</div>
+          <div className="text-[11.5px] text-fg-soft">
+            You own {owned} freeze{owned === 1 ? "" : "s"}
           </div>
         </div>
-
-        {alreadyOwns ? (
-          <span className="shrink-0 inline-flex items-center gap-1 rounded-xl bg-forest/10 px-3 py-2 text-[11px] font-bold text-forest">
-            <Check size={13} strokeWidth={3} /> Owned
-          </span>
-        ) : isVerified ? (
-          <button
-            onClick={handleBuy}
-            disabled={busy || priceDisabled}
-            className="shrink-0 rounded-xl bg-indigo px-4 py-2 text-[12px] font-bold text-cream shadow-[0_3px_0_0_#0f1d33] transition-all hover:brightness-110 active:translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {busy ? <Loader2 size={13} className="animate-spin" /> : label}
-          </button>
-        ) : (
-          <span className="shrink-0 inline-flex items-center gap-1 rounded-xl bg-canvas-warm px-3 py-2 text-[11px] font-semibold text-fg-soft">
-            <ShieldCheck size={12} strokeWidth={2.5} /> Verify to buy
-          </span>
-        )}
       </div>
+
+      <p className="mb-3 text-[12px] leading-snug text-fg-soft">
+        Buy ahead. A freeze covers one missed day so your streak stays alive.
+      </p>
+
+      {alreadyOwns ? (
+        <div className="flex items-center justify-center gap-1.5 rounded-full bg-forest/10 py-2.5 text-[12.5px] font-bold text-forest">
+          <Check size={14} strokeWidth={3} /> Freeze owned
+        </div>
+      ) : !isVerified ? (
+        <div className="rounded-full bg-canvas-warm py-2.5 text-center text-[12px] font-semibold text-fg-soft">
+          Verify to buy a freeze
+        </div>
+      ) : (
+        <button
+          onClick={handleBuy}
+          disabled={busy || priceDisabled}
+          className="flex w-full items-center justify-center gap-2 rounded-full border-2 border-indigo py-2.5 text-[12.5px] font-bold text-indigo transition hover:bg-indigo hover:text-cream disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {busy ? (
+            <Loader2 size={14} strokeWidth={2.8} className="animate-spin" />
+          ) : (
+            label
+          )}
+        </button>
+      )}
     </div>
   );
 }

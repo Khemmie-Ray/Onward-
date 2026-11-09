@@ -1,12 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { useConnection } from "wagmi";
 import { AlertCircle, LogOut } from "lucide-react";
-import { LoopSigil } from "@/components/home/motifs";
 import { UserAvatar } from "@/components/shared/UserAvatar";
 import { HOME_ROUTE } from "@/lib/nav/routes";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
@@ -33,9 +32,6 @@ export function Sidebar({
   const { isVerified } = useIdentityContext();
   const { profile: data, error } = useProfile();
 
-  console.log(data);
-
-  // Reuses the same cached query key as Header/ShellTopBar, so no extra request.
   const { data: profile } = useQuery({
     queryKey: ["me", "status", address ?? "anon"],
     queryFn: async () => {
@@ -51,7 +47,6 @@ export function Sidebar({
     refetchOnWindowFocus: false,
   });
 
-  // Profile is shown as a row below the nav, so keep it out of the main list.
   const mainNav = destinations.filter((d) => d.href !== "/profile");
   const username = data?.displayName?.trim() || "Profile";
   const shortAddress = address
@@ -61,13 +56,14 @@ export function Sidebar({
 
   return (
     <aside className="flex h-full w-full shrink-0 flex-col bg-blue px-4 py-6">
-      <Link href={HOME_ROUTE} className="mb-10 flex items-center gap-2.5 px-2">
-        <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-paper/10">
-          <LoopSigil size={20} color="var(--color-mustard)" />
-        </div>
-        <span className="display text-[22px] font-semibold text-paper">
-          onward
-        </span>
+      <Link href={HOME_ROUTE} className="mb-20">
+        <Image
+          src="/images/w-logo.png"
+          width={150}
+          height={150}
+          alt="Onward logo"
+          priority
+        />
       </Link>
 
       <nav aria-label="Primary">
@@ -111,39 +107,38 @@ export function Sidebar({
         </ul>
       </nav>
 
-      
       <div className="mt-auto pt-4">
         <Link
-        href="/profile"
-        aria-current={profileActive ? "page" : undefined}
-        className="relative mt-9 block rounded-[20px] bg-mint backdrop-blur-3xl px-4 pb-4 pt-9 text-center transition hover:brightness-[0.97]"
-      >
-        <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2">
-          <span className="inline-block rounded-full ring-4 ring-blue">
-            <UserAvatar avatarId={profile?.avatarId} size={54} />
-          </span>
-          {!isVerified && (
-            <span
-              title="Not verified yet"
-              className="absolute right-0 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-mustard ring-2 ring-blue"
-            >
-              <AlertCircle
-                size={11}
-                strokeWidth={2.8}
-                className="text-indigo"
-              />
+          href="/profile"
+          aria-current={profileActive ? "page" : undefined}
+          className="relative mt-9 block rounded-[20px] bg-mint backdrop-blur-3xl px-4 pb-4 pt-9 text-center transition hover:brightness-[0.97]"
+        >
+          <span className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2">
+            <span className="inline-block rounded-full ring-4 ring-blue">
+              <UserAvatar avatarId={profile?.avatarId} size={54} />
             </span>
-          )}
-        </span>
+            {!isVerified && (
+              <span
+                title="Not verified yet"
+                className="absolute right-0 top-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-mustard ring-2 ring-blue"
+              >
+                <AlertCircle
+                  size={11}
+                  strokeWidth={2.8}
+                  className="text-indigo"
+                />
+              </span>
+            )}
+          </span>
 
-        <p className="truncate text-[15px] font-bold text-blue">{username}</p>
-        {shortAddress && (
-          <p className="mt-0.5 truncate font-mono text-[11px] ">
-            {shortAddress}
-          </p>
-        )}
-      </Link>
-      <div className="border-t border-paper/20 my-3"></div>
+          <p className="truncate text-[15px] font-bold text-blue">{username}</p>
+          {shortAddress && (
+            <p className="mt-0.5 truncate font-mono text-[11px] ">
+              {shortAddress}
+            </p>
+          )}
+        </Link>
+        <div className="border-t border-paper/20 my-3"></div>
         <button
           type="button"
           onClick={() => void logout()}

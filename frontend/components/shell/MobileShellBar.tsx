@@ -9,6 +9,7 @@ import { X } from "lucide-react";
 import { LoopSigil } from "@/components/home/motifs";
 import { HOME_ROUTE } from "@/lib/nav/routes";
 import { getRightPanel, RightPanelContent } from "./RightPanel";
+import Image from "next/image";
 
 export function MobileShellBar() {
   const pathname = usePathname();
@@ -23,7 +24,6 @@ export function MobileShellBar() {
     if (open) setHasOpened(true);
   }, [open]);
 
- 
   useEffect(() => setOpen(false), [pathname]);
 
   const close = useCallback(() => setOpen(false), []);
@@ -46,12 +46,13 @@ export function MobileShellBar() {
     <>
       <header className="flex items-center justify-between border-b border-fg-soft/10 bg-paper/85 px-5 py-4 backdrop-blur-md">
         <Link href={HOME_ROUTE} className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-indigo">
-            <LoopSigil size={20} color="var(--color-mustard)" />
-          </div>
-          <span className="display text-[22px] font-semibold text-indigo">
-            onward
-          </span>
+          <Image
+            src="/images/b-logo.png"
+            width={150}
+            height={150}
+            alt="Onward logo"
+            priority
+          />
         </Link>
 
         {hasPanel && (

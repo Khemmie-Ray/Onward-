@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
 import { UserAvatar } from "@/components/shared/UserAvatar";
-import { LoopSigil } from "@/components/home/motifs";
 
 interface ProfileHeaderProps {
   displayName: string;
@@ -38,12 +37,23 @@ const ProfileHeader = ({
 
   return (
     <section className="mb-7 animate-[fade-up_0.8s_0.05s_ease_both]">
-      <div className="relative overflow-hidden rounded-[26px] bg-[linear-gradient(135deg,#271d4e_0%,#3a2a6b_55%,#48307a_100%)] px-5 py-6 sm:px-8 sm:py-7">
-        <LoopSigil
-          size={190}
-          color="var(--color-cream)"
-          className="pointer-events-none absolute -right-8 -top-10 opacity-[0.06]"
-        />
+      <div className="relative overflow-hidden rounded-[26px] bg-[#1C133D] px-5 py-6 sm:px-8 sm:py-7">
+        {/* Onward mark watermark: open ring (the O) plus the dot, drawn inline */}
+        <svg
+          aria-hidden
+          viewBox="0 0 100 100"
+          fill="none"
+          className="pointer-events-none absolute -right-8 -top-10 h-[190px] w-[190px] text-cream opacity-[0.08]"
+        >
+          <path
+            d="M81.4 39.8 A33 33 0 1 1 60.2 18.6"
+            stroke="currentColor"
+            strokeWidth="13"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <circle cx="73" cy="27" r="9" fill="currentColor" />
+        </svg>
 
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center">
           <UserAvatar

@@ -1,6 +1,3 @@
-// Compact stat tile for the profile overview row. Tinted card, big number with an
-// optional small unit (e.g. 6 /30), label underneath.
-
 const TONE_BG = {
   forest: "bg-forest-tint",
   mustard: "bg-mustard/25",
@@ -21,7 +18,7 @@ export function ProfileStat({
 }) {
   return (
     <div
-      className={`min-w-[140px] flex-1 rounded-[18px] px-4 py-3.5 ${TONE_BG[tone]}`}
+      className={`w-full md:w-[calc(25%-9px)] rounded-[18px] px-4 py-3.5 ${TONE_BG[tone]}`}
     >
       <div className="display text-[26px] font-bold leading-none tabular-nums text-indigo">
         {value}

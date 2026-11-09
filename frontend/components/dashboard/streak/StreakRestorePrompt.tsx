@@ -22,6 +22,8 @@ type Status =
       current_streak: number;
     };
 
+const SUBSEQUENT_PRICE = 200;
+
 export function StreakRestorePrompt({
   onRestore,
 }: {
@@ -182,36 +184,40 @@ export function StreakRestorePrompt({
         ? "Restoring…"
         : bridging
           ? "Finishing…"
-          : "Restore";
+          : `Restore for ${data.price} G$`;
 
   return (
-    <div className="mb-4 overflow-hidden rounded-2xl border border-terracotta/30 bg-terracotta/8">
-      <div className="flex items-center gap-3 p-4">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-terracotta/15 text-terracotta">
+    <div className="rounded-2xl bg-paper p-4 shadow-[0_2px_10px_rgba(31,58,110,0.05)]">
+      <div className="mb-2 flex items-center gap-2.5">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-terracotta-tint text-terracotta">
           <Flame size={18} strokeWidth={2.5} />
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-[13px] font-bold text-indigo">
-            Your streak lapsed
+        <div className="min-w-0">
+          <div className="text-[14px] font-bold text-indigo">
+            Restore streak
           </div>
-          <div className="text-[11.5px] text-fg-soft leading-snug">
-            You missed yesterday. Restore your {data.current_streak}-day streak
-            for{" "}
-            <span className="font-bold text-terracotta">{data.price} G$</span>
-            {data.is_first_restore
-              ? " (first restore; 200 G$ next time)."
-              : " (200 G$ per restore after your first)."}{" "}
-            Restore today, before the gap grows past one day.
+          <div className="text-[11.5px] text-fg-soft">
+            Next restore: {SUBSEQUENT_PRICE} G$
           </div>
         </div>
-        <button
-          onClick={handleRestore}
-          disabled={busy}
-          className="shrink-0 rounded-xl bg-terracotta px-4 py-2 text-[12px] font-bold text-cream shadow-sm transition-all hover:brightness-105 active:translate-y-[1px] disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {busy ? <Loader2 size={13} className="animate-spin" /> : label}
-        </button>
       </div>
+
+      <p className="mb-3 text-[12px] leading-snug text-fg-soft">
+        Missed a day? Bring your streak back if the gap is within the last 2
+        days.
+      </p>
+
+      <button
+        onClick={handleRestore}
+        disabled={busy}
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-indigo py-2.5 text-[12.5px] font-bold text-cream transition hover:bg-indigo/90 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {busy ? (
+          <Loader2 size={14} strokeWidth={2.8} className="animate-spin" />
+        ) : (
+          label
+        )}
+      </button>
     </div>
   );
 }

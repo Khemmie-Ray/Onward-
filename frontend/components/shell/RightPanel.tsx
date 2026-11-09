@@ -53,7 +53,7 @@ export function RightPanelOutlet() {
   if (!Panel) return null;
 
   return (
-    <aside className="no-scrollbar hidden h-full w-full flex-col gap-3 overflow-y-auto py-6 px-4 xl:flex">
+    <aside className="no-scrollbar hidden h-full w-full flex-col gap-3 overflow-y-auto py-6 px-4 lg:flex md:flex">
       <StatBar />
       <Panel />
     </aside>
