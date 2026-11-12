@@ -75,6 +75,7 @@ export type DbUser = {
   last_active_at: string;
   current_streak: number;
   longest_streak: number;
+  freeze_armed_on: string | null;
   total_g_earned: number;
   current_level: number;
   referral_code: string | null;
