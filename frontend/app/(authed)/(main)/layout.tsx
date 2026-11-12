@@ -3,6 +3,7 @@ import { MobileTabBar } from "@/components/dashboard/nav/MobileTabbar";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 import { Sidebar } from "@/components/shell/Sidebar";
 import { RightPanelOutlet } from "@/components/shell/RightPanel";
+import { MobileShellBar } from "@/components/shell/MobileShellBar";
 
 export default function AuthedLayout({ children }: { children: ReactNode }) {
   return (
@@ -11,10 +12,15 @@ export default function AuthedLayout({ children }: { children: ReactNode }) {
         <div className="hidden h-full md:flex lg:w-[18%] md:w-[18%]">
           <Sidebar />
         </div>
+          <div className="flex min-w-0 flex-1 flex-col">
+        <div className="md:hidden lg:hidden block">
+            <MobileShellBar />
+          </div>
         <main className="no-scrollbar flex-1 overflow-y-auto px-5 py-6 pb-24 md:px-8 md:pb-6">
           {children}
         </main>
-        <div className="hidden h-full lg:flex md:flex lg:w-[25%] md:w-[25%]">
+        </div>
+        <div className="hidden h-full lg:flex md:block lg:w-[25%] md:w-[25%]">
           <RightPanelOutlet />
         </div>
       </div>
