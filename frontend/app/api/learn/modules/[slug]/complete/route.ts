@@ -4,7 +4,7 @@ import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { mintModuleBadge } from "@/lib/onchain/badges";
 import { invalidateBadges } from "@/lib/server/badge-cache";
-import { markStreakDay } from "@/lib/streak";
+import { markStreakDay } from "@/lib/streak-data";
 import { awardPoints } from "@/lib/server/point";
 import { triggerReferralOnFirstActivity } from "@/lib/referral/trigger";
 import { assertModulePlayable } from "@/lib/learn/lock";
@@ -25,7 +25,6 @@ export async function POST(
   const body = (await request.json().catch(() => null)) as Body | null;
   const answers = body?.answers ?? [];
 
-  // ─── Load the module (need id + points_reward) ──────────
   const { data: module, error: modErr } = await supabaseAdmin
     .from("learn_modules")
     .select("id, slug, points_reward, status")
@@ -141,7 +140,7 @@ export async function POST(
       userWallet: user.wallet_address as Address,
       moduleSlug: slug,
     });
- 
+
     invalidateBadges(user.wallet_address as string);
 
     onchain = {
