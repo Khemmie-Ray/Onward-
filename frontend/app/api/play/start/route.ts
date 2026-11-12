@@ -8,6 +8,7 @@ import {
   type GeneratedRound,
   type RoundItem,
 } from "@/lib/scam/roundGenerator";
+import { resolveTierKeyForNextPlay, loadTier } from "@/lib/scam/difficulty";
 import type { PlayMode } from "@/lib/scoring";
 import { verifyStakePlaced } from "@/lib/onchain/play";
 
@@ -27,15 +28,16 @@ function previewResponse(
     featured_family: round.featured_family,
     family_label: round.family_label,
     family_description: round.family_description,
+    difficulty: round.tier.maxPatternDifficulty,
+    tier: round.tier.key,
+    tier_label: round.tier.label,
     exemplar: {
       kind: round.exemplar.kind,
       content: round.exemplar.content,
       teaching: round.exemplar.teaching,
     },
-    exemplar_icon: round.exemplar_icon,
     display_items: round.full_patterns.map((p) => ({
       pattern_id: p.id,
-      icon: p.icon,
       is_scam: p.is_scam,
       kind: p.kind,
     })),
@@ -128,6 +130,7 @@ export async function POST(request: Request) {
         popup_duration_ms: existingPending.popup_duration_ms,
         total_seconds: existingPending.total_seconds,
         mode: existingPending.mode,
+        difficulty: existingPending.difficulty,
       });
       return previewResponse(rebuilt, existingPending.id, mode);
     } catch (err) {
@@ -138,9 +141,11 @@ export async function POST(request: Request) {
   const previewId =
     mode === "premium" && body?.round_id ? body.round_id : crypto.randomUUID();
 
+  const tier = await loadTier(await resolveTierKeyForNextPlay(user.id));
+
   let round: GeneratedRound;
   try {
-    round = await generateRound(mode, user.current_level, previewId);
+    round = await generateRound(tier);
   } catch (err) {
     console.error("[generateRound failed]", err);
     return NextResponse.json(
@@ -161,6 +166,7 @@ export async function POST(request: Request) {
       items: round.items,
       popup_duration_ms: round.popup_duration_ms,
       total_seconds: round.total_seconds,
+      difficulty: round.tier.key,
       status: "pending",
       level_before: user.current_level,
     });
@@ -180,6 +186,7 @@ export async function POST(request: Request) {
           popup_duration_ms: existing.popup_duration_ms,
           total_seconds: existing.total_seconds,
           mode: existing.mode,
+          difficulty: existing.difficulty,
         });
         return previewResponse(rebuilt, existing.id, mode);
       }
