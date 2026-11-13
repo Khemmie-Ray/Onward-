@@ -87,7 +87,7 @@ export function GameStatsHeader({
         <div className="flex items-baseline justify-between">
           <span className="text-[12px] font-bold text-indigo">Pass line</span>
           <span className="text-[12.5px] font-semibold text-fg-soft">
-            <span className="display text-[16px] font-bold text-indigo tabular-nums">
+            <span className="display font-bold text-indigo tabular-nums">
               {caught}
             </span>{" "}
             / {denom} scams caught

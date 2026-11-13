@@ -59,7 +59,7 @@ export function ClaimCard({ onClaimed }: { onClaimed?: () => void } = {}) {
           </div>
           <div className="display text-[34px] font-bold leading-none tabular-nums">
             {balance.toLocaleString()}
-            <span className="ml-1.5 text-[16px] font-bold text-cream/50">
+            <span className="ml-1.5 font-bold text-cream/50">
               points
             </span>
           </div>

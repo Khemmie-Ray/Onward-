@@ -41,7 +41,7 @@ export function MilestoneCard({ m }: { m: ResolvedMilestone }) {
             <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-fg-soft">
               {m.track.category}
             </div>
-            <div className="display truncate text-[16px] font-bold text-indigo">
+            <div className="display truncate font-bold text-indigo">
               {m.tierName}
             </div>
           </div>

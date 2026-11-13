@@ -93,7 +93,7 @@ export function FlipCard({
               <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-mustard mb-3">
                 The answer
               </div>
-              <div className="text-[16px] md:text-[18px] leading-[1.55] text-paper whitespace-pre-line">
+              <div className="md:text-[18px] leading-[1.55] text-paper whitespace-pre-line">
                 {data.back}
               </div>
               <div className="mt-6 flex items-center justify-between shrink-0">
