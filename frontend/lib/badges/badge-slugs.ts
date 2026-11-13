@@ -176,6 +176,51 @@ export const LEARN_BADGE_SLUGS: BadgeSlug[] = [
     label: "Sending to the wrong network",
     category: "Networks",
   },
+  {
+    slug: "coins-and-tokens",
+    label: "Coins and tokens",
+    category: "Tokens",
+  },
+  {
+    slug: "kinds-of-tokens",
+    label: "The kinds of tokens you'll see",
+    category: "Tokens",
+  },
+  {
+    slug: "volatility-and-stablecoins",
+    label: "Why prices swing, and what stablecoins do",
+    category: "Tokens",
+  },
+  {
+    slug: "memecoins",
+    label: "Memecoins and the fear of missing out",
+    category: "Tokens",
+  },
+  {
+    slug: "gooddollar-the-token",
+    label: "GoodDollar, the token you already hold",
+    category: "Tokens",
+  },
+  {
+    slug: "how-people-get-crypto",
+    label: "How people actually get crypto",
+    category: "Tokens",
+  },
+  {
+    slug: "buying-your-first-tokens",
+    label: "Buying your first tokens",
+    category: "Tokens",
+  },
+  {
+    slug: "where-price-comes-from",
+    label: "Where a token's price comes from",
+    category: "Tokens",
+  },
+  {
+    slug: "fake-tokens-look-real",
+    label: "Fake tokens that look real",
+    category: "Tokens",
+  },
 ];
 
 export const ALL_BADGE_SLUGS: BadgeSlug[] = [

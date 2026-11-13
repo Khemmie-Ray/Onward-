@@ -2,15 +2,12 @@
 
 import { useState } from "react";
 import {
-  ArrowRight,
-  ArrowUpRight,
-  Info,
+  AlertTriangle,
+  ArrowDown,
+  ChevronDown,
+  ExternalLink,
   Loader2,
   Lock,
-  Wallet,
-  AlertTriangle,
-  ExternalLink,
-  ChevronLeft,
 } from "lucide-react";
 import { isAddress, parseUnits, type Address } from "viem";
 import { useConnection, useSendTransaction, useWriteContract } from "wagmi";
@@ -21,19 +18,12 @@ import {
   useTokenBalances,
   formatBalance,
   TOKENS,
-  type TokenBalance,
 } from "@/hooks/useTokenBalances";
 import { EXPLORER_BASE } from "@/constants/contracts/address";
 
 type Step = "form" | "review";
 
 const SENDABLE = [
-  {
-    key: "CELO",
-    symbol: "CELO",
-    name: "Celo",
-    address: null as Address | null,
-  },
   {
     key: "G$",
     symbol: TOKENS.gDollar.symbol,
@@ -46,27 +36,51 @@ const SENDABLE = [
     name: TOKENS.usdt.name,
     address: TOKENS.usdt.address,
   },
+  {
+    key: "CELO",
+    symbol: "CELO",
+    name: "Celo",
+    address: null as Address | null,
+  },
 ] as const;
 
-export function WithdrawCard() {
+// Small inline token coin, so the wallet styling stays in this file.
+function TokenCoin({ symbol, size = 20 }: { symbol: string; size?: number }) {
+  const map: Record<string, { bg: string; fg: string; label: string }> = {
+    G$: { bg: "bg-mustard", fg: "text-indigo", label: "G$" },
+    CELO: { bg: "bg-[#FBCB46]", fg: "text-indigo", label: "C" },
+    USDT: { bg: "bg-forest", fg: "text-cream", label: "₮" },
+  };
+  const s = map[symbol] ?? {
+    bg: "bg-cream/20",
+    fg: "text-cream",
+    label: symbol[0],
+  };
   return (
-    <div className="rounded-[18px] bg-paper p-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)]">
-      <WithdrawPanel />
-    </div>
+    <span
+      className={`inline-flex shrink-0 items-center justify-center rounded-full font-bold ${s.bg} ${s.fg}`}
+      style={{ width: size, height: size, fontSize: size * 0.4 }}
+    >
+      {s.label}
+    </span>
   );
+}
+
+export function WithdrawCard() {
+  return <WithdrawPanel />;
 }
 
 export function SwapComingSoon() {
   return (
-    <div className="rounded-[18px] bg-paper p-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)]">
+    <div className="rounded-[20px] bg-indigo p-6 text-cream">
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-canvas-warm">
-          <Lock size={20} strokeWidth={2.5} className="text-fg-soft" />
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-cream/5">
+          <Lock size={20} strokeWidth={2.5} className="text-cream/60" />
         </div>
-        <h3 className="display text-[20px] font-bold text-indigo mb-1.5">
+        <h3 className="display mb-1.5 text-[20px] font-bold text-cream">
           Swap is coming soon
         </h3>
-        <p className="max-w-70 text-[12.5px] leading-[1.55] text-fg-soft">
+        <p className="max-w-70 text-[12.5px] leading-[1.55] text-cream/60">
           Soon you&apos;ll be able to swap your G$ into USDT right here, so you
           can take your earnings wherever you need them. We&apos;re getting it
           ready.
@@ -81,13 +95,14 @@ function WithdrawPanel() {
   const { balances } = useTokenBalances(address as Address | undefined);
 
   const [tokenKey, setTokenKey] =
-    useState<(typeof SENDABLE)[number]["key"]>("USDT");
+    useState<(typeof SENDABLE)[number]["key"]>("G$");
   const [amount, setAmount] = useState("");
   const [to, setTo] = useState("");
   const [step, setStep] = useState<Step>("form");
   const [sending, setSending] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const sendTx = useSendTransaction();
   const writeTx = useWriteContract();
@@ -165,18 +180,9 @@ function WithdrawPanel() {
 
   if (step === "review") {
     return (
-      <div>
-        <button
-          onClick={() => setStep("form")}
-          disabled={sending}
-          className="mb-4 inline-flex items-center gap-1 text-[12px] font-semibold text-fg-soft hover:text-indigo disabled:opacity-50"
-        >
-          <ChevronLeft size={14} strokeWidth={2.8} />
-          Back
-        </button>
-
-        <div className="mb-4 rounded-xl bg-canvas-warm p-4">
-          <div className="mb-3 text-[9px] font-bold uppercase tracking-[0.14em] text-fg-soft">
+      <div className="rounded-[20px] bg-indigo p-5 text-cream sm:p-6">
+        <div className="mb-4 rounded-xl bg-cream/5 p-4">
+          <div className="mb-3 text-[9px] font-bold uppercase tracking-[0.14em] text-cream/50">
             Check before you send
           </div>
           <ReviewRow label="Sending" value={`${amount} ${token.symbol}`} />
@@ -184,13 +190,13 @@ function WithdrawPanel() {
           <ReviewRow label="Network" value="Celo" />
         </div>
 
-        <div className="mb-4 flex items-start gap-2 rounded-xl border border-terracotta/30 bg-terracotta-tint p-3">
+        <div className="mb-4 flex items-start gap-2 rounded-xl bg-cream/5 p-3">
           <AlertTriangle
             size={14}
             strokeWidth={2.5}
-            className="mt-0.5 shrink-0 text-terracotta"
+            className="mt-0.5 shrink-0 text-mustard"
           />
-          <p className="text-[11.5px] leading-snug text-indigo/80">
+          <p className="text-[11.5px] leading-snug text-cream/80">
             This sends on the Celo network and cannot be reversed. Make sure the
             address is correct and can receive on Celo. If you&apos;re unsure,
             send a small amount first.
@@ -198,165 +204,159 @@ function WithdrawPanel() {
         </div>
 
         {error && (
-          <p className="mb-3 text-center text-[11.5px] font-semibold text-terracotta">
+          <p className="mb-3 text-center text-[11.5px] font-semibold text-[#F2A68C]">
             {error}
           </p>
         )}
 
-        <button
-          onClick={doSend}
-          disabled={sending}
-          className="mx-auto flex w-full items-center justify-center gap-2 rounded-xl bg-indigo py-3.5 text-sm font-bold text-cream transition hover:bg-indigo/90 disabled:cursor-not-allowed disabled:bg-indigo/40 lg:w-[60%] md:w-[60%]"
-        >
-          {sending ? (
-            <>
-              <Loader2 size={15} strokeWidth={2.8} className="animate-spin" />
-              Sending…
-            </>
-          ) : (
-            <>
-              Send {amount} {token.symbol}
-              <ArrowUpRight size={15} strokeWidth={2.8} />
-            </>
-          )}
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setStep("form")}
+            disabled={sending}
+            className="flex-1 rounded-2xl bg-cream/10 py-3.5 text-[13px] font-bold text-cream transition hover:bg-cream/20 disabled:opacity-50"
+          >
+            Back
+          </button>
+          <button
+            onClick={doSend}
+            disabled={sending}
+            className="flex-[2] flex items-center justify-center gap-2 rounded-2xl bg-forest py-3.5 text-sm font-bold text-cream transition hover:brightness-105 disabled:cursor-not-allowed disabled:bg-forest/40"
+          >
+            {sending ? (
+              <>
+                <Loader2 size={15} strokeWidth={2.8} className="animate-spin" />
+                Sending…
+              </>
+            ) : (
+              `Confirm — send ${amount} ${token.symbol}`
+            )}
+          </button>
+        </div>
       </div>
     );
   }
+
   return (
-    <div>
+    <div className="rounded-[20px] bg-indigo p-5 text-cream sm:p-6">
       {txHash && (
         <a
           href={`${EXPLORER_BASE}tx/${txHash}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="mb-4 flex items-center justify-center gap-1.5 rounded-xl bg-forest/10 py-2.5 text-[11.5px] font-semibold text-forest transition hover:bg-forest/15"
+          className="mb-4 flex items-center justify-center gap-1.5 rounded-xl bg-forest/20 py-2.5 text-[11.5px] font-semibold text-[#9BE3B4] transition hover:bg-forest/30"
         >
           Sent. View on the explorer
           <ExternalLink size={12} strokeWidth={2.5} />
         </a>
       )}
-      <div className="mb-4">
-        <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-fg-soft">
-          Token
-        </div>
-        <div className="grid grid-cols-3 gap-2">
-          {SENDABLE.map((t) => {
-            const b = balances.find((x) => x.symbol === t.symbol);
-            const selected = t.key === tokenKey;
-            return (
-              <button
-                key={t.key}
-                onClick={() => {
-                  setTokenKey(t.key);
-                  setAmount("");
-                }}
-                className={`rounded-xl p-3 text-center transition ${
-                  selected
-                    ? "bg-indigo text-cream"
-                    : "bg-canvas-warm text-indigo hover:bg-canvas-warm/70"
-                }`}
-              >
-                <div className="display text-[15px] font-bold leading-none">
-                  {t.symbol}
-                </div>
-                <div className="mt-1 text-[9px] font-semibold opacity-70 tabular-nums">
-                  {b ? formatBalance(b.formatted) : "0"}
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <div className="mb-4 flex flex-col gap-4 md:flex-row">
-        <div className="flex-1">
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-fg-soft">
-              Amount
-            </span>
+      <div className="rounded-2xl bg-cream/5 px-4 py-3.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-cream/50">
+            Amount
+          </span>
+          <div className="relative flex items-center gap-2">
             <button
               onClick={handleMax}
-              className="text-[11px] font-bold text-mustard hover:opacity-80"
+              className="rounded-full bg-cream/10 px-3 py-1 text-[11px] font-bold text-cream/80 transition hover:bg-cream/20"
             >
-              Max{balance ? ` ${formatBalance(balance.formatted)}` : ""}
+              MAX
             </button>
-          </div>
-          <div className="flex items-center gap-2 rounded-xl bg-canvas-warm px-4 py-3.5">
-            <input
-              inputMode="decimal"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => {
-                const v = e.target.value.replace(/[^0-9.]/g, "");
-                if (v.split(".").length <= 2) setAmount(v);
-              }}
-              className="w-full bg-transparent text-[14px] font-bold text-indigo outline-none tabular-nums placeholder:text-fg-soft/40"
-            />
-            <span className="text-[13px] font-bold text-fg-soft">
+            <button
+              onClick={() => setMenuOpen((v) => !v)}
+              className="flex items-center gap-1.5 rounded-full bg-cream/10 px-2.5 py-1 text-[12px] font-bold text-cream transition hover:bg-cream/20"
+            >
+              <TokenCoin symbol={token.symbol} />
               {token.symbol}
-            </span>
+              <ChevronDown size={13} strokeWidth={2.5} />
+            </button>
+
+            {menuOpen && (
+              <div className="absolute right-0 top-9 z-20 w-56 overflow-hidden rounded-2xl bg-paper p-1.5 shadow-[0_12px_40px_rgba(31,58,110,0.25)]">
+                {SENDABLE.map((t) => {
+                  const b = balances.find((x) => x.symbol === t.symbol);
+                  return (
+                    <button
+                      key={t.key}
+                      onClick={() => {
+                        setTokenKey(t.key);
+                        setAmount("");
+                        setMenuOpen(false);
+                      }}
+                      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-canvas-warm ${
+                        t.key === tokenKey ? "bg-canvas-warm" : ""
+                      }`}
+                    >
+                      <TokenCoin symbol={t.symbol} size={26} />
+                      <span className="flex-1 text-[13px] font-bold text-indigo">
+                        {t.symbol}
+                      </span>
+                      <span className="text-[12px] font-semibold tabular-nums text-fg-soft">
+                        {b ? formatBalance(b.formatted) : "0"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-          {overBalance && (
-            <p className="mt-1.5 text-[11px] font-semibold text-terracotta">
-              More than your {token.symbol} balance.
-            </p>
-          )}
         </div>
-        <div className="flex-1">
-          <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-fg-soft">
-            Send to
-          </div>
-          <input
-            placeholder="0x…"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            spellCheck={false}
-            className="w-full rounded-xl bg-canvas-warm px-4 py-3.5 font-mono text-[13px] text-indigo outline-none placeholder:text-fg-soft/40"
-          />
-          {to.trim() !== "" && !addressValid && (
-            <p className="mt-1.5 text-[11px] font-semibold text-terracotta">
-              That doesn&apos;t look like a valid address. It should start with
-              0x and be 42 characters.
-            </p>
-          )}
+        <input
+          inputMode="decimal"
+          placeholder="0.00"
+          value={amount}
+          onChange={(e) => {
+            const v = e.target.value.replace(/[^0-9.]/g, "");
+            if (v.split(".").length <= 2) setAmount(v);
+          }}
+          className="mt-1 w-full bg-transparent text-[26px] font-bold text-cream outline-none tabular-nums placeholder:text-cream/30"
+        />
+        {overBalance && (
+          <p className="mt-1 text-[11px] font-semibold text-[#F2A68C]">
+            More than your {token.symbol} balance.
+          </p>
+        )}
+      </div>
+
+      <div className="my-2 flex justify-center">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-cream/5 text-cream/60">
+          <ArrowDown size={16} strokeWidth={2.5} />
         </div>
       </div>
-      {!sendingCelo && !hasGas && (
-        <div className="mb-4 flex items-start gap-2 rounded-xl border border-mustard/30 bg-mustard/10 p-3">
-          <Info
-            size={14}
-            strokeWidth={2.5}
-            className="mt-0.5 shrink-0 text-mustard"
-          />
-          <p className="text-[11.5px] leading-snug text-indigo/80">
-            Sending a token needs a small amount of CELO for the network fee,
-            and your CELO balance is empty. You&apos;ll need a little CELO
-            before this can go through.
-          </p>
+
+      {/* Destination */}
+      <div className="rounded-2xl bg-cream/5 px-4 py-3.5">
+        <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cream/50">
+          To a Celo address
         </div>
+        <input
+          placeholder="0x…"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          spellCheck={false}
+          className="w-full bg-transparent font-mono text-[14px] text-cream outline-none placeholder:text-cream/30"
+        />
+        {to.trim() !== "" && !addressValid && (
+          <p className="mt-1 text-[11px] font-semibold text-[#F2A68C]">
+            That doesn&apos;t look like a valid address. It should start with 0x
+            and be 42 characters.
+          </p>
+        )}
+      </div>
+
+      {!sendingCelo && !hasGas && (
+        <p className="mt-3 text-right text-[11.5px] text-cream/50">
+          Sending a token needs a little CELO for the network fee.
+        </p>
       )}
 
       <button
         onClick={() => canReview && setStep("review")}
         disabled={!canReview}
-        className="mx-auto flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-bold transition lg:w-[60%] md:w-[60%] disabled:cursor-not-allowed disabled:bg-indigo/40 disabled:text-cream bg-indigo text-cream hover:bg-indigo/90"
+        className="mt-4 w-full rounded-2xl bg-forest py-3.5 text-sm font-bold text-cream transition hover:brightness-105 disabled:cursor-not-allowed disabled:bg-forest/40"
       >
-        Review
-        <ArrowRight size={15} strokeWidth={2.8} />
+        Withdraw {amountValid ? `${amount} ` : ""}
+        {token.symbol}
       </button>
-      <div className="mt-4 border-t border-indigo/8 py-3">
-        <div className="mb-2 flex items-center gap-1.5">
-          <Wallet size={14} strokeWidth={2.5} className="text-fg-soft" />
-          <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-fg-soft">
-            Before you send
-          </span>
-        </div>
-        <p className="text-[11px] leading-snug text-fg-soft">
-          Sends go out on the Celo network and can&apos;t be undone. Check the
-          address and the network match where you want the money to land. When
-          in doubt, send a small test amount first.
-        </p>
-      </div>
     </div>
   );
 }
@@ -372,9 +372,9 @@ function ReviewRow({
 }) {
   return (
     <div className="flex items-start justify-between gap-3 py-1.5">
-      <span className="shrink-0 text-[12px] text-fg-soft">{label}</span>
+      <span className="shrink-0 text-[12px] text-cream/60">{label}</span>
       <span
-        className={`text-right text-[12.5px] font-semibold text-indigo ${
+        className={`text-right text-[12.5px] font-semibold text-cream ${
           mono ? "break-all font-mono text-[11.5px]" : ""
         }`}
       >

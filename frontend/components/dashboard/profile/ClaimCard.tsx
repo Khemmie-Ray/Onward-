@@ -2,8 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  Coins,
-  Lock,
   ArrowRight,
   Info,
   ShieldCheck,
@@ -13,6 +11,17 @@ import {
 import { useIdentityContext } from "@/contexts/IdentityContext";
 import { useClaim, CLAIM_TIERS, type ClaimTier } from "@/hooks/useClaim";
 import { EXPLORER_BASE } from "@/constants/contracts/address";
+
+function GCoin({ size = 22 }: { size?: number }) {
+  return (
+    <span
+      className="inline-flex shrink-0 items-center justify-center rounded-full bg-mustard font-bold text-indigo"
+      style={{ width: size, height: size, fontSize: size * 0.4 }}
+    >
+      G$
+    </span>
+  );
+}
 
 export function ClaimCard({ onClaimed }: { onClaimed?: () => void } = {}) {
   const { isVerified, startVerifying } = useIdentityContext();
@@ -38,28 +47,28 @@ export function ClaimCard({ onClaimed }: { onClaimed?: () => void } = {}) {
     if (ok) setSelectedTier(null);
   };
 
-  console.log(selectedTier);
-
   return (
-    <div className="rounded-[18px] bg-paper p-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)]">
-      <div className="flex items-center justify-between mb-5">
+    <div className="rounded-[20px] bg-indigo p-5 text-cream sm:p-6">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="flex items-center gap-1.5 mb-1">
-            <Coins size={15} strokeWidth={2.5} className="text-mustard" />
-            <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-fg-soft">
+          <div className="mb-1 flex items-center gap-2">
+            <GCoin />
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-cream/60">
               Convert points to G$
             </span>
           </div>
-          <div className="display text-[32px] font-bold text-indigo tabular-nums leading-none">
+          <div className="display text-[34px] font-bold leading-none tabular-nums">
             {balance.toLocaleString()}
-            <span className="text-[16px] text-fg-soft ml-1.5">points</span>
+            <span className="ml-1.5 font-bold text-cream/50">
+              points
+            </span>
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-fg-soft mb-0.5">
+          <div className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-cream/50">
             Claimable now
           </div>
-          <div className="display text-[20px] font-bold text-forest tabular-nums">
+          <div className="display text-[22px] font-bold tabular-nums text-[#9BE3B4]">
             {claimableG.toLocaleString()} G$
           </div>
         </div>
@@ -67,17 +76,17 @@ export function ClaimCard({ onClaimed }: { onClaimed?: () => void } = {}) {
 
       {!isVerified ? (
         <>
-          <div className="flex items-start gap-2 rounded-xl bg-mustard/10 border border-mustard/30 p-3 mb-5">
+          <div className="mt-5 flex items-start gap-2 rounded-xl bg-mustard/10 p-3">
             <ShieldCheck
               size={14}
               strokeWidth={2.5}
-              className="text-mustard mt-0.5 shrink-0"
+              className="mt-0.5 shrink-0 text-mustard"
             />
             <div>
-              <p className="text-[12px] font-bold text-indigo leading-snug">
+              <p className="text-[12px] font-bold leading-snug text-cream">
                 Verify to convert points
               </p>
-              <p className="text-[11px] text-fg-soft leading-snug mt-0.5">
+              <p className="mt-0.5 text-[11px] leading-snug text-cream/60">
                 Converting points to G$ needs a verified GoodID, so the reward
                 reaches one real person. Verification takes about a minute.
               </p>
@@ -86,7 +95,7 @@ export function ClaimCard({ onClaimed }: { onClaimed?: () => void } = {}) {
 
           <button
             onClick={startVerifying}
-            className="w-full py-3.5 rounded-xl bg-indigo text-cream font-bold text-sm hover:bg-indigo/90 transition flex items-center justify-center gap-2 lg:w-[50%] md:w-[50%] mx-auto"
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-mustard py-3.5 text-sm font-bold text-indigo transition hover:brightness-105"
           >
             Verify first
             <ArrowRight size={15} strokeWidth={2.8} />
@@ -94,60 +103,53 @@ export function ClaimCard({ onClaimed }: { onClaimed?: () => void } = {}) {
         </>
       ) : (
         <>
-          <div className="mb-4">
-            <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-fg-soft mb-2">
-              Pick an amount
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {CLAIM_TIERS.map((tier) => {
-                const claimable = canClaimTier(tier);
-                const isSelected = selectedTier === tier;
-                return (
-                  <button
-                    key={tier}
-                    onClick={() => claimable && setSelectedTier(tier)}
-                    disabled={!claimable || claiming}
-                    className={`rounded-xl p-3 text-center transition ${
-                      isSelected
-                        ? "bg-indigo text-cream"
-                        : claimable
-                          ? "bg-canvas-warm text-indigo hover:bg-canvas-warm/70"
-                          : "bg-canvas-warm/40 text-fg-soft/40 cursor-not-allowed"
-                    }`}
-                  >
-                    <div className="display text-[18px] font-bold tabular-nums leading-none">
-                      {tier}
-                    </div>
-                    <div className="text-[9px] font-semibold mt-1 opacity-70">
-                      = {tier} G$
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+          <div className="mb-2 mt-5 text-[10px] font-bold uppercase tracking-[0.12em] text-cream/50">
+            Pick an amount
+          </div>
+          <div className="grid grid-cols-3 gap-2.5">
+            {CLAIM_TIERS.map((tier) => {
+              const claimable = canClaimTier(tier);
+              const isSelected = selectedTier === tier;
+              return (
+                <button
+                  key={tier}
+                  onClick={() => claimable && setSelectedTier(tier)}
+                  disabled={!claimable || claiming}
+                  className={`rounded-2xl py-4 text-center transition ${
+                    isSelected
+                      ? "bg-mustard text-indigo"
+                      : claimable
+                        ? "bg-cream/5 text-cream hover:bg-cream/10"
+                        : "cursor-not-allowed bg-cream/5 text-cream/30"
+                  }`}
+                >
+                  <div className="display text-[24px] font-bold leading-none tabular-nums">
+                    {tier}
+                  </div>
+                  <div className="mt-1 text-[10px] font-semibold opacity-70">
+                    = {tier} G$
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           <button
             onClick={handleClaim}
             disabled={!selectedTier || claiming}
-            className={`w-full py-3.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-2 mb-4 lg:w-[50%] md:w-[50%] mx-auto ${
-              !selectedTier || claiming
-                ? "bg-indigo/40 text-cream cursor-not-allowed"
-                : "bg-indigo text-cream hover:bg-indigo/90"
-            }`}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-mustard py-3.5 text-sm font-bold text-indigo transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {claiming ? (
               <>
                 <Loader2 size={15} strokeWidth={2.8} className="animate-spin" />
-                Converting...
+                Converting…
               </>
             ) : selectedTier ? (
               <>
-                Convert {selectedTier} points to {selectedTier} G$
-                <ArrowRight size={15} strokeWidth={2.8} />
+                Convert {selectedTier} points → {selectedTier} G$
               </>
             ) : (
-              "Select an amount"
+              "Pick an amount"
             )}
           </button>
 
@@ -156,7 +158,7 @@ export function ClaimCard({ onClaimed }: { onClaimed?: () => void } = {}) {
               href={`${EXPLORER_BASE}tx/${lastTx}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-1.5 text-[11px] font-semibold text-forest hover:text-forest/80 transition mb-4"
+              className="mt-4 flex items-center justify-center gap-1.5 text-[11px] font-semibold text-[#9BE3B4] transition hover:opacity-80"
             >
               View your last claim
               <ExternalLink size={12} strokeWidth={2.5} />
@@ -164,7 +166,7 @@ export function ClaimCard({ onClaimed }: { onClaimed?: () => void } = {}) {
           )}
 
           {claimableG === 0 && balance >= 100 && !loadingStatus && (
-            <p className="text-[11px] text-fg-soft text-center mb-4 leading-snug">
+            <p className="mt-3 text-center text-[11.5px] leading-snug text-cream/60">
               You&apos;ve hit your claim limit for now. Check back after your
               daily or weekly window resets.
             </p>
@@ -172,34 +174,27 @@ export function ClaimCard({ onClaimed }: { onClaimed?: () => void } = {}) {
         </>
       )}
 
-      <div className="border-t border-indigo/8 mt-4 py-3">
-        <div className="flex items-center gap-1.5 mb-3">
-          <Info size={14} strokeWidth={2.5} className="text-fg-soft" />
-          <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-fg-soft">
+      <div className="mt-5 border-t border-cream/10 pt-4">
+        <div className="mb-3 flex items-center gap-1.5">
+          <Info size={13} strokeWidth={2.5} className="text-cream/50" />
+          <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-cream/50">
             Claim rules
           </span>
         </div>
-        <div className="flex justify-between text-[11px] flex-wrap gap-y-1.5">
-          <p className="text-fg-soft">
-            Minimum:{" "}
-            <span className="font-semibold text-indigo tabular-nums ml-2">
-              100 pts
-            </span>
-          </p>
-          <p className="text-fg-soft">
-            Daily cap:{" "}
-            <span className="font-semibold text-indigo tabular-nums ml-2">
-              500 G$
-            </span>
-          </p>
-          <p className="text-fg-soft">
-            Weekly cap:{" "}
-            <span className="font-semibold text-indigo tabular-nums ml-2">
-              1,000 G$
-            </span>
-          </p>
+        <div className="flex flex-wrap gap-2">
+          <RuleChip label="Minimum" value="100 pts" />
+          <RuleChip label="Daily cap" value="500 G$" />
+          <RuleChip label="Weekly cap" value="1,000 G$" />
         </div>
       </div>
     </div>
+  );
+}
+
+function RuleChip({ label, value }: { label: string; value: string }) {
+  return (
+    <span className="rounded-full bg-cream/5 px-3 py-1.5 text-[11px] text-cream/70">
+      {label} <span className="font-bold text-cream">{value}</span>
+    </span>
   );
 }

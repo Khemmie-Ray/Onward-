@@ -13,8 +13,6 @@ type Body = {
 };
 
 export async function POST(request: Request) {
-  // Read wallet directly from SIWE session — no DB row required yet.
-  // This is the legitimate "first time we see this user" event.
   const walletAddress = await getAuthedAddress();
   if (!walletAddress) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -28,11 +26,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const name = body.display_name?.trim();
+  const name = body.display_name?.trim().toLowerCase();
   const avatarId = body.avatar_id;
   const referralCode = body.referral_code ?? null;
 
-  // Look up existing row (may not exist for first-time SIWE users)
   const { data: existingUser } = await supabaseAdmin
     .from("users")
     .select("id, display_name, avatar_id")

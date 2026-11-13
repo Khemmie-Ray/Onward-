@@ -1,6 +1,6 @@
 "use client";
 
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -11,8 +11,11 @@ import { keccak256, toBytes, type Address } from "viem";
 import { PreRoundBriefing } from "@/components/dashboard/play/PreRoundBriefing";
 import { WhackAScam } from "@/components/dashboard/play/WhackAScamGame";
 import { EndRoundModal } from "@/components/dashboard/play/EndRoundModal";
-import { PlayLeftPanel } from "@/components/dashboard/play/PlayLeftPanel";
-import { PlayStage } from "@/components/dashboard/play/PlayStage";
+import { GameStatsHeader } from "@/components/dashboard/play/GameStatsHeader";
+import { BoardShell } from "@/components/dashboard/play/BoardShell";
+import { Hole } from "@/components/dashboard/play/Hole";
+import { AbandonConfirmModal } from "@/components/dashboard/play/AbandonConfirmModal";
+import { SCORING } from "@/lib/scoring";
 import type {
   Mode,
   FreeStep,
@@ -33,7 +36,7 @@ import {
 import { useCeloBalance } from "@/hooks/useCeloBalance";
 import { useIdentityContext } from "@/contexts/IdentityContext";
 
-type Phase = "tab-select" | "briefing" | "playing" | "ended";
+type Phase = "intro" | "playing" | "ended";
 
 const PENDING_KEY = "premium_pending_uuid";
 const PENDING_LIST_KEY = "premium_pending_uuids";
@@ -86,11 +89,34 @@ export default function PlayPage() {
   const { address } = useConnection();
   const { isVerified, startVerifying } = useIdentityContext();
 
-  const [activeTab, setActiveTab] = useState<Mode>("free");
-  const [phase, setPhase] = useState<Phase>("tab-select");
+  const [activeTab] = useState<Mode>("free");
+  const [phase, setPhase] = useState<Phase>("intro");
+  const [showQuit, setShowQuit] = useState(false);
+  const [endDismissed, setEndDismissed] = useState(false);
+  const [freeSpent, setFreeSpent] = useState(false);
+
+  const { data: today } = useQuery<{
+    family_label: string;
+    family_description: string;
+    difficulty: number;
+    exemplar: { kind: string; content: Record<string, unknown>; teaching: string };
+    free_available: boolean;
+  }>({
+    queryKey: ["play", "today-pattern"],
+    queryFn: async () => {
+      const res = await authFetch("/api/play/today");
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const freeAvailable = (today?.free_available ?? true) && !freeSpent;
 
   const [freeStep, setFreeStep] = useState<FreeStep>("idle");
   const [premiumStep, setPremiumStep] = useState<PremiumStep>("idle");
+  const [isBeginning, setIsBeginning] = useState(false);
 
   const [preview, setPreview] = useState<RoundPreview | null>(null);
   const [roundId, setRoundId] = useState<string | null>(null);
@@ -111,11 +137,11 @@ export default function PlayPage() {
     needsForfeit?: boolean;
     message?: string;
   } | null>(null);
-  const [checkingResume, setCheckingResume] = useState(false);
+  const [, setCheckingResume] = useState(false);
   const [forfeiting, setForfeiting] = useState(false);
 
   const resetToTabSelect = useCallback(() => {
-    setPhase("tab-select");
+    setPhase("intro");
     setPreview(null);
     setRoundId(null);
     setResult(null);
@@ -124,10 +150,11 @@ export default function PlayPage() {
     setPremiumError(null);
     setFreeStep("idle");
     setPremiumStep("idle");
+    setEndDismissed(false);
   }, []);
 
   const goBackToPlay = useCallback(() => {
-    const inFlight = phase === "briefing" || phase === "playing";
+    const inFlight = phase === "playing";
     const isPremiumRound =
       preview?.mode === "premium" || (!preview && activeTab === "premium");
 
@@ -139,6 +166,31 @@ export default function PlayPage() {
     }
     router.push("/play");
   }, [phase, preview, activeTab, router]);
+
+  const beginPlay = useCallback(
+    async (previewData: RoundPreview) => {
+      setIsBeginning(true);
+      try {
+        const res = await authFetch("/api/play/begin", {
+          method: "POST",
+          body: JSON.stringify({ preview_id: previewData.preview_id }),
+        });
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const data = (await res.json()) as { round_id: string };
+        setPreview(previewData);
+        setRoundId(data.round_id);
+        setPhase("playing");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to start round";
+        if (previewData.mode === "free") setFreeError(msg);
+        else setPremiumError(msg);
+        setPhase("intro");
+      } finally {
+        setIsBeginning(false);
+      }
+    },
+    [authFetch],
+  );
 
   const startFreeRound = async () => {
     setFreeError(null);
@@ -152,6 +204,7 @@ export default function PlayPage() {
       });
       if (res.status === 429) {
         const d = await res.json().catch(() => ({}));
+        setFreeSpent(true);
         setFreeCapMessage({
           kind: "cap",
           message: d?.error ?? "Today's free round is done.",
@@ -161,19 +214,18 @@ export default function PlayPage() {
       }
       if (!res.ok) throw new Error(`Status ${res.status}`);
       const data: RoundPreview = await res.json();
-      setPreview(data);
-      setPhase("briefing");
       setFreeStep("idle");
+      await beginPlay(data);
     } catch (e) {
       setFreeError(e instanceof Error ? e.message : "Failed to load round");
       setFreeStep("idle");
     }
   };
 
-  const isPremiumTab = activeTab === "premium";
+  const isPremiumTab = activeTab === "premium" || !freeAvailable;
 
   useEffect(() => {
-    if (activeTab !== "premium" || !address) return;
+    if (!isPremiumTab || !address) return;
     let cancelled = false;
     (async () => {
       setCheckingResume(true);
@@ -207,9 +259,9 @@ export default function PlayPage() {
     return () => {
       cancelled = true;
     };
-  }, [activeTab, address, authFetch]);
+  }, [isPremiumTab, address, authFetch]);
   const { stakeAmount } = useStakeAmount(isPremiumTab);
-  const { balance, refetch: refetchBalance } = useGDollarBalance(
+  const { refetch: refetchBalance } = useGDollarBalance(
     address as Address | undefined,
     isPremiumTab,
   );
@@ -217,7 +269,7 @@ export default function PlayPage() {
     address as Address | undefined,
     isPremiumTab,
   );
-  const { celoWei, refetch: refetchCelo } = useCeloBalance(
+  const { refetch: refetchCelo } = useCeloBalance(
     address as Address | undefined,
     isPremiumTab,
   );
@@ -227,11 +279,7 @@ export default function PlayPage() {
 
   const handledStakeTxRef = useRef<`0x${string}` | null>(null);
 
-  const hasEnoughBalance = balance >= stakeAmount;
   const needsApproval = allowance < stakeAmount;
-
-  const MIN_GAS_CELO_WEI = 10_000_000_000_000_000n;
-  const hasEnoughGas = celoWei >= MIN_GAS_CELO_WEI;
 
   const startPremiumRound = async () => {
     if (!address) return;
@@ -301,7 +349,6 @@ export default function PlayPage() {
   useEffect(() => {
     if (premiumStep !== "approving") return;
 
-    // Success -> move to staking.
     if (approveState.isSuccess && pendingHash) {
       refetchAllowance();
       setPremiumStep("staking");
@@ -309,7 +356,6 @@ export default function PlayPage() {
       return;
     }
 
-    // Error or rejection -> release the user instead of spinning forever.
     if (approveState.error) {
       const msg = approveState.errorMessage ?? "";
       setPremiumError(
@@ -371,10 +417,9 @@ export default function PlayPage() {
           });
           if (res.ok) {
             const data: RoundPreview = await res.json();
-            setPreview(data);
-            setPhase("briefing");
             setPremiumStep("idle");
             clearPendingUuid(pendingUuid);
+            await beginPlay(data);
             return;
           }
           const d = await res.json().catch(() => ({}));
@@ -407,34 +452,20 @@ export default function PlayPage() {
     premiumStep,
     authFetch,
     refetchBalance,
+    beginPlay,
   ]);
 
-  const [isBeginning, setIsBeginning] = useState(false);
-
-  const handleStartPlay = async () => {
-    if (!preview) return;
-    setIsBeginning(true);
-    try {
-      const res = await authFetch("/api/play/begin", {
-        method: "POST",
-        body: JSON.stringify({ preview_id: preview.preview_id }),
-      });
-      if (!res.ok) throw new Error(`Status ${res.status}`);
-      const data = (await res.json()) as { round_id: string };
-      setRoundId(data.round_id);
-      setPhase("playing");
-      setIsBeginning(false);
-    } catch (e) {
-      if (preview.mode === "free") {
-        setFreeError(e instanceof Error ? e.message : "Failed to start round");
-      } else {
-        setPremiumError(
-          e instanceof Error ? e.message : "Failed to start round",
-        );
-      }
-      setIsBeginning(false);
-      setPhase("tab-select");
+  const handleIntroStart = () => {
+    if (freeAvailable) {
+      startFreeRound();
+      return;
     }
+
+    if (!isVerified) {
+      startVerifying();
+      return;
+    }
+    startPremiumRound();
   };
 
   const handleGameComplete = async (r: WhackResult) => {
@@ -458,6 +489,7 @@ export default function PlayPage() {
         queryClient.invalidateQueries({ queryKey: ["me", "status"] });
         queryClient.invalidateQueries({ queryKey: ["play", "stats"] });
         queryClient.invalidateQueries({ queryKey: ["modules"] });
+        queryClient.invalidateQueries({ queryKey: ["play", "today-pattern"] });
       }
     } catch (e) {
       console.error("[play submit failed]", e);
@@ -503,11 +535,10 @@ export default function PlayPage() {
       }
       if (!res.ok) throw new Error(`Status ${res.status}`);
       const data: RoundPreview = await res.json();
-      setPreview(data);
-      setPhase("briefing");
       setPremiumStep("idle");
       setResumeInfo(null);
       if (resumeInfo.round_id) clearPendingUuid(resumeInfo.round_id);
+      await beginPlay(data);
     } catch (e) {
       setPremiumError(
         e instanceof Error ? e.message : "Could not resume your staked round",
@@ -556,103 +587,172 @@ export default function PlayPage() {
   const txPending =
     passed === true && !settleTxHash && !submitData?.onchain?.onchainError;
 
+  const roundMode: Mode = preview?.mode ?? activeTab;
+  const threshold = SCORING[roundMode].minCorrect;
+  const difficulty = preview?.difficulty ?? today?.difficulty ?? 1;
+  const patternLabel =
+    preview?.family_label ?? today?.family_label ?? "Whack-a-Scam";
+
+  const starting =
+    isBeginning || freeStep === "starting" || premiumStep !== "idle";
+  const ctaLabel = freeAvailable
+    ? "Got it, start the round"
+    : !isVerified
+      ? "Verify to play"
+      : "Stake to play";
+  const startError = freeError ?? premiumError;
+  const capMessage = (freeCapMessage ?? premiumCapMessage)?.message ?? null;
+
   return (
-    <div className="px-4 py-2 w-full bg-canvas">
-      <button
-        onClick={goBackToPlay}
-        className="mb-3 inline-flex items-center gap-1.5 text-[13px] font-semibold text-fg-soft transition-colors hover:text-indigo"
-      >
-        <ArrowLeft size={14} strokeWidth={2.5} />
-        Back to Play
-      </button>
-
-      <div className="flex justify-between lg:flex-row md:flex-row flex-col gap-6">
-        <aside className="order-2 lg:order-1 lg:w-[48%] md:w-[48%] w-full">
-          <PlayLeftPanel
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            stakeAmount={stakeAmount}
-          />
-        </aside>
-
-        <main className="order-1 lg:order-2 lg:w-[48%] md:w-[48%] w-full">
-          {phase === "tab-select" && (
-            <PlayStage
-              activeTab={activeTab}
-              freeStep={freeStep}
-              freeCapMessage={freeCapMessage}
-              freeError={freeError}
-              onStartFree={startFreeRound}
-              onSwitchToPremium={() => setActiveTab("premium")}
-              premiumStep={premiumStep}
-              premiumCapMessage={premiumCapMessage}
-              premiumError={premiumError}
-              hasEnoughBalance={hasEnoughBalance}
-              balance={balance}
-              stakeAmount={stakeAmount}
-              needsApproval={needsApproval}
-              isVerified={isVerified}
-              onStartPremium={startPremiumRound}
-              onVerify={startVerifying}
-              resumeInfo={resumeInfo}
-              checkingResume={checkingResume}
-              onResumeStake={handleResumeStake}
-              onForfeitStake={handleForfeitStake}
-              forfeiting={forfeiting}
-            />
-          )}
-
-          {phase === "briefing" && preview && (
-            <div className="rounded-[16px] bg-paper p-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)] py-10">
-              <PreRoundBriefing
-                familyLabel={preview.family_label}
-                familyDescription={preview.family_description}
-                exemplar={preview.exemplar}
-                scamIcon={preview.exemplar_icon}
-                onReady={handleStartPlay}
-                isStarting={isBeginning}
-              />
-            </div>
-          )}
-
-          {phase === "playing" && preview && roundId && (
-            <div className="rounded-[16px] bg-paper p-4 shadow-[0_2px_8px_rgba(31,58,110,0.05)] py-10 flex items-center justify-center">
-              <WhackAScam
-                roundId={roundId}
-                items={preview.display_items}
-                onComplete={handleGameComplete}
-                onAbandon={handleAbandon}
-                boardProgression={preview.board_progression}
-                popupDurationMs={preview.popup_duration_ms}
-                baseSpawnDelay={preview.base_spawn_delay}
-                spawnJitter={preview.spawn_jitter}
-              />
-            </div>
-          )}
-
-          {phase === "ended" && preview && result && (
-            <div className="rounded-[16px] bg-paper p-6 shadow-[0_2px_8px_rgba(31,58,110,0.05)] py-10">
-              <EndRoundModal
-                result={result}
-                passed={passed}
-                mode={preview.mode}
-                familyLabel={preview.family_label}
-                familyDescription={preview.family_description}
-                exemplar={preview.exemplar}
-                rewardAmount={submitData?.reward_g_amount ?? 0}
-                pointsAwarded={submitData?.points_awarded ?? 0}
-                newPointsBalance={submitData?.new_points_balance ?? null}
-                levelBefore={submitData?.level_before ?? 0}
-                levelAfter={submitData?.level_after ?? 0}
-                txPending={txPending}
-                txHash={settleTxHash}
-                onPlayAgain={resetToTabSelect}
-                onClose={resetToTabSelect}
-              />
-            </div>
-          )}
-        </main>
+    <div className="w-full">
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={goBackToPlay}
+            aria-label="Back to Play"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-indigo shadow-[0_2px_8px_rgba(31,58,110,0.08)] transition hover:bg-canvas-warm"
+          >
+            <ArrowLeft size={16} strokeWidth={2.6} />
+          </button>
+          <h1 className="display text-[26px] font-bold tracking-[-0.015em] text-indigo">
+            Whack-a-Scam
+          </h1>
+        </div>
+        {phase === "playing" && (
+          <button
+            onClick={() => setShowQuit(true)}
+            className="rounded-full border border-indigo/20 px-4 py-2 text-[13px] font-bold text-indigo transition hover:bg-canvas-warm"
+          >
+            Quit round
+          </button>
+        )}
       </div>
+      {phase === "playing" && preview && roundId ? (
+        <WhackAScam
+          roundId={roundId}
+          items={preview.display_items}
+          onComplete={handleGameComplete}
+          mode={preview.mode}
+          patternLabel={patternLabel}
+          difficulty={difficulty}
+          boardProgression={preview.board_progression}
+          popupDurationMs={preview.popup_duration_ms}
+          baseSpawnDelay={preview.base_spawn_delay}
+          spawnJitter={preview.spawn_jitter}
+        />
+      ) : (
+        <div className="flex flex-col gap-4">
+          <GameStatsHeader
+            secondsLeft={phase === "ended" ? 0 : 60}
+            totalSeconds={60}
+            status={phase === "ended" ? "Round over" : "Starts on tap"}
+            caught={phase === "ended" ? (result?.correctWhacks ?? 0) : 0}
+            threshold={threshold}
+            totalScams={phase === "ended" ? (result?.totalScams ?? 0) : 0}
+            points={phase === "ended" ? (result?.score ?? 0) : 0}
+            wrong={phase === "ended" ? (result?.wrongWhacks ?? 0) : 0}
+            escaped={phase === "ended" ? (result?.missedScams ?? 0) : 0}
+          />
+
+          <BoardShell
+            patternLabel={patternLabel}
+            difficulty={difficulty}
+            dim={phase !== "playing"}
+            overlay={
+              phase === "intro" && today ? (
+                resumeInfo?.resumable ? (
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-forest">
+                      Staked round waiting
+                    </div>
+                    <h2 className="display mt-1 text-[22px] font-bold leading-tight text-indigo">
+                      Pick up where you left off
+                    </h2>
+                    <p className="mt-2 text-[13px] leading-snug text-fg-soft">
+                      You already staked for a premium round. Resume it, or
+                      forfeit the stake to start fresh.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleResumeStake}
+                      disabled={premiumStep !== "idle"}
+                      className="mt-4 w-full rounded-full bg-forest py-3 text-[14px] font-bold text-paper transition hover:brightness-105 disabled:opacity-60"
+                    >
+                      {premiumStep !== "idle" ? "Resuming…" : "Resume staked round"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleForfeitStake}
+                      disabled={forfeiting}
+                      className="mt-2 w-full rounded-full border border-indigo/15 py-2.5 text-[13px] font-bold text-indigo transition hover:bg-canvas-warm disabled:opacity-60"
+                    >
+                      {forfeiting ? "Forfeiting…" : "Forfeit stake"}
+                    </button>
+                    {startError && (
+                      <p className="mt-3 text-[12px] font-medium text-terracotta">
+                        {startError}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <PreRoundBriefing
+                      familyLabel={today.family_label}
+                      familyDescription={today.family_description}
+                      exemplar={today.exemplar}
+                      onReady={handleIntroStart}
+                      isStarting={starting}
+                      ctaLabel={ctaLabel}
+                    />
+                    {!freeAvailable && (
+                      <p className="mt-3 text-center text-[12px] font-medium text-fg-soft">
+                        {capMessage ??
+                          "Your free round today is used. Stake G$ to keep playing."}
+                      </p>
+                    )}
+                    {startError && (
+                      <p className="mt-3 text-[12px] font-medium text-terracotta">
+                        {startError}
+                      </p>
+                    )}
+                  </>
+                )
+              ) : phase === "ended" && preview && result && !endDismissed ? (
+                <EndRoundModal
+                  result={result}
+                  passed={passed}
+                  mode={preview.mode}
+                  familyLabel={preview.family_label}
+                  rewardAmount={submitData?.reward_g_amount ?? 0}
+                  pointsAwarded={submitData?.points_awarded ?? 0}
+                  txPending={txPending}
+                  txHash={settleTxHash}
+                  onSeeMissed={() => setEndDismissed(true)}
+                  onPlayAgain={resetToTabSelect}
+                />
+              ) : undefined
+            }
+          >
+            <div className="grid grid-cols-3 gap-3 sm:gap-4">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="aspect-[4/3] w-full">
+                  <Hole state={null} onWhack={() => {}} />
+                </div>
+              ))}
+            </div>
+          </BoardShell>
+        </div>
+      )}
+
+      {showQuit && (
+        <AbandonConfirmModal
+          onCancel={() => setShowQuit(false)}
+          onConfirm={() => {
+            setShowQuit(false);
+            handleAbandon();
+          }}
+        />
+      )}
     </div>
   );
 }

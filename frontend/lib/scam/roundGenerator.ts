@@ -1,7 +1,6 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import type { WhackIcon } from "./whackIcon";
-import { iconById } from "./whackIcon";
 import type { PlayMode } from "@/lib/scoring";
+import { loadTier, type DifficultyTier, type TierKey } from "./difficulty";
 
 export type RoundItem = {
   pattern_id: string;
@@ -19,11 +18,6 @@ export type PatternRow = {
   kind: string;
   content: Record<string, unknown>;
   teaching: string;
-  icon_id: string | null;
-};
-
-export type PatternWithIcon = PatternRow & {
-  icon: WhackIcon;
 };
 
 export type GeneratedRound = {
@@ -31,27 +25,33 @@ export type GeneratedRound = {
   family_label: string;
   family_description: string;
   exemplar: PatternRow;
-  exemplar_icon: WhackIcon;
   items: RoundItem[];
-  full_patterns: PatternWithIcon[];
+  full_patterns: PatternRow[];
   popup_duration_ms: number;
   total_seconds: number;
   board_progression: number[];
   base_spawn_delay: number;
   spawn_jitter: number;
+  tier: DifficultyTier;
 };
 
 export { type PlayMode };
 
-const PACING = {
-  totalSeconds: 60,
-  popupDurationMs: 1550,
-  baseSpawnDelay: 450,
-  spawnJitter: 300,
-  boardProgression: [6],
-  listSize: 100,
-  scamRatio: 0.4,
-} as const;
+function pickBandPool(
+  pool: PatternRow[],
+  min: number,
+  max: number,
+): PatternRow[] {
+  let lo = min;
+  let hi = max;
+  for (;;) {
+    const inBand = pool.filter((p) => p.difficulty >= lo && p.difficulty <= hi);
+    if (inBand.length > 0) return inBand;
+    if (lo <= 1 && hi >= 5) return pool;
+    lo = Math.max(1, lo - 1);
+    hi = Math.min(5, hi + 1);
+  }
+}
 
 function todayFeaturedIndex(familyCount: number): number {
   const msPerDay = 86_400_000;
@@ -75,9 +75,7 @@ async function pickFamily(): Promise<string> {
 }
 
 export async function generateRound(
-  _mode: PlayMode,
-  _userLevel: number,
-  previewId: string,
+  tier: DifficultyTier,
 ): Promise<GeneratedRound> {
   const family = await pickFamily();
 
@@ -91,8 +89,8 @@ export async function generateRound(
   if (!exemplarData) throw new Error(`No exemplar for family ${family}`);
   const exemplar = exemplarData as PatternRow;
 
-  const numScams = Math.floor(PACING.listSize * PACING.scamRatio);
-  const numLegits = PACING.listSize - numScams;
+  const numScams = Math.floor(tier.listSize * tier.scamRatio);
+  const numLegits = tier.listSize - numScams;
 
   const { data: scamVariants } = await supabaseAdmin
     .from("scam_patterns")
@@ -117,33 +115,69 @@ export async function generateRound(
     return out;
   };
 
-  const chosenScams = sampleN(scamVariants as PatternRow[], numScams);
+  const scamPool = pickBandPool(
+    scamVariants as PatternRow[],
+    tier.minPatternDifficulty,
+    tier.maxPatternDifficulty,
+  );
+
+  const chosenScams = sampleN(scamPool, numScams);
   const chosenLegits = sampleN(legitPool as PatternRow[], numLegits);
   const sequence = [...chosenScams, ...chosenLegits].sort(
     () => Math.random() - 0.5,
   );
-
-  const featuredScamIconId = (exemplar as PatternRow).icon_id;
-  const sequenceWithIcons: PatternWithIcon[] = sequence.map((p) => ({
-    ...p,
-    icon: p.is_scam
-      ? iconById(featuredScamIconId, true)
-      : iconById(p.icon_id, false),
-  }));
 
   return {
     featured_family: family,
     family_label: exemplar.family_label,
     family_description: exemplar.family_description,
     exemplar,
-    exemplar_icon: iconById((exemplar as PatternRow).icon_id, true),
     items: sequence.map((p) => ({ pattern_id: p.id, is_scam: p.is_scam })),
-    full_patterns: sequenceWithIcons,
-    popup_duration_ms: PACING.popupDurationMs,
-    total_seconds: PACING.totalSeconds,
-    board_progression: [...PACING.boardProgression],
-    base_spawn_delay: PACING.baseSpawnDelay,
-    spawn_jitter: PACING.spawnJitter,
+    full_patterns: sequence,
+    popup_duration_ms: tier.popupDurationMs,
+    total_seconds: tier.totalSeconds,
+    board_progression: [tier.boardSize],
+    base_spawn_delay: tier.baseSpawnDelay,
+    spawn_jitter: tier.spawnJitter,
+    tier,
+  };
+}
+
+export type TodayPattern = {
+  featured_family: string;
+  family_label: string;
+  family_description: string;
+  difficulty: number;
+  exemplar: {
+    kind: string;
+    content: Record<string, unknown>;
+    teaching: string;
+  };
+};
+
+export async function getTodayPattern(): Promise<TodayPattern> {
+  const family = await pickFamily();
+
+  const { data: exemplarData } = await supabaseAdmin
+    .from("scam_patterns")
+    .select("*")
+    .eq("family", family)
+    .eq("is_exemplar", true)
+    .single();
+
+  if (!exemplarData) throw new Error(`No exemplar for family ${family}`);
+  const ex = exemplarData as PatternRow;
+
+  return {
+    featured_family: family,
+    family_label: ex.family_label,
+    family_description: ex.family_description,
+    difficulty: ex.difficulty,
+    exemplar: {
+      kind: ex.kind,
+      content: ex.content,
+      teaching: ex.teaching,
+    },
   };
 }
 
@@ -154,7 +188,10 @@ export async function rebuildRoundFromSession(session: {
   popup_duration_ms: number;
   total_seconds: number;
   mode: string;
+  difficulty: string;
 }): Promise<GeneratedRound> {
+  const tier = await loadTier((session.difficulty as TierKey) ?? "easy");
+
   const { data: exemplar } = await supabaseAdmin
     .from("scam_patterns")
     .select("*")
@@ -178,33 +215,22 @@ export async function rebuildRoundFromSession(session: {
 
   const patternMap = new Map(patterns.map((p) => [p.id, p]));
 
-  const featuredScamIconId = (exemplar as PatternRow).icon_id;
-  const sequence: PatternWithIcon[] = session.items
-    .map((item) => {
-      const p = patternMap.get(item.pattern_id);
-      if (!p) return null;
-      const row = p as PatternRow;
-      return {
-        ...row,
-        icon: row.is_scam
-          ? iconById(featuredScamIconId, true)
-          : iconById(row.icon_id, false),
-      };
-    })
-    .filter((x): x is PatternWithIcon => x !== null);
+  const sequence: PatternRow[] = session.items
+    .map((item) => patternMap.get(item.pattern_id) as PatternRow | undefined)
+    .filter((x): x is PatternRow => Boolean(x));
 
   return {
     featured_family: session.featured_family,
     family_label: (exemplar as PatternRow).family_label,
     family_description: (exemplar as PatternRow).family_description,
     exemplar: exemplar as PatternRow,
-    exemplar_icon: iconById((exemplar as PatternRow).icon_id, true),
     items: session.items,
     full_patterns: sequence,
     popup_duration_ms: session.popup_duration_ms,
     total_seconds: session.total_seconds,
-    board_progression: [...PACING.boardProgression],
-    base_spawn_delay: PACING.baseSpawnDelay,
-    spawn_jitter: PACING.spawnJitter,
+    board_progression: [tier.boardSize],
+    base_spawn_delay: tier.baseSpawnDelay,
+    spawn_jitter: tier.spawnJitter,
+    tier,
   };
 }

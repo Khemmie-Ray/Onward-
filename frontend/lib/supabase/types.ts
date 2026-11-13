@@ -75,16 +75,17 @@ export type DbUser = {
   last_active_at: string;
   current_streak: number;
   longest_streak: number;
+  freeze_armed_on: string | null;
   total_g_earned: number;
   current_level: number;
   referral_code: string | null;
   referred_by_user_id: string | null;
   is_verified: boolean | null;
   verified_checked_at: string | null;
-   verified_on_onward: boolean | null;
+  verified_on_onward: boolean | null;
   onward_verified_at: string | null;
   onward_verify_checked_at: string | null;
-  contest_qualified: boolean;         
+  contest_qualified: boolean;
   contest_qualified_at: string | null;
 };
 
@@ -142,7 +143,6 @@ export type DbScamPattern = {
   difficulty: number;
   kind: "dm" | "tweet" | "wallet_popup" | "page";
   content: Record<string, unknown>;
-  icon_id: string | null;
   teaching: string;
   created_at: string;
 };
@@ -157,6 +157,7 @@ export type DbGameSession = {
   status: "pending" | "active" | "submitted" | "expired";
   last_heartbeat_at: string | null;
   mode: "free" | "premium";
+  difficulty: "easy" | "hard" | "superhard";
   started_at: string;
   completed_at: string | null;
   appeared_scams: number | null;
@@ -173,11 +174,14 @@ export type DbGameSession = {
   level_after: number | null;
 };
 
+export type StreakDaySource = "played" | "freeze" | "restore" | "manual";
+
 export type DbStreakDay = {
   user_id: string;
   day: string;
   passed: boolean;
   rounds_played: number;
+  source: StreakDaySource;
 };
 
 export type DbLeaderboardPeriod = {
@@ -230,6 +234,46 @@ export type DbSpendEvent = {
   metadata: Record<string, unknown> | null;
   tx_hash: string | null;
   created_at: string;
+};
+
+export type StreakClaimStatus = "pending" | "paid" | "failed";
+
+export type DbStreakRewardClaim = {
+  id: string;
+  user_id: string;
+  milestone_day: number;
+  amount_g: number;
+  status: StreakClaimStatus;
+  tx_hash: string | null;
+  claimed_at: string;
+  paid_at: string | null;
+};
+
+export type DbStreakRewardCache = {
+  milestone_day: number;
+  amount_g: number;
+  refreshed_at: string;
+};
+
+export type DbDifficultyTier = {
+  key: "easy" | "hard" | "superhard";
+  label: string;
+  rank: number;
+  total_seconds: number;
+  popup_duration_ms: number;
+  base_spawn_delay: number;
+  spawn_jitter: number;
+  board_size: number;
+  list_size: number;
+  scam_ratio: number;
+  min_pattern_difficulty: number;
+  max_pattern_difficulty: number;
+  min_precision: number | null;
+  min_correct: number | null;
+  min_recall: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Database = {
@@ -342,6 +386,25 @@ export type Database = {
         Update: Partial<DbSpendEvent>;
         Relationships: [];
       };
+      streak_reward_claims: {
+        Row: DbStreakRewardClaim;
+        Insert: Partial<DbStreakRewardClaim> & {
+          user_id: string;
+          milestone_day: number;
+          amount_g: number;
+        };
+        Update: Partial<DbStreakRewardClaim>;
+        Relationships: [];
+      };
+      streak_reward_cache: {
+        Row: DbStreakRewardCache;
+        Insert: Partial<DbStreakRewardCache> & {
+          milestone_day: number;
+          amount_g: number;
+        };
+        Update: Partial<DbStreakRewardCache>;
+        Relationships: [];
+      };
       learn_tracks: {
         Row: DbLearnTrack;
         Insert: Partial<DbLearnTrack> & {
@@ -429,6 +492,16 @@ export type Database = {
           ends_at: string;
         };
         Update: Partial<DbContestConfig>;
+        Relationships: [];
+      };
+      difficulty_tiers: {
+        Row: DbDifficultyTier;
+        Insert: Partial<DbDifficultyTier> & {
+          key: DbDifficultyTier["key"];
+          label: string;
+          rank: number;
+        };
+        Update: Partial<DbDifficultyTier>;
         Relationships: [];
       };
     };

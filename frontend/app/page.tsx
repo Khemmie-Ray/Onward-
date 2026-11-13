@@ -1,183 +1,173 @@
 "use client";
 
-import { ArrowRight, BookOpen, Sparkles, Target } from "lucide-react";
 import { useEffect, useState } from "react";
-import Image from "next/image";
-import { FeatureCard } from "@/components/home/FeatureCard";
+import { PublicGuard } from "@/components/auth/PublicGuard";
+import Link from "next/link";
 import Header from "@/components/shared/Header";
 import Footer from "@/components/shared/Footer";
-import { PublicGuard } from "@/components/auth/PublicGuard";
-import { LoginModal } from "@/components/auth/LoginModal";
+import { ArrowRight } from "lucide-react";
 
-type Stats = {
-  learners: number;
-  gDistributed: number;
-  modulesDone: number;
-};
+const PILLS = "/home/falling-pills.svg";
+const A = (name: string) => `/home/${name}.png`;
 
 export default function Home() {
   const [loginOpen, setLoginOpen] = useState(false);
 
-  const [stats, setStats] = useState<Stats>({
-    learners: 0,
-    gDistributed: 0,
-    modulesDone: 0,
-  });
-
-  // Capture referral code from ?ref= param into localStorage
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const ref = params.get("ref");
+    const ref = new URLSearchParams(window.location.search).get("ref");
     if (ref) localStorage.setItem("onward_ref", ref.toUpperCase());
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/stats");
-        if (!res.ok) return;
-        const data = (await res.json()) as Stats;
-        if (!cancelled) setStats(data);
-      } catch {
-        // Silently fall back to zeros — landing page must still render
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const open = () => setLoginOpen(true);
 
   return (
     <PublicGuard>
-      <main className="mx-auto w-[90%] flex flex-col relative mt-10">
+      <div className="min-h-screen overflow-x-hidden bg-[radial-gradient(60%_40%_at_50%_24%,#F8EFE0_0%,#ffffff_70%)] text-[#1B133B] font-display">
         <Header />
-        <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-          <div className="absolute right-[10%] top-[8%] h-[200px] w-[200px] rounded-full opacity-60 blur-[80px] bg-[radial-gradient(circle,rgba(230,180,72,0.45)_0%,transparent_70%)]" />
-          <div className="absolute left-[8%] bottom-[5%] h-[200px] w-[200px] rounded-full opacity-50 blur-[80px] bg-[radial-gradient(circle,rgba(199,93,63,0.35)_0%,transparent_70%)]" />
-        </div>
-        <div className="flex-1 overflow-y-auto no-scrollbar relative z-10">
-          <div className="flex justify-between lg:flex-row md:flex-row flex-col items-center">
-            <div className="stagger lg:w-[40%] md:w-[40%] w-full mb-8">
-              <h1 className="mt-5 font-semibold leading-[1.02] tracking-tight">
-                <span className="block text-[48px] text-indigo md:text-[60px]">
-                  Learn the loop.
-                </span>
-                <span className="block text-[48px] text-indigo md:text-[60px]">
-                  Earn the g$.
-                </span>
-                <span className="block text-[48px] text-terracotta md:text-[60px]">
-                  Beat the scams.
-                </span>
+        <main className="mx-auto w-[90%] ">
+          <section className="flex justify-between items-center lg:flex-row md:flex-row flex-col mb-10 mt-24">
+            <div className="lg:w-[50%] md:w-[50%] w-full lg:order-1 md:order-1 order-2 mb-3">
+              <h1 className="m-0 text-[clamp(56px,11vw,120px)] font-extrabold leading-[0.9] tracking-[-0.055em] text-[#1B133B]">
+                Learn a little everyday.
               </h1>
-
-              <p className="mt-5 text-[18px] leading-[1.65] text-fg-soft">
-                A loop, not a course. Bite-sized lessons and daily challenges
-                that pay you in g$ as you learn the GoodDollar ecosystem from
-                the inside out.
+              <p className="mt-6 font-['Newsreader',Georgia,serif] text-[20px] leading-[1.55] text-[#4A4466]">
+                Short lessons and quick games on money, the internet and new
+                tech. Five minutes a day, then come back tomorrow.
               </p>
 
-              <div className="mt-7 flex items-center gap-5">
-                <button
-                  onClick={() => setLoginOpen(true)}
-                  className="inline-flex items-center gap-2 bg-terracotta px-6 py-3.5 font-semibold text-paper shadow-[0_6px_20px_rgba(199,93,63,0.35)] transition-all hover:-translate-y-0.5 active:translate-y-0"
-                >
-                  Start learning
-                  <ArrowRight size={16} strokeWidth={2.5} />
-                </button>
-              </div>
-
-              <div className="mt-10 flex items-center gap-6">
-                <Stat
-                  value={stats.learners.toLocaleString()}
-                  label="Learners"
-                  tone="indigo"
-                />
-                <div className="h-8 w-px bg-shadow" />
-                <Stat
-                  value={stats.gDistributed.toLocaleString()}
-                  label="g$ distributed"
-                  tone="terracotta"
-                />
-                <div className="h-8 w-px bg-shadow" />
-                <Stat
-                  value={stats.modulesDone.toLocaleString()}
-                  label="Modules done"
-                  tone="forest"
-                />
-              </div>
+              <Link href="/login"
+              className="mt-6 inline-flex items-center gap-3 rounded-full bg-[#77C082] px-6 text-[18px] font-bold text-[#1B133B] transition duration-200 hover:-translate-y-0.5 hover:brightness-95 active:translate-y-0 active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1B133B] focus-visible:ring-offset-2 py-3"
+            >
+              Start learning free
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1B133B] text-[#77C082]">
+                <ArrowRight size={16} strokeWidth={2.6} />
+              </span>
+            </Link>
             </div>
-            <div className="relative flex lg:w-[55%] md:w-[55%] w-full items-center justify-center animate-[fade-up_0.9s_0.4s_ease_both] mb-4">
-              <Image
-                src="/hero.png"
-                alt=""
-                width={300}
-                height={300}
-                className="w-full"
-                priority
+
+            <div className="flex justify-center lg:w-[48%] md:w-[48%] w-full lg:order-2 md:order-2 order-1 mb-3">
+              <img
+                src={PILLS}
+                alt="Topic pills dropping into a stack"
+                className="h-auto w-full"
               />
             </div>
-          </div>
-          <div className="flex justify-between items-center lg:flex-row md:flex-row flex-col my-20">
-            <FeatureCard
-              icon={BookOpen}
-              title="Modules"
-              copy="Five-minute lessons. Pass the quick check, mint a soulbound badge to your wallet."
-              bg="var(--color-mustard-tint)"
-              iconBg="var(--color-mustard)"
-              iconColor="var(--color-indigo)"
-            />
-            <FeatureCard
-              icon={Target}
-              title="Whack-a-scam"
-              copy="Sixty seconds. One round a day. Train the muscle that spots fraud before it costs you."
-              bg="var(--color-terracotta-tint)"
-              iconBg="var(--color-terracotta)"
-              iconColor="var(--color-paper)"
-            />
-            <FeatureCard
-              icon={Sparkles}
-              title="Achievements"
-              copy="Soulbound badges that prove what you actually know. Yours, forever, on Celo."
-              bg="var(--color-aubergine-tint)"
-              iconBg="var(--color-aubergine)"
-              iconColor="var(--color-paper)"
-            />
-          </div>
-          <Footer />
-        </div>
-      </main>
+          </section>
+          <div className="mx-auto mb-10 flex max-w-[1296px] flex-col gap-6 border-t border-[#EEE9E0] pt-16 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="mb-3 text-sm font-bold uppercase tracking-[0.14em] text-[#6E6788]">
+                How it works
+              </p>
+              <h2 className="text-4xl font-extrabold leading-none tracking-[-0.045em] text-[#1B133B] md:text-6xl">
+                Three moves.
+                <br />
+                <span className="text-[#5B45B8]">Five minutes.</span>
+              </h2>
+            </div>
 
-      <LoginModal open={loginOpen} onOpenChange={setLoginOpen} />
+            <ol className="flex w-full items-center text-xs font-bold text-[#1B133B] md:w-auto md:gap-3 md:text-sm">
+              {[
+                { n: "01", label: "Learn", dot: "bg-[#1B133B]" },
+                { n: "02", label: "Play", dot: "bg-[#E8B547]" },
+                { n: "03", label: "Grow", dot: "bg-[#77C082]" },
+              ].map((s, i) => (
+                <li
+                  key={s.n}
+                  className={`flex items-center ${i > 0 ? "min-w-0 flex-1 md:flex-none" : "shrink-0"}`}
+                >
+                  {i > 0 && (
+                    <span className="mx-2 min-w-3 flex-1 border-t-2 border-dashed border-[#DDD6F0] md:mx-3 md:w-10 md:flex-none" />
+                  )}
+                  <span className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[#EEE9E0] py-1.5 pl-2 pr-3 md:gap-2 md:py-2 md:pr-4">
+                    <span
+                      className={`h-2 w-2 rounded-full md:h-2.5 md:w-2.5 ${s.dot}`}
+                    />
+                    <span className="text-[#6E6788]">{s.n}</span>
+                    {s.label}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <section className="flex justify-between items-center lg:flex-row md:flex-row flex-col">
+            <Card
+              chip="Learn"
+              title="Bite-size lessons"
+              body="One small idea at a time, about five minutes each."
+              card="bg-[#1B133B] text-white"
+              subCls="text-[#CBC4F7]"
+              chipCls="border-[#4A3B95]"
+              art={A("3d-books-cap")}
+            />
+            <Card
+              chip="Play"
+              title="Learn by playing"
+              body="Quick games that make new ideas stick."
+              card="bg-[#FAF5E9] text-[#1B133B]"
+              subCls="text-[#4A4466]"
+              chipCls="border-[#D9CFBE]"
+              art={A("3d-puzzle")}
+              artTop
+            />
+            <Card
+              chip="Grow"
+              title="Keep your streak"
+              body="A badge for every step you take forward."
+              card="bg-[#77C082] text-[#1B133B]"
+              subCls="text-[#24402B]"
+              chipCls="border-[rgba(27,19,59,0.35)]"
+              art={A("3d-trophy")}
+            />
+          </section>
+        </main>
+        <Footer />
+      </div>
     </PublicGuard>
   );
 }
 
-function Stat({
-  value,
-  label,
-  tone,
+function Card({
+  chip,
+  title,
+  body,
+  card,
+  subCls,
+  chipCls,
+  art,
+  artTop = false,
 }: {
-  value: string;
-  label: string;
-  tone: "indigo" | "terracotta" | "forest";
+  chip: string;
+  title: string;
+  body: string;
+  card: string;
+  subCls: string;
+  chipCls: string;
+  art: string;
+  artTop?: boolean;
 }) {
-  const toneClass =
-    tone === "indigo"
-      ? "text-indigo"
-      : tone === "terracotta"
-        ? "text-terracotta"
-        : "text-forest";
   return (
-    <div className="flex flex-col">
+    <div
+      style={{ backgroundImage: `url(${art})` }}
+      className={`flex w-full min-h-70 flex-col gap-2.25 overflow-hidden rounded-[28px] mb-4 bg-no-repeat p-6 transition hover:-translate-y-1.5 hover:rotate-[0.6deg] md:w-[32%] lg:w-[32%] ${
+        artTop
+          ? "bg-size-[clamp(130px,46%,180px)_auto] bg-position-[right_20px_top_64px]"
+          : "bg-size-[40%_auto] bg-position-[right_16px_bottom_16px]"
+      } ${card}`}
+    >
       <span
-        className={`display text-[24px] font-bold leading-none tabular-nums ${toneClass}`}
+        className={`self-start rounded-full border-[1.5px] px-3 py-[5px] text-[13px] font-bold ${chipCls}`}
       >
-        {value}
+        {chip}
       </span>
-      <span className="mt-1 text-[11px] font-medium uppercase tracking-[0.1em] text-fg-soft">
-        {label}
-      </span>
+
+      <div className={`flex flex-col gap-[9px] ${artTop ? "mt-auto" : ""}`}>
+        <b className="text-[26px] font-bold leading-tight tracking-[-0.03em]">
+          {title}
+        </b>
+        <span className={`max-w-[60%] leading-snug ${subCls}`}>
+          {body}
+        </span>
+      </div>
     </div>
   );
 }
