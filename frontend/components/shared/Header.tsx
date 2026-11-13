@@ -1,243 +1,45 @@
 "use client";
 
-import { HOME_ROUTE } from "@/lib/nav/routes";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useConnection } from "wagmi";
-import { Squash as Hamburger } from "hamburger-react";
-import { ArrowRight } from "lucide-react";
-import { LoopSigil } from "@/components/home/motifs";
-import { WalletPill } from "../auth/WalletPill";
-import { LoginModal } from "../auth/LoginModal";
-import { useAuthFetch } from "@/hooks/useAuthFetch";
-import { useOnwardLogout } from "@/hooks/useOnwardLogout";
-
-type ProfileStatus = {
-  hasUsername: boolean;
-  avatarId: string | null;
-};
-
-const INITIAL_HEADER_HEIGHT = 96;
+import Image from "next/image";
 
 const Header = () => {
-  const { address, isConnected, isConnecting, isReconnecting } =
-    useConnection();
-  const logout = useOnwardLogout();
-  const pathname = usePathname();
-  const authFetch = useAuthFetch();
-
-  const [mounted, setMounted] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [loginOpen, setLoginOpen] = useState(false);
-  const [headerHeight, setHeaderHeight] = useState(INITIAL_HEADER_HEIGHT);
-
-  const headerRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => setMounted(true), []);
-
-  useEffect(() => {
-    const el = headerRef.current;
-    if (!el) return;
-
-    const measure = () => setHeaderHeight(el.offsetHeight);
-    measure();
-
-    const observer = new ResizeObserver(measure);
-    observer.observe(el);
-
-    return () => observer.disconnect();
-  }, []);
-
-  useEffect(() => {
-    setIsMobileMenuOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
-    if (isConnected) setIsMobileMenuOpen(false);
-  }, [isConnected]);
-
-  useEffect(() => {
-    if (isMobileMenuOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [isMobileMenuOpen]);
-
-  const isHydrating = isConnecting || isReconnecting;
-  const showControl = mounted && !isHydrating;
-  const isLeaderboardActive = pathname === "/leaderboard";
-
-  const { data } = useQuery({
-    queryKey: ["me", "status", address ?? "anon"],
-    queryFn: async () => {
-      const res = await authFetch("/api/profile/status");
-      if (!res.ok) throw new Error("Status check failed");
-      return res.json() as Promise<ProfileStatus>;
-    },
-    enabled: mounted && isConnected && !isHydrating && !!address,
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-    retry: false,
-  });
-
-  const handleDisconnect = async () => {
-    setIsMobileMenuOpen(false);
-    await logout();
-  };
-
-  const handleConnectClick = () => {
-    setIsMobileMenuOpen(false);
-    setLoginOpen(true);
-  };
-
-  const navPillWrap = "rounded-2xl bg-canvas-warm p-2";
-  const navPillBase =
-    "block px-6 py-2 rounded-xl font-semibold text-[14px] transition-all";
-  const navPillActive = "bg-indigo text-cream shadow-sm";
-  const navPillInactive = "bg-transparent text-indigo hover:bg-indigo/5";
 
   return (
     <>
-      <header
-        ref={headerRef}
-        className="fixed top-0 left-0 right-0 z-30 bg-paper/85 backdrop-blur-md border-b border-fg-soft/10 py-6"
-      >
-        <div className="mx-auto w-[90%]">
-          <nav
-            className="grid grid-cols-2 md:grid-cols-3 items-center gap-4"
-            style={{ animation: "fade-up 0.8s 0.05s ease both" }}
+      <header className="fixed inset-x-0 top-0 z-30 border-b border-fg-soft/10 bg-white/90 backdrop-blur-md">
+        <nav className="mx-auto flex w-[90%] items-center justify-between gap-4 py-5">
+          <Link
+            href="/"
+            aria-label="Onward home"
+            className="flex items-center gap-2.5"
           >
-            <div className="justify-self-start">
-              <Link
-                href={isConnected ? HOME_ROUTE : "/"}
-                className="flex items-center gap-2.5"
-              >
-                <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-indigo">
-                  <LoopSigil size={20} color="var(--color-mustard)" />
-                </div>
-                <span className="display text-[24px] font-semibold text-indigo">
-                  onward
-                </span>
-              </Link>
-            </div>
+            <Image
+              src="/images/m-logo.png"
+              alt="Onward"
+              width={125}
+              height={36}
+              priority
+              className=" w-auto lg:block md:block hidden"
+            />
+              <Image
+              src="/images/mark.png"
+              alt="Onward"
+              width={45}
+              height={36}
+              priority
+              className=" w-auto lg:hidden md:hidden block"
+            />
+          </Link>
 
-            <div className="hidden md:flex justify-self-center">
-              {!isConnected && (
-                <div className={navPillWrap}>
-                  <Link
-                    href="/leaderboard"
-                    className={`${navPillBase} ${
-                      isLeaderboardActive ? navPillActive : navPillInactive
-                    }`}
-                  >
-                    Leaderboard
-                  </Link>
-                </div>
-              )}
-            </div>
-
-            <div className="justify-self-end">
-              <div className="hidden md:flex items-center">
-                {showControl &&
-                  (isConnected && address ? (
-                    <WalletPill
-                      address={address}
-                      avatarId={data?.avatarId ?? null}
-                      onDisconnect={handleDisconnect}
-                    />
-                  ) : (
-                    <button
-                      onClick={handleConnectClick}
-                      className="rounded-xl px-8 py-2.5 font-semibold text-paper transition-all bg-terracotta shadow-lg hover:bg-[#a84730] hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0"
-                    >
-                      Sign in
-                    </button>
-                  ))}
-              </div>
-
-              <div className="md:hidden flex items-center justify-end">
-                {showControl && isConnected && address ? (
-                  <WalletPill
-                    address={address}
-                    avatarId={data?.avatarId ?? null}
-                    onDisconnect={handleDisconnect}
-                  />
-                ) : (
-                  <div className="-mr-2">
-                    <Hamburger
-                      toggled={isMobileMenuOpen}
-                      toggle={setIsMobileMenuOpen}
-                      size={22}
-                      color="var(--color-indigo)"
-                      rounded
-                      label="Toggle menu"
-                      duration={0.4}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </nav>
-        </div>
-
-        {isMobileMenuOpen && (
-          <div className="md:hidden absolute top-full inset-x-0 z-40 px-5 sm:px-8 pt-2">
-            <div
-              className="bg-paper rounded-2xl shadow-[0_12px_32px_rgba(31,58,110,0.12)] border border-fg-soft/10 p-4 flex flex-col gap-3"
-              style={{ animation: "fade-up 0.3s ease both" }}
-            >
-              {!isConnected && (
-                <Link
-                  href="/leaderboard"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`flex items-center justify-between py-3 px-4 rounded-xl font-semibold transition-all ${
-                    isLeaderboardActive
-                      ? "bg-indigo text-cream shadow-md"
-                      : "bg-transparent text-indigo hover:bg-indigo/10"
-                  }`}
-                >
-                  Leaderboard
-                  {!isLeaderboardActive && (
-                    <ArrowRight
-                      size={14}
-                      strokeWidth={2.5}
-                      className="text-mustard"
-                    />
-                  )}
-                </Link>
-              )}
-
-              {showControl && !isConnected && (
-                <div className="pt-3 border-t border-fg-soft/10">
-                  <button
-                    onClick={handleConnectClick}
-                    className="w-full rounded-xl px-6 py-3.5 font-semibold text-paper bg-terracotta shadow-lg hover:bg-terracotta/90 transition"
-                  >
-                    Sign in
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+          <Link href="/login"
+            className="inline-flex py-3 items-center gap-2 rounded-full bg-[#1B133B] px-5 font-bold text-white shadow-sm transition duration-200 hover:-translate-y-0.5 hover:bg-[#372c64] active:translate-y-0 active:scale-[0.97]"
+          >
+            <span className="h-[7px] w-[7px] rounded-full bg-[#77C082]" />
+            Get started
+          </Link>
+        </nav>
       </header>
-      <div aria-hidden className="shrink-0" style={{ height: headerHeight }} />
-
-      {isMobileMenuOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-20 bg-aubergine/30 backdrop-blur-sm"
-          onClick={() => setIsMobileMenuOpen(false)}
-          aria-hidden
-        />
-      )}
-
-      <LoginModal open={loginOpen} onOpenChange={setLoginOpen} />
     </>
   );
 };
