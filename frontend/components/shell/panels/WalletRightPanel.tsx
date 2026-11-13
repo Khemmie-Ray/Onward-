@@ -36,7 +36,7 @@ export function WalletRightPanel() {
             <Flame size={17} strokeWidth={2.5} />
           </div>
           <div>
-            <div className="display text-[16px] font-bold leading-tight text-indigo">
+            <div className="display font-bold leading-tight text-indigo">
               Streak shop
             </div>
             <div className="text-[11.5px] text-fg-soft">

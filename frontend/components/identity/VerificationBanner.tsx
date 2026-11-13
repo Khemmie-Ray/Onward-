@@ -80,7 +80,7 @@ export function VerificationBanner() {
           <ShieldCheck size={18} strokeWidth={2.5} className="text-indigo" />
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="display text-[16px] font-bold text-indigo leading-tight">
+          <h3 className="display font-bold text-indigo leading-tight">
             Verify with GoodID
           </h3>
           <p className="text-[12.5px] text-fg-soft mt-1 leading-relaxed">

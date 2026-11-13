@@ -6,7 +6,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Squash as Hamburger } from "hamburger-react";
 import { X } from "lucide-react";
-import { LoopSigil } from "@/components/home/motifs";
 import { HOME_ROUTE } from "@/lib/nav/routes";
 import { getRightPanel, RightPanelContent } from "./RightPanel";
 import Image from "next/image";
