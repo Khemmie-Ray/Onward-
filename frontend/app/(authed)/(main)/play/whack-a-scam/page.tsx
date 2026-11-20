@@ -99,7 +99,11 @@ export default function PlayPage() {
     family_label: string;
     family_description: string;
     difficulty: number;
-    exemplar: { kind: string; content: Record<string, unknown>; teaching: string };
+    exemplar: {
+      kind: string;
+      content: Record<string, unknown>;
+      teaching: string;
+    };
     free_available: boolean;
   }>({
     queryKey: ["play", "today-pattern"],
@@ -123,6 +127,8 @@ export default function PlayPage() {
   const [result, setResult] = useState<WhackResult | null>(null);
   const queryClient = useQueryClient();
   const [submitData, setSubmitData] = useState<SubmitResponse | null>(null);
+  // Set when scoring fails, so the end screen never sits on "Scoring…".
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const [freeCapMessage, setFreeCapMessage] = useState<DailyCapMessage>(null);
   const [premiumCapMessage, setPremiumCapMessage] =
@@ -146,6 +152,7 @@ export default function PlayPage() {
     setRoundId(null);
     setResult(null);
     setSubmitData(null);
+    setSubmitError(null);
     setFreeError(null);
     setPremiumError(null);
     setFreeStep("idle");
@@ -470,8 +477,18 @@ export default function PlayPage() {
 
   const handleGameComplete = async (r: WhackResult) => {
     setResult(r);
+    setSubmitError(null);
     setPhase("ended");
-    if (!roundId) return;
+    if (!roundId) {
+      setSubmitError(
+        "We lost track of this round. Start a new one to play again.",
+      );
+      return;
+    }
+
+    // A won round waits for on-chain payouts, so allow time, but never forever.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 100_000);
 
     try {
       const res = await authFetch("/api/play/submit", {
@@ -481,18 +498,38 @@ export default function PlayPage() {
           whacks: r.whacks,
           missed_scams: r.missedScams,
         }),
+        signal: controller.signal,
       });
-      if (res.ok) {
-        const data: SubmitResponse = await res.json();
-        setSubmitData(data);
-
-        queryClient.invalidateQueries({ queryKey: ["me", "status"] });
-        queryClient.invalidateQueries({ queryKey: ["play", "stats"] });
-        queryClient.invalidateQueries({ queryKey: ["modules"] });
-        queryClient.invalidateQueries({ queryKey: ["play", "today-pattern"] });
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string };
+        console.error("[play submit]", res.status, d.error);
+        setSubmitError(
+          d.error ?? "We couldn't score this round. Please try again.",
+        );
+        return;
       }
+      const data: SubmitResponse = await res.json();
+      setSubmitData(data);
+
+      queryClient.invalidateQueries({ queryKey: ["me", "status"] });
+      queryClient.invalidateQueries({ queryKey: ["play", "stats"] });
+      queryClient.invalidateQueries({ queryKey: ["modules"] });
+      queryClient.invalidateQueries({ queryKey: ["play", "today-pattern"] });
+      queryClient.invalidateQueries({ queryKey: ["quests"] });
+      queryClient.invalidateQueries({ queryKey: ["leaderboard", "quests"] });
+      queryClient.invalidateQueries({ queryKey: ["milestones"] });
+      queryClient.invalidateQueries({ queryKey: ["streak", "rewards"] });
     } catch (e) {
       console.error("[play submit failed]", e);
+      setSubmitError(
+        controller.signal.aborted
+          ? preview?.mode === "premium"
+            ? "Confirming your stake on Celo is taking longer than usual. Your round is saved, and if you won, your stake and bonus will reach your wallet shortly."
+            : "Scoring is taking longer than usual. Your round is saved, so check your points in a minute."
+          : "We couldn't reach the server to score this round. Check your connection.",
+      );
+    } finally {
+      clearTimeout(timeout);
     }
   };
 
@@ -678,7 +715,9 @@ export default function PlayPage() {
                       disabled={premiumStep !== "idle"}
                       className="mt-4 w-full rounded-full bg-forest py-3 text-[14px] font-bold text-paper transition hover:brightness-105 disabled:opacity-60"
                     >
-                      {premiumStep !== "idle" ? "Resuming…" : "Resume staked round"}
+                      {premiumStep !== "idle"
+                        ? "Resuming…"
+                        : "Resume staked round"}
                     </button>
                     <button
                       type="button"
@@ -727,6 +766,7 @@ export default function PlayPage() {
                   pointsAwarded={submitData?.points_awarded ?? 0}
                   txPending={txPending}
                   txHash={settleTxHash}
+                  error={submitError}
                   onSeeMissed={() => setEndDismissed(true)}
                   onPlayAgain={resetToTabSelect}
                 />

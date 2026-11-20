@@ -11,10 +11,37 @@ function ymd(d: Date): string {
   return c.toISOString().slice(0, 10);
 }
 
+// The streak number counts only days earned by real engagement. Days bridged by
+// a freeze or a restore keep the run contiguous but never add to the count, so
+// we never award a streak day the user did not actually play.
+function countEngagedStreak(
+  rows: { day: string; source: string | null }[],
+  today: Date,
+): number {
+  if (rows.length === 0) return 0;
+
+  const sourceByDay = new Map(rows.map((r) => [r.day, r.source]));
+  const todayStr = ymd(today);
+  const yesterday = new Date(today);
+  yesterday.setUTCDate(today.getUTCDate() - 1);
+  const yesterdayStr = ymd(yesterday);
+
+  const mostRecent = rows[0].day; // passed days, newest first
+  if (mostRecent !== todayStr && mostRecent !== yesterdayStr) return 0;
+
+  let streak = 0;
+  const cursor = new Date(mostRecent + "T00:00:00Z");
+  while (sourceByDay.has(ymd(cursor))) {
+    const src = sourceByDay.get(ymd(cursor));
+    if (src !== "freeze" && src !== "restore") streak++; // engaged days only
+    cursor.setUTCDate(cursor.getUTCDate() - 1);
+  }
+  return streak;
+}
+
 async function applyFreezesToGaps(userId: string): Promise<string[]> {
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-
   const yesterday = new Date(today);
   yesterday.setUTCDate(today.getUTCDate() - 1);
   const yesterdayStr = ymd(yesterday);
@@ -29,15 +56,13 @@ async function applyFreezesToGaps(userId: string): Promise<string[]> {
   if (!rows || rows.length === 0) return [];
 
   const passed = new Set(rows.map((r) => r.day as string));
-
-  if (passed.has(yesterdayStr)) return [];
+  if (passed.has(yesterdayStr)) return []; // no gap
 
   const missedRun: string[] = [];
   const cursor = new Date(yesterday);
-
   for (let i = 0; i < 60; i++) {
     const ds = ymd(cursor);
-    if (passed.has(ds)) break; // hit the live part of the streak; stop
+    if (passed.has(ds)) break;
     missedRun.push(ds);
     cursor.setUTCDate(cursor.getUTCDate() - 1);
   }
@@ -50,7 +75,7 @@ async function applyFreezesToGaps(userId: string): Promise<string[]> {
 
   const { data: u } = await supabaseAdmin
     .from("users")
-    .select("wallet_address")
+    .select("wallet_address, freeze_armed_on")
     .eq("id", userId)
     .maybeSingle();
   const wallet = (u?.wallet_address as string | undefined)
@@ -58,6 +83,12 @@ async function applyFreezesToGaps(userId: string): Promise<string[]> {
     .pop()
     ?.toLowerCase();
   if (!wallet) return [];
+
+  // Forward-only: a freeze covers a missed day only if it was armed on or before
+  // that day. If the oldest missed day predates the arming, or nothing is armed,
+  // the freeze cannot hold this gap, and recovery is restore's job.
+  const armedOn = (u?.freeze_armed_on as string | null) ?? null;
+  if (!armedOn || oldestMissed < armedOn) return [];
 
   let owned: bigint;
   try {
@@ -67,12 +98,12 @@ async function applyFreezesToGaps(userId: string): Promise<string[]> {
     return [];
   }
   if (owned === 0n) return [];
-
   if (missedRun.length > Number(owned)) return [];
 
-  const toBridge = [...missedRun].reverse();
-
+  const toBridge = [...missedRun].reverse(); // oldest first
   const bridged: string[] = [];
+  let lastOwned = owned;
+
   for (const day of toBridge) {
     let before: bigint;
     try {
@@ -105,17 +136,20 @@ async function applyFreezesToGaps(userId: string): Promise<string[]> {
       });
       break;
     }
+    lastOwned = after;
 
-    const { error: bridgeErr } = await supabaseAdmin.from("streak_days").upsert(
-      {
-        user_id: userId,
-        day,
-        passed: true,
-        rounds_played: 0,
-        source: "freeze",
-      },
-      { onConflict: "user_id,day" },
-    );
+    const { error: bridgeErr } = await supabaseAdmin
+      .from("streak_days")
+      .upsert(
+        {
+          user_id: userId,
+          day,
+          passed: true,
+          rounds_played: 0,
+          source: "freeze",
+        },
+        { onConflict: "user_id,day" },
+      );
     if (bridgeErr) {
       console.error("[freeze] bridge upsert failed", {
         day,
@@ -134,9 +168,15 @@ async function applyFreezesToGaps(userId: string): Promise<string[]> {
     });
   }
 
-  if (bridged.length > 0) {
-    await recomputeUserStreak(userId);
+  // Spent balance drops the arming, so a freeze bought later starts fresh.
+  if (lastOwned === 0n) {
+    await supabaseAdmin
+      .from("users")
+      .update({ freeze_armed_on: null })
+      .eq("id", userId);
   }
+
+  if (bridged.length > 0) await recomputeUserStreak(userId);
   return bridged;
 }
 
@@ -169,13 +209,15 @@ export async function markStreakDay(userId: string): Promise<void> {
       .eq("user_id", userId)
       .eq("day", dayStr);
   } else {
-    await supabaseAdmin.from("streak_days").insert({
-      user_id: userId,
-      day: dayStr,
-      passed: true,
-      rounds_played: 1,
-      source: "played",
-    });
+    await supabaseAdmin
+      .from("streak_days")
+      .insert({
+        user_id: userId,
+        day: dayStr,
+        passed: true,
+        rounds_played: 1,
+        source: "played",
+      });
   }
 
   await recomputeUserStreak(userId);
@@ -184,23 +226,18 @@ export async function markStreakDay(userId: string): Promise<void> {
 export async function recomputeUserStreak(userId: string): Promise<void> {
   const { data: days } = await supabaseAdmin
     .from("streak_days")
-    .select("day, passed")
+    .select("day, source")
     .eq("user_id", userId)
     .eq("passed", true)
     .order("day", { ascending: false });
 
-  if (!days || days.length === 0) return;
-
-  let streak = 0;
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
 
-  for (const row of days) {
-    const expected = new Date(today);
-    expected.setUTCDate(today.getUTCDate() - streak);
-    if (row.day === expected.toISOString().slice(0, 10)) streak++;
-    else break;
-  }
+  const streak = countEngagedStreak(
+    (days ?? []) as { day: string; source: string | null }[],
+    today,
+  );
 
   const { data: u } = await supabaseAdmin
     .from("users")
@@ -221,31 +258,17 @@ export async function computeLiveStreak(userId: string): Promise<number> {
 
   const { data: days } = await supabaseAdmin
     .from("streak_days")
-    .select("day")
+    .select("day, source")
     .eq("user_id", userId)
     .eq("passed", true)
     .order("day", { ascending: false })
     .limit(400);
-  if (!days || days.length === 0) return 0;
 
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  const ymdLocal = (d: Date) => d.toISOString().slice(0, 10);
 
-  const todayStr = ymdLocal(today);
-  const yesterday = new Date(today);
-  yesterday.setUTCDate(today.getUTCDate() - 1);
-  const yesterdayStr = ymdLocal(yesterday);
-
-  const mostRecent = days[0].day as string;
-  if (mostRecent !== todayStr && mostRecent !== yesterdayStr) return 0;
-
-  const set = new Set(days.map((d) => d.day as string));
-  let streak = 0;
-  const cursor = new Date(mostRecent + "T00:00:00Z");
-  while (set.has(ymdLocal(cursor))) {
-    streak++;
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
-  }
-  return streak;
+  return countEngagedStreak(
+    (days ?? []) as { day: string; source: string | null }[],
+    today,
+  );
 }
