@@ -18,8 +18,11 @@ export async function GET(request: Request) {
 
   const { data: modules } = await supabaseAdmin
     .from("learn_modules")
-    .select("id, track_id")
-    .eq("status", "live");
+    .select(
+      "id, track_id, slug, title, order_in_track, estimated_minutes, points_reward",
+    )
+    .eq("status", "live")
+    .order("order_in_track", { ascending: true });
 
   const { data: completions } = await supabaseAdmin
     .from("learn_completions")
@@ -28,17 +31,35 @@ export async function GET(request: Request) {
 
   const completedIds = new Set((completions ?? []).map((c) => c.module_id));
 
-  const modulesByTrack = new Map<string, string[]>();
+  const modulesByTrack = new Map<
+    string,
+    Array<{
+      id: string;
+      slug: string;
+      title: string;
+      estimated_minutes: number;
+      points_reward: number;
+    }>
+  >();
   for (const m of modules ?? []) {
     const list = modulesByTrack.get(m.track_id) ?? [];
-    list.push(m.id);
+    list.push({
+      id: m.id,
+      slug: m.slug,
+      title: m.title,
+      estimated_minutes: m.estimated_minutes,
+      points_reward: m.points_reward,
+    });
     modulesByTrack.set(m.track_id, list);
   }
 
   const result = tracks.map((t) => {
-    const moduleIds = modulesByTrack.get(t.id) ?? [];
-    const total = moduleIds.length;
-    const done = moduleIds.filter((id) => completedIds.has(id)).length;
+    const trackModules = modulesByTrack.get(t.id) ?? [];
+    const total = trackModules.length;
+    const done = trackModules.filter((m) => completedIds.has(m.id)).length;
+
+    const next = trackModules.find((m) => !completedIds.has(m.id)) ?? null;
+
     return {
       slug: t.slug,
       title: t.title,
@@ -57,6 +78,15 @@ export async function GET(request: Request) {
               : done === total
                 ? "complete"
                 : "in_progress",
+      next_module:
+        next && t.status !== "coming_soon"
+          ? {
+              slug: next.slug,
+              title: next.title,
+              estimated_minutes: next.estimated_minutes,
+              points_reward: next.points_reward,
+            }
+          : null,
     };
   });
 

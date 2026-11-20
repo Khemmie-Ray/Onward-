@@ -1,59 +1,55 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Coins, Flame, Trophy, Sparkles } from "lucide-react";
-import { formatUnits } from "viem";
+import { useQuery } from "@tanstack/react-query";
+import { useConnection } from "wagmi";
 import { LoopSigil } from "@/components/home/motifs";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
+import { useProfile } from "@/hooks/useProfile";
 import ProfileHeader from "@/components/dashboard/profile/ProfileHeader";
-import type { ProfileData } from "@/lib/data/profile";
-import LifetimeStat from "@/components/dashboard/profile/LifetimeStat";
-import { usePendingClaim } from "@/hooks/usePendingClaim";
-import { ReferralCard } from "@/components/dashboard/profile/ReferralCard";
-import { WalletActions } from "@/components/dashboard/profile/WalletActions";
-import { OnchainBadgeCollection } from "@/components/dashboard/profile/OnchainBadgeCollection";
+import { ProfileStat } from "@/components/dashboard/profile/ProfileStat";
+import { Milestones } from "@/components/dashboard/profile/Milestones";
+import { MILESTONE_TRACKS, resolveMilestone } from "@/lib/milestones";
 
 type PointsData = {
   balance: number;
   lifetime_earned: number;
   lifetime_claimed: number;
+  leaderboard_points: number;
+};
+
+type ContestRewardsSummary = {
+  summary: { total_g: number; contests_won: number; best_rank: number | null };
 };
 
 const Profile = () => {
   const authFetch = useAuthFetch();
-  const [data, setData] = useState<ProfileData | null>(null);
-  const [points, setPoints] = useState<PointsData | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { address } = useConnection();
 
-  const { pendingBalance } = usePendingClaim();
+  const { profile: data, error } = useProfile();
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [profileRes, pointsRes] = await Promise.all([
-          authFetch("/api/profile"),
-          authFetch("/api/points/balance"),
-        ]);
+  const { data: points } = useQuery({
+    queryKey: ["points", "balance", address ?? "anon"],
+    queryFn: async (): Promise<PointsData> => {
+      const res = await authFetch("/api/points/balance");
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      return (await res.json()) as PointsData;
+    },
+    enabled: Boolean(address),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
 
-        if (!profileRes.ok) throw new Error(`Status ${profileRes.status}`);
-        const profileJson = (await profileRes.json()) as ProfileData;
-        if (!cancelled) setData(profileJson);
-
-        if (pointsRes.ok) {
-          const pointsJson = (await pointsRes.json()) as PointsData;
-          if (!cancelled) setPoints(pointsJson);
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof Error ? e.message : "Failed to load");
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [authFetch]);
+  const { data: contest } = useQuery({
+    queryKey: ["contest", "my-rewards", address ?? "anon"],
+    queryFn: async (): Promise<ContestRewardsSummary> => {
+      const res = await authFetch("/api/contest/my-rewards");
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      return (await res.json()) as ContestRewardsSummary;
+    },
+    enabled: Boolean(address),
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  });
 
   if (error) {
     return (
@@ -76,7 +72,7 @@ const Profile = () => {
             <LoopSigil size={32} color="var(--color-indigo)" />
           </div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-soft">
-            Loading your collection
+            Loading your profile
           </div>
         </div>
       </div>
@@ -84,79 +80,70 @@ const Profile = () => {
   }
 
   const pointsBalance = points?.balance ?? 0;
+  const leaderboardPoints = points?.leaderboard_points ?? 0;
+  const contestRewardsG = contest?.summary?.total_g ?? 0;
 
-  const pendingG =
-    pendingBalance > 0n ? parseFloat(formatUnits(pendingBalance, 18)) : 0;
-  const gEarnedTotal = data.totalGEarned + pendingG;
+  const metrics: Record<string, number> = {
+    streak: data.currentStreak,
+    modules: data.modulesCompleted,
+    referrals: data.referralsQualified,
+  };
+  const milestones = MILESTONE_TRACKS.map((t) =>
+    resolveMilestone(t, metrics[t.metric] ?? 0),
+  );
 
-  const gClaimed = points?.lifetime_claimed ?? 0;
+  const flagship = [...milestones].sort(
+    (a, b) => b.tierLevel - a.tierLevel || b.value - a.value,
+  )[0];
+  const flagshipLabel = flagship?.tierName ?? "Newcomer";
 
   return (
     <>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute right-[10%] top-[8%] h-100 w-100 rounded-full opacity-50 blur-[80px] bg-[radial-gradient(circle,rgba(199,93,63,0.30)_0%,transparent_70%)]"
-      />
       <ProfileHeader
         displayName={data.displayName}
         avatarId={data.avatarId}
         walletAddress={data.walletAddress}
         daysOnOnward={data.daysOnOnward}
+        level={data.currentLevel}
+        flagshipLabel={flagshipLabel}
       />
-      <section className="flex justify-between lg:flex-row md:flex-row flex-col gap-3 mb-10 animate-[fade-up_0.8s_0.18s_ease_both]">
-        <div className="flex flex-wrap gap-5 lg:w-[52%] md:w-[52%] w-full">
-          <LifetimeStat
-            label="Points balance"
-            value={pointsBalance.toLocaleString()}
-            tone="mustard"
-            icon={<Sparkles size={28} strokeWidth={2} />}
-            sub="unclaimed"
-          />
-          <LifetimeStat
-            label="g$ claimed"
-            value={
-              gClaimed.toLocaleString(undefined, {
-                maximumFractionDigits: 2,
-              }) + "g"
-            }
-            tone="forest"
-            icon={<Coins size={28} strokeWidth={2} />}
-            sub="from point conversion"
-          />
-          <LifetimeStat
-            label="Level"
-            value={String(data.currentLevel)}
-            tone="aubergine"
-            icon={<Trophy size={28} strokeWidth={2} />}
-          />
-          <LifetimeStat
-            label="Longest streak"
-            value={`${data.longestStreak}d`}
-            tone="terracotta"
-            icon={<Flame size={28} strokeWidth={2} />}
-          />
-        </div>
-        <div className="w-full lg:w-[45%] md:w-[45%]">
-          <ReferralCard />
-        </div>
+
+      <section className="mb-9 flex flex-wrap gap-3 animate-[fade-up_0.8s_0.14s_ease_both]">
+        <ProfileStat
+          value={String(data.modulesCompleted)}
+          unit={`/${data.modulesTotal}`}
+          label="modules done"
+          tone="forest"
+        />
+        <ProfileStat
+          value={String(data.currentStreak)}
+          label="day streak"
+          tone="mustard"
+        />
+        <ProfileStat
+          value={String(data.roundsPlayed)}
+          label="rounds played"
+          tone="aubergine"
+        />
+        <ProfileStat
+          value={pointsBalance.toLocaleString()}
+          label="points balance"
+          tone="neutral"
+        />
+        <ProfileStat
+          value={leaderboardPoints.toLocaleString()}
+          label="leaderboard points"
+          tone="aubergine"
+        />
+        <ProfileStat
+          value={contestRewardsG.toLocaleString()}
+          unit="G$"
+          label="contest rewards"
+          tone="forest"
+        />
       </section>
-      <section className="mb-6 animate-[fade-up_0.8s_0.24s_ease_both]">
-        <div className="w-full">
-          <WalletActions />
-        </div>
-      </section>
-      <section className="mb-10 animate-[fade-up_0.8s_0.32s_ease_both]">
-        <div className="mb-1">
-          <h2 className="display text-[22px] font-semibold tracking-[-0.015em] text-indigo">
-            Badge collection
-          </h2>
-        </div>
-        <p className="text-[12.5px] text-fg-soft mb-5">
-          Each badge is a soulbound NFT on Celo, pulled live from your wallet.
-          Yours forever.
-        </p>
-        <OnchainBadgeCollection />
-      </section>
+
+      <Milestones items={milestones} />
     </>
   );
 };

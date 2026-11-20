@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Hole } from "./Hole";
-import { GameHeader } from "./GameHeader";
-import { AbandonConfirmModal } from "./AbandonConfirmModal";
-import type { DisplayItem, HoleState, WhackResult } from "./type";
+import { GameStatsHeader } from "./GameStatsHeader";
+import { BoardShell } from "./BoardShell";
+import { SCORING } from "@/lib/scoring";
+import type { DisplayItem, HoleState, WhackResult, Mode } from "./type";
 
 const ROUND_SECONDS = 60;
 const MAX_HOLES = 6;
@@ -13,7 +14,9 @@ type Props = {
   roundId: string;
   items: DisplayItem[];
   onComplete: (result: WhackResult) => void;
-  onAbandon: () => void;
+  mode: Mode;
+  patternLabel: string;
+  difficulty?: number | null;
   boardProgression?: number[];
   popupDurationMs?: number;
   baseSpawnDelay?: number;
@@ -23,7 +26,9 @@ type Props = {
 export function WhackAScam({
   items,
   onComplete,
-  onAbandon,
+  mode,
+  patternLabel,
+  difficulty,
   boardProgression = [6],
   popupDurationMs = 2000,
   baseSpawnDelay = 400,
@@ -31,13 +36,22 @@ export function WhackAScam({
 }: Props) {
   const [secondsLeft, setSecondsLeft] = useState(ROUND_SECONDS);
   const [score, setScore] = useState(0);
+  // Live display mirrors of the stat refs (refs stay the source of truth).
+  const [caught, setCaught] = useState(0);
+  const [wrong, setWrong] = useState(0);
+  const [escaped, setEscaped] = useState(0);
+  // Scams that have appeared so far (the "featured total" the header counts
+  // against). Mirrors statsRef.appearedScams for render.
+  const [appeared, setAppeared] = useState(0);
+
   const [holes, setHoles] = useState<(HoleState | null)[]>(() =>
     Array(MAX_HOLES).fill(null),
   );
   const [activeHoleCount, setActiveHoleCount] = useState(
     boardProgression[0] ?? 6,
   );
-  const [showAbandonConfirm, setShowAbandonConfirm] = useState(false);
+
+  const threshold = SCORING[mode].minCorrect;
 
   const secondsLeftRef = useRef(ROUND_SECONDS);
   const activeHoleCountRef = useRef(boardProgression[0] ?? 6);
@@ -135,8 +149,15 @@ export function WhackAScam({
 
     const nextItem = (): DisplayItem | null => {
       const queue = itemQueueRef.current;
-      if (itemCursorRef.current >= queue.length) return null;
-      const item = queue[itemCursorRef.current];
+      if (queue.length === 0) return null;
+      // Ran through the list before the round ended: reshuffle and loop so the
+      // board keeps spawning for the full timer instead of going quiet. Harder
+      // tiers spawn fast enough to exhaust the list ~10s early otherwise.
+      if (itemCursorRef.current >= queue.length) {
+        itemQueueRef.current = [...queue].sort(() => Math.random() - 0.5);
+        itemCursorRef.current = 0;
+      }
+      const item = itemQueueRef.current[itemCursorRef.current];
       itemCursorRef.current++;
       return item;
     };
@@ -171,13 +192,16 @@ export function WhackAScam({
       if (!item) return;
 
       lastSpawnAtRef.current[holeIdx] = now;
-      if (item.is_scam) statsRef.current.appearedScams++;
-      else statsRef.current.spawnedLegits++;
+      if (item.is_scam) {
+        statsRef.current.appearedScams++;
+        setAppeared(statsRef.current.appearedScams);
+      } else {
+        statsRef.current.spawnedLegits++;
+      }
 
       const newHoleState: HoleState = {
         id: Date.now() + Math.random(),
         patternId: item.pattern_id,
-        icon: item.icon,
         isScam: item.is_scam,
         appearedAt: performance.now(),
         durationMs: popupDurationMs,
@@ -226,6 +250,7 @@ export function WhackAScam({
             ) {
               statsRef.current.missedScams++;
               statsRef.current.missedInstanceIds.add(h.id);
+              setEscaped(statsRef.current.missedScams);
             }
             return null;
           }
@@ -240,7 +265,7 @@ export function WhackAScam({
   const handleWhack = useCallback((holeIdx: number) => {
     setHoles((prev) => {
       const hole = prev[holeIdx];
-      if (!hole?.icon) return prev;
+      if (!hole) return prev;
       if (statsRef.current.whackedInstanceIds.has(hole.id)) return prev;
 
       statsRef.current.whackedInstanceIds.add(hole.id);
@@ -248,9 +273,11 @@ export function WhackAScam({
 
       if (hole.isScam) {
         statsRef.current.correctWhacks++;
+        setCaught(statsRef.current.correctWhacks);
         setScore((s) => s + 1);
       } else {
         statsRef.current.wrongWhacks++;
+        setWrong(statsRef.current.wrongWhacks);
         setScore((s) => Math.max(0, s - 1));
       }
 
@@ -267,50 +294,31 @@ export function WhackAScam({
     });
   }, []);
 
-  const handleConfirmAbandon = () => {
-    finishedRef.current = true;
-    setShowAbandonConfirm(false);
-    onAbandon();
-  };
-
-  const gridCols =
-    activeHoleCount <= 2
-      ? "grid-cols-2"
-      : activeHoleCount <= 4
-        ? "grid-cols-2"
-        : "grid-cols-3";
+  const gridCols = activeHoleCount <= 4 ? "grid-cols-2" : "grid-cols-3";
 
   return (
-    <div className="flex flex-col items-center w-full">
-      <GameHeader
+    <div className="flex w-full flex-col gap-4">
+      <GameStatsHeader
         secondsLeft={secondsLeft}
-        score={score}
-        onAbandonClick={() => setShowAbandonConfirm(true)}
+        totalSeconds={ROUND_SECONDS}
+        status={secondsLeft > 0 ? "Keep going" : "Round over"}
+        caught={caught}
+        threshold={threshold}
+        totalScams={appeared}
+        points={score}
+        wrong={wrong}
+        escaped={escaped}
       />
 
-      <div className="w-full max-w-130 px-2 sm:px-0">
-        <div
-          className={`grid ${gridCols} gap-3 sm:gap-4 p-4 sm:p-6 rounded-[24px] bg-aubergine/95 shadow-[0_12px_32px_rgba(91,46,92,0.30)]`}
-        >
+      <BoardShell patternLabel={patternLabel} difficulty={difficulty}>
+        <div className={`grid ${gridCols} gap-3 sm:gap-4`}>
           {Array.from({ length: activeHoleCount }).map((_, idx) => (
-            <div key={idx} className="aspect-square w-full">
-              <Hole
-                state={holes[idx]}
-                onWhack={() => handleWhack(idx)}
-                size={activeHoleCount === 6 ? 96 : 110}
-                fluid
-              />
+            <div key={idx} className="aspect-[4/3] w-full">
+              <Hole state={holes[idx]} onWhack={() => handleWhack(idx)} />
             </div>
           ))}
         </div>
-      </div>
-
-      {showAbandonConfirm && (
-        <AbandonConfirmModal
-          onCancel={() => setShowAbandonConfirm(false)}
-          onConfirm={handleConfirmAbandon}
-        />
-      )}
+      </BoardShell>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { mintModuleBadge } from "@/lib/onchain/badges";
 import { invalidateBadges } from "@/lib/server/badge-cache";
-import { markStreakDay } from "@/lib/streak";
+import { markStreakDay } from "@/lib/streak-data";
 import { isModuleLocked } from "@/lib/modules/lock-check";
 import { awardPoints } from "@/lib/server/point";
 import { triggerReferralOnFirstActivity } from "@/lib/referral/trigger";

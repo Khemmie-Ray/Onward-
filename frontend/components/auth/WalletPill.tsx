@@ -259,7 +259,7 @@ function BalanceRow({ token }: { token: TokenBalance }) {
             className="animate-spin text-fg-soft"
           />
         ) : (
-          <div className="display text-[16px] font-bold tabular-nums text-indigo">
+          <div className="display font-bold tabular-nums text-indigo">
             {formatBalance(token.formatted)}
           </div>
         )}

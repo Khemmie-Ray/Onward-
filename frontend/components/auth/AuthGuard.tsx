@@ -1,5 +1,6 @@
 "use client";
 
+import { HOME_ROUTE } from "@/lib/nav/routes";
 import { useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useConnection } from "wagmi";
@@ -63,7 +64,7 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       if (!data.hasUsername) {
         desiredTarget = isOnboardingPath ? null : "/onboarding/username";
       } else if (isOnboardingPath || isLandingPath) {
-        desiredTarget = "/overview";
+        desiredTarget = HOME_ROUTE;
       }
     }
   }

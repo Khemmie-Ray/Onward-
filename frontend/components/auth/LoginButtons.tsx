@@ -1,54 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useWeb3AuthConnect, useWeb3Auth } from "@web3auth/modal/react";
-import { Mail, Loader2, Wallet } from "lucide-react";
+import { Loader2, Wallet, ArrowRight } from "lucide-react";
 import { WALLET_CONNECTORS, AUTH_CONNECTION } from "@web3auth/modal";
-// import { useConnection } from "wagmi";
-// import { useSession } from "next-auth/react";
-// import { useSiweAuth } from "@/hooks/useSiweAuth";
 
 type Method = "google" | "email" | "wallet" | null;
 
 export function LoginButtons() {
   const { connectTo, loading: connecting, error } = useWeb3AuthConnect();
   const { isInitialized } = useWeb3Auth();
-  // const { isConnected, address } = useConnection();
-  // const { status } = useSession();
-  // const { signInWithEthereum } = useSiweAuth();
 
-  const [signing, setSigning] = useState(false);
   const [activeMethod, setActiveMethod] = useState<Method>(null);
   const [email, setEmail] = useState("");
-  // const siweAttempted = useRef(false);
 
-  console.log(WALLET_CONNECTORS, AUTH_CONNECTION)
-
-  // useEffect(() => {
-  //   if (
-  //     isConnected &&
-  //     address &&
-  //     status === "unauthenticated" &&
-  //     !siweAttempted.current
-  //   ) {
-  //     siweAttempted.current = true;
-  //     setSigning(true);
-  //     signInWithEthereum()
-  //       .then((ok) => {
-  //         if (ok) onSignedIn?.();
-  //       })
-  //       .catch((e) => {
-  //         console.error("[SIWE failed]", e);
-  //         siweAttempted.current = false;
-  //       })
-  //       .finally(() => {
-  //         setSigning(false);
-  //         setActiveMethod(null);
-  //       });
-  //   }
-  // }, [isConnected, address, status, signInWithEthereum, onSignedIn]);
-
-  const anyBusy = !isInitialized || connecting || signing;
+  const anyBusy = !isInitialized || connecting;
 
   const loginWithGoogle = async () => {
     if (anyBusy) return;
@@ -93,11 +59,12 @@ export function LoginButtons() {
   const walletLoading = activeMethod === "wallet";
 
   return (
-    <div className="flex flex-col gap-3 w-full">
+    <div className="flex w-full flex-col gap-4">
+      {/* Google */}
       <button
         onClick={loginWithGoogle}
         disabled={anyBusy}
-        className="w-full flex items-center justify-center gap-3 rounded-xl border-2 border-indigo/15 bg-white py-3.5 font-semibold text-indigo hover:border-indigo/30 transition disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-indigo/15 bg-white py-4 font-semibold text-indigo transition hover:border-indigo/30 active:scale-[0.99] disabled:opacity-50"
       >
         {googleLoading ? (
           <Loader2 size={18} className="animate-spin" />
@@ -106,42 +73,58 @@ export function LoginButtons() {
         )}
         Continue with Google
       </button>
+      <div className="my-1 flex items-center gap-3">
+        <div className="h-px flex-1 bg-indigo/10" />
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-fg-soft">
+          or use your email
+        </span>
+        <div className="h-px flex-1 bg-indigo/10" />
+      </div>
 
+      {/* Email */}
       <div className="flex flex-col gap-2">
+        <label
+          htmlFor="login-email"
+          className="text-[13px] font-bold text-indigo"
+        >
+          Email
+        </label>
         <input
+          id="login-email"
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && loginWithEmail()}
           placeholder="you@email.com"
           disabled={anyBusy}
-          className="w-full px-4 py-3 rounded-xl border-2 border-indigo/15 bg-white text-indigo placeholder:text-fg-soft/60 focus:border-indigo outline-none transition disabled:opacity-50"
+          className="w-full rounded-2xl border-2 border-indigo/15 bg-white px-4 py-3.5 text-indigo outline-none transition placeholder:text-fg-soft/60 focus:border-indigo disabled:opacity-50"
         />
         <button
           onClick={loginWithEmail}
           disabled={anyBusy || !email.trim()}
-          className="w-full flex items-center justify-center gap-2 rounded-xl bg-indigo py-3.5 font-semibold text-cream hover:bg-indigo/90 transition disabled:opacity-40"
+          className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo py-4 font-semibold text-cream transition hover:bg-indigo/90 active:scale-[0.99] disabled:opacity-40"
         >
           {emailLoading ? (
             <Loader2 size={18} className="animate-spin" />
           ) : (
-            <Mail size={18} strokeWidth={2.5} />
+            <>
+              Continue with email <ArrowRight size={18} strokeWidth={2.5} />
+            </>
           )}
-          Continue with email
         </button>
       </div>
-
-      <div className="flex items-center gap-3 my-1">
-        <div className="flex-1 h-px bg-indigo/10" />
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-fg-soft">
+      <div className="my-1 flex items-center gap-3">
+        <div className="h-px flex-1 bg-indigo/10" />
+        <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-fg-soft">
           or connect a wallet
         </span>
-        <div className="flex-1 h-px bg-indigo/10" />
+        <div className="h-px flex-1 bg-indigo/10" />
       </div>
-
+      {/* wallet */}
       <button
         onClick={loginWithWallet}
         disabled={anyBusy}
-        className="w-full flex items-center justify-center gap-2 rounded-xl border-2 border-indigo/15 bg-white py-3.5 font-semibold text-indigo hover:border-indigo/30 transition disabled:opacity-50"
+        className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[#77C082] py-4 font-bold text-[#1B133B] shadow-[0_10px_28px_-10px_rgba(119,192,130,0.7)] transition duration-200 hover:-translate-y-0.5 hover:brightness-95 active:translate-y-0 active:scale-[0.99] disabled:opacity-50"
       >
         {walletLoading ? (
           <Loader2 size={18} className="animate-spin" />
@@ -150,17 +133,7 @@ export function LoginButtons() {
         )}
         Metamask
       </button>
-{/* 
-      {!isInitialized && (
-        <p className="text-center text-[11px] text-fg-soft">
-          Getting things ready…
-        </p>
-      )}
-      {signing && (
-        <p className="text-center text-[11px] text-fg-soft">
-          Confirm the signature to finish signing in…
-        </p>
-      )} */}
+
       {error && (
         <p className="text-center text-[11px] text-terracotta">
           {error.message}
@@ -172,7 +145,7 @@ export function LoginButtons() {
 
 function GoogleIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24">
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
       <path
         fill="#4285F4"
         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"

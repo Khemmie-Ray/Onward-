@@ -1,12 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { type Address } from "viem";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resolveRoundOnchain } from "@/lib/onchain/play";
 import { isVerifiedCached } from "@/lib/server/verification-cache";
 import { gradeRound, nextLevel, SCORING, type PlayMode } from "@/lib/scoring";
+import { loadTier, type TierKey } from "@/lib/scam/difficulty";
 import { awardPoints } from "@/lib/server/point";
 import { triggerReferralOnFirstActivity } from "@/lib/referral/trigger";
+import { evaluateQuests } from "@/lib/server/quest";
 
 type SubmitBody = {
   round_id?: string;
@@ -34,7 +36,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Cached: only hits the chain when the stored value has aged out.
   const isVerified = await isVerifiedCached(
     user.id,
     user.wallet_address as Address,
@@ -106,7 +107,18 @@ export async function POST(request: Request) {
   const missedScams = Math.min(reportedMissed, maxPossibleMissed);
   const appearedScams = correctWhacks + missedScams;
 
-  const grade = gradeRound({ mode, correctWhacks, wrongWhacks, missedScams });
+  const tier = await loadTier((session.difficulty as TierKey) ?? "easy");
+  const grade = gradeRound({
+    mode,
+    correctWhacks,
+    wrongWhacks,
+    missedScams,
+    overrides: {
+      minPrecision: tier.minPrecision,
+      minCorrect: tier.minCorrect,
+      minRecall: tier.minRecall,
+    },
+  });
 
   const levelBefore = user.current_level;
   const levelAfter = nextLevel(levelBefore, grade.passed);
@@ -178,7 +190,8 @@ export async function POST(request: Request) {
     }
   }
 
-  // ─── Onchain resolution ─────────────────────────────────
+  after(() => evaluateQuests(user.id));
+
   let onchain = {
     rewardTxHash: null as string | null,
     stakeResolveTxHash: null as string | null,
@@ -212,10 +225,6 @@ export async function POST(request: Request) {
     await supabaseAdmin
       .from("game_sessions")
       .update({
-        // For premium rounds the payout happens in WhackStake.resolve, so
-        // rewardTxHash is always null there and the resolve hash is what
-        // matters. Persist whichever we got, otherwise the DB can never tell a
-        // settled premium round from an unresolved one.
         reward_tx_hash: r.rewardTxHash ?? r.stakeResolveTxHash,
         stake_resolve_tx_hash: r.stakeResolveTxHash,
         level_badge_tx_hash: r.levelBadgeTxHash,

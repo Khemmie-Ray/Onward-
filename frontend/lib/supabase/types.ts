@@ -52,7 +52,11 @@ export type PointSource =
   | "streak_milestone"
   | "contest_win"
   | "claim_redemption"
-  | "manual_adjustment";
+  | "manual_adjustment"
+  | "daily_quest"
+  | "monthly_quest"
+  | "milestone"
+  | "referral_quality";
 
 export type ClaimStatus = "pending" | "submitted" | "confirmed" | "failed";
 
@@ -75,16 +79,17 @@ export type DbUser = {
   last_active_at: string;
   current_streak: number;
   longest_streak: number;
+  freeze_armed_on: string | null;
   total_g_earned: number;
   current_level: number;
   referral_code: string | null;
   referred_by_user_id: string | null;
   is_verified: boolean | null;
   verified_checked_at: string | null;
-   verified_on_onward: boolean | null;
+  verified_on_onward: boolean | null;
   onward_verified_at: string | null;
   onward_verify_checked_at: string | null;
-  contest_qualified: boolean;         
+  contest_qualified: boolean;
   contest_qualified_at: string | null;
 };
 
@@ -142,7 +147,6 @@ export type DbScamPattern = {
   difficulty: number;
   kind: "dm" | "tweet" | "wallet_popup" | "page";
   content: Record<string, unknown>;
-  icon_id: string | null;
   teaching: string;
   created_at: string;
 };
@@ -157,6 +161,7 @@ export type DbGameSession = {
   status: "pending" | "active" | "submitted" | "expired";
   last_heartbeat_at: string | null;
   mode: "free" | "premium";
+  difficulty: "easy" | "hard" | "superhard";
   started_at: string;
   completed_at: string | null;
   appeared_scams: number | null;
@@ -173,11 +178,14 @@ export type DbGameSession = {
   level_after: number | null;
 };
 
+export type StreakDaySource = "played" | "freeze" | "restore" | "manual";
+
 export type DbStreakDay = {
   user_id: string;
   day: string;
   passed: boolean;
   rounds_played: number;
+  source: StreakDaySource;
 };
 
 export type DbLeaderboardPeriod = {
@@ -230,6 +238,137 @@ export type DbSpendEvent = {
   metadata: Record<string, unknown> | null;
   tx_hash: string | null;
   created_at: string;
+};
+
+export type StreakClaimStatus = "pending" | "paid" | "failed";
+
+export type DbStreakRewardClaim = {
+  id: string;
+  user_id: string;
+  milestone_day: number;
+  amount_g: number;
+  status: StreakClaimStatus;
+  tx_hash: string | null;
+  claimed_at: string;
+  paid_at: string | null;
+};
+
+export type DbStreakRewardCache = {
+  milestone_day: number;
+  amount_g: number;
+  refreshed_at: string;
+};
+
+// ─── Quests and milestones ──────────────────────────────────────────────────
+
+export type QuestTier = "easy" | "medium" | "stretch";
+
+export type QuestMetric =
+  | "modules_completed"
+  | "rounds_played"
+  | "rounds_passed"
+  | "correct_whacks"
+  | "activity_points";
+
+export type DbQuestDefinition = {
+  id: string;
+  title: string;
+  tier: QuestTier;
+  metric: QuestMetric;
+  target: number;
+  params: Record<string, unknown>;
+  weight: number;
+  active: boolean;
+  created_at: string;
+};
+
+export type DbUserDailyQuest = {
+  id: string;
+  user_id: string;
+  quest_day: string;
+  tier: QuestTier;
+  quest_id: string;
+  target: number;
+  progress: number;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type DbMonthlyQuest = {
+  month: string;
+  title: string;
+  description: string | null;
+  target_quest_points: number;
+  reward_points: number;
+  badge_slug: string | null;
+  created_at: string;
+};
+
+export type DbUserMonthlyQuest = {
+  user_id: string;
+  month: string;
+  completed_at: string;
+  badge_tx_hash: string | null;
+};
+
+export type MilestoneCategory =
+  | "getting_started"
+  | "learning"
+  | "quests"
+  | "seasonal";
+
+export type DbMilestoneMetric =
+  | "verified"
+  | "modules_completed"
+  | "track_completed"
+  | "full_clear_days"
+  | "monthly_quests_completed"
+  | "season_participant";
+
+export type DbMilestoneDefinition = {
+  id: string;
+  category: MilestoneCategory;
+  title: string;
+  description: string | null;
+  metric: DbMilestoneMetric;
+  threshold: number;
+  params: Record<string, unknown>;
+  reward_points: number;
+  badge_slug: string | null;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+};
+
+export type DbUserMilestone = {
+  user_id: string;
+  milestone_id: string;
+  achieved_at: string;
+  points_awarded: number;
+  badge_tx_hash: string | null;
+  /** When the user claimed the points. Null = earned, not yet claimed. */
+  claimed_at: string | null;
+};
+
+export type DbDifficultyTier = {
+  key: "easy" | "hard" | "superhard";
+  label: string;
+  rank: number;
+  total_seconds: number;
+  popup_duration_ms: number;
+  base_spawn_delay: number;
+  spawn_jitter: number;
+  board_size: number;
+  list_size: number;
+  scam_ratio: number;
+  min_pattern_difficulty: number;
+  max_pattern_difficulty: number;
+  min_precision: number | null;
+  min_correct: number | null;
+  min_recall: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Database = {
@@ -342,6 +481,25 @@ export type Database = {
         Update: Partial<DbSpendEvent>;
         Relationships: [];
       };
+      streak_reward_claims: {
+        Row: DbStreakRewardClaim;
+        Insert: Partial<DbStreakRewardClaim> & {
+          user_id: string;
+          milestone_day: number;
+          amount_g: number;
+        };
+        Update: Partial<DbStreakRewardClaim>;
+        Relationships: [];
+      };
+      streak_reward_cache: {
+        Row: DbStreakRewardCache;
+        Insert: Partial<DbStreakRewardCache> & {
+          milestone_day: number;
+          amount_g: number;
+        };
+        Update: Partial<DbStreakRewardCache>;
+        Relationships: [];
+      };
       learn_tracks: {
         Row: DbLearnTrack;
         Insert: Partial<DbLearnTrack> & {
@@ -429,6 +587,78 @@ export type Database = {
           ends_at: string;
         };
         Update: Partial<DbContestConfig>;
+        Relationships: [];
+      };
+      quest_definitions: {
+        Row: DbQuestDefinition;
+        Insert: Partial<DbQuestDefinition> & {
+          id: string;
+          title: string;
+          tier: QuestTier;
+          metric: QuestMetric;
+          target: number;
+        };
+        Update: Partial<DbQuestDefinition>;
+        Relationships: [];
+      };
+      user_daily_quests: {
+        Row: DbUserDailyQuest;
+        Insert: Partial<DbUserDailyQuest> & {
+          user_id: string;
+          quest_day: string;
+          tier: QuestTier;
+          quest_id: string;
+          target: number;
+        };
+        Update: Partial<DbUserDailyQuest>;
+        Relationships: [];
+      };
+      monthly_quests: {
+        Row: DbMonthlyQuest;
+        Insert: Partial<DbMonthlyQuest> & {
+          month: string;
+          title: string;
+        };
+        Update: Partial<DbMonthlyQuest>;
+        Relationships: [];
+      };
+      user_monthly_quests: {
+        Row: DbUserMonthlyQuest;
+        Insert: Partial<DbUserMonthlyQuest> & {
+          user_id: string;
+          month: string;
+        };
+        Update: Partial<DbUserMonthlyQuest>;
+        Relationships: [];
+      };
+      milestone_definitions: {
+        Row: DbMilestoneDefinition;
+        Insert: Partial<DbMilestoneDefinition> & {
+          id: string;
+          category: MilestoneCategory;
+          title: string;
+          metric: DbMilestoneMetric;
+        };
+        Update: Partial<DbMilestoneDefinition>;
+        Relationships: [];
+      };
+      user_milestones: {
+        Row: DbUserMilestone;
+        Insert: Partial<DbUserMilestone> & {
+          user_id: string;
+          milestone_id: string;
+        };
+        Update: Partial<DbUserMilestone>;
+        Relationships: [];
+      };
+      difficulty_tiers: {
+        Row: DbDifficultyTier;
+        Insert: Partial<DbDifficultyTier> & {
+          key: DbDifficultyTier["key"];
+          label: string;
+          rank: number;
+        };
+        Update: Partial<DbDifficultyTier>;
         Relationships: [];
       };
     };

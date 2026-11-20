@@ -2,50 +2,52 @@
 
 import { useState } from "react";
 import { ClaimCard } from "./ClaimCard";
-import { WithdrawCard, SwapComingSoon } from "./WithdrawCard";
+import { WithdrawCard } from "./WithdrawCard";
 
-type Panel = "claim" | "withdraw" | "swap";
+type Panel = "withdraw" | "convert";
 
 export function WalletActions() {
-  const [panel, setPanel] = useState<Panel>("claim");
+  const [panel, setPanel] = useState<Panel>("withdraw");
 
   return (
-    <div className="w-full">
-      <div className="mb-4 flex justify-end">
-        <div className="inline-flex items-center gap-1 rounded-full bg-paper p-1.5 shadow-[0_2px_10px_rgba(31,58,110,0.08)]">
-          <TabButton
-            label="Claim"
-            active={panel === "claim"}
-            onClick={() => setPanel("claim")}
-          />
+    <div className="w-full rounded-[24px] bg-paper p-4 shadow-[0_8px_30px_rgba(31,58,110,0.06)] sm:p-6">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-[13px] font-bold uppercase tracking-[0.14em] text-indigo">
+          Wallet actions
+        </h2>
+        <div className="inline-flex gap-1 self-start rounded-full bg-canvas-warm p-1 sm:self-auto">
           <TabButton
             label="Withdraw"
+            dot="bg-forest"
             active={panel === "withdraw"}
             onClick={() => setPanel("withdraw")}
           />
-          {/* <TabButton
-            label="Swap"
-            active={panel === "swap"}
-            onClick={() => setPanel("swap")}
-          /> */}
+          <TabButton
+            label="Convert"
+            dot="bg-mustard"
+            active={panel === "convert"}
+            onClick={() => setPanel("convert")}
+          />
         </div>
       </div>
 
-      {panel === "claim" && (
+      {panel === "withdraw" ? (
+        <WithdrawCard />
+      ) : (
         <ClaimCard onClaimed={() => setPanel("withdraw")} />
       )}
-      {panel === "withdraw" && <WithdrawCard />}
-      {/* {panel === "swap" && <SwapComingSoon />} */}
     </div>
   );
 }
 
 function TabButton({
   label,
+  dot,
   active,
   onClick,
 }: {
   label: string;
+  dot: string;
   active: boolean;
   onClick: () => void;
 }) {
@@ -53,10 +55,11 @@ function TabButton({
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`rounded-full px-5 py-2.5 text-[12.5px] font-bold transition-colors ${
+      className={`inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-[12.5px] font-bold transition-colors ${
         active ? "bg-indigo text-cream" : "text-fg-soft hover:text-indigo"
       }`}
     >
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
       {label}
     </button>
   );

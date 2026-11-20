@@ -22,6 +22,10 @@ const POSITIVE_ONLY_SOURCES: ReadonlySet<PointSource> = new Set([
   "leaderboard_weekly",
   "streak_milestone",
   "contest_win",
+  "daily_quest",
+  "monthly_quest",
+  "milestone",
+  "referral_quality",
 ]);
 
 const NEGATIVE_ONLY_SOURCES: ReadonlySet<PointSource> = new Set([
@@ -55,7 +59,7 @@ export async function awardPoints(
     p_source: source,
     p_user_id: userId,
   });
-  
+
   const { data, error } = await supabaseAdmin.rpc("award_points", {
     p_user_id: userId,
     p_delta: delta,
