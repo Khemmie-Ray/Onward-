@@ -7,6 +7,7 @@ import { invalidateBadges } from "@/lib/server/badge-cache";
 import { markStreakDay } from "@/lib/streak-data";
 import { awardPoints } from "@/lib/server/point";
 import { triggerReferralOnFirstActivity } from "@/lib/referral/trigger";
+import { evaluateQuests } from "@/lib/server/quest";
 import { assertModulePlayable } from "@/lib/learn/lock";
 
 type Body = {
@@ -204,6 +205,7 @@ export async function POST(
 
   await triggerReferralOnFirstActivity(user.id);
   await markStreakDay(user.id);
+  await evaluateQuests(user.id);
 
   return NextResponse.json({
     status: "complete",

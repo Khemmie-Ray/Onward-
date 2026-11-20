@@ -52,7 +52,11 @@ export type PointSource =
   | "streak_milestone"
   | "contest_win"
   | "claim_redemption"
-  | "manual_adjustment";
+  | "manual_adjustment"
+  | "daily_quest"
+  | "monthly_quest"
+  | "milestone"
+  | "referral_quality";
 
 export type ClaimStatus = "pending" | "submitted" | "confirmed" | "failed";
 
@@ -253,6 +257,97 @@ export type DbStreakRewardCache = {
   milestone_day: number;
   amount_g: number;
   refreshed_at: string;
+};
+
+// ─── Quests and milestones ──────────────────────────────────────────────────
+
+export type QuestTier = "easy" | "medium" | "stretch";
+
+export type QuestMetric =
+  | "modules_completed"
+  | "rounds_played"
+  | "rounds_passed"
+  | "correct_whacks"
+  | "activity_points";
+
+export type DbQuestDefinition = {
+  id: string;
+  title: string;
+  tier: QuestTier;
+  metric: QuestMetric;
+  target: number;
+  params: Record<string, unknown>;
+  weight: number;
+  active: boolean;
+  created_at: string;
+};
+
+export type DbUserDailyQuest = {
+  id: string;
+  user_id: string;
+  quest_day: string;
+  tier: QuestTier;
+  quest_id: string;
+  target: number;
+  progress: number;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type DbMonthlyQuest = {
+  month: string;
+  title: string;
+  description: string | null;
+  target_quest_points: number;
+  reward_points: number;
+  badge_slug: string | null;
+  created_at: string;
+};
+
+export type DbUserMonthlyQuest = {
+  user_id: string;
+  month: string;
+  completed_at: string;
+  badge_tx_hash: string | null;
+};
+
+export type MilestoneCategory =
+  | "getting_started"
+  | "learning"
+  | "quests"
+  | "seasonal";
+
+export type DbMilestoneMetric =
+  | "verified"
+  | "modules_completed"
+  | "track_completed"
+  | "full_clear_days"
+  | "monthly_quests_completed"
+  | "season_participant";
+
+export type DbMilestoneDefinition = {
+  id: string;
+  category: MilestoneCategory;
+  title: string;
+  description: string | null;
+  metric: DbMilestoneMetric;
+  threshold: number;
+  params: Record<string, unknown>;
+  reward_points: number;
+  badge_slug: string | null;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+};
+
+export type DbUserMilestone = {
+  user_id: string;
+  milestone_id: string;
+  achieved_at: string;
+  points_awarded: number;
+  badge_tx_hash: string | null;
+  /** When the user claimed the points. Null = earned, not yet claimed. */
+  claimed_at: string | null;
 };
 
 export type DbDifficultyTier = {
@@ -492,6 +587,68 @@ export type Database = {
           ends_at: string;
         };
         Update: Partial<DbContestConfig>;
+        Relationships: [];
+      };
+      quest_definitions: {
+        Row: DbQuestDefinition;
+        Insert: Partial<DbQuestDefinition> & {
+          id: string;
+          title: string;
+          tier: QuestTier;
+          metric: QuestMetric;
+          target: number;
+        };
+        Update: Partial<DbQuestDefinition>;
+        Relationships: [];
+      };
+      user_daily_quests: {
+        Row: DbUserDailyQuest;
+        Insert: Partial<DbUserDailyQuest> & {
+          user_id: string;
+          quest_day: string;
+          tier: QuestTier;
+          quest_id: string;
+          target: number;
+        };
+        Update: Partial<DbUserDailyQuest>;
+        Relationships: [];
+      };
+      monthly_quests: {
+        Row: DbMonthlyQuest;
+        Insert: Partial<DbMonthlyQuest> & {
+          month: string;
+          title: string;
+        };
+        Update: Partial<DbMonthlyQuest>;
+        Relationships: [];
+      };
+      user_monthly_quests: {
+        Row: DbUserMonthlyQuest;
+        Insert: Partial<DbUserMonthlyQuest> & {
+          user_id: string;
+          month: string;
+        };
+        Update: Partial<DbUserMonthlyQuest>;
+        Relationships: [];
+      };
+      milestone_definitions: {
+        Row: DbMilestoneDefinition;
+        Insert: Partial<DbMilestoneDefinition> & {
+          id: string;
+          category: MilestoneCategory;
+          title: string;
+          metric: DbMilestoneMetric;
+        };
+        Update: Partial<DbMilestoneDefinition>;
+        Relationships: [];
+      };
+      user_milestones: {
+        Row: DbUserMilestone;
+        Insert: Partial<DbUserMilestone> & {
+          user_id: string;
+          milestone_id: string;
+        };
+        Update: Partial<DbUserMilestone>;
         Relationships: [];
       };
       difficulty_tiers: {

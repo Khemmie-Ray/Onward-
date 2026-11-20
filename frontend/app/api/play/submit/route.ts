@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { type Address } from "viem";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -8,6 +8,7 @@ import { gradeRound, nextLevel, SCORING, type PlayMode } from "@/lib/scoring";
 import { loadTier, type TierKey } from "@/lib/scam/difficulty";
 import { awardPoints } from "@/lib/server/point";
 import { triggerReferralOnFirstActivity } from "@/lib/referral/trigger";
+import { evaluateQuests } from "@/lib/server/quest";
 
 type SubmitBody = {
   round_id?: string;
@@ -188,6 +189,8 @@ export async function POST(request: Request) {
       console.error("[submit route points award failed]", err);
     }
   }
+
+  after(() => evaluateQuests(user.id));
 
   let onchain = {
     rewardTxHash: null as string | null,
