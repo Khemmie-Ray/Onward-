@@ -1,3 +1,4 @@
+// frontend/app/(authed)/(main)/profile/page.tsx
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
@@ -5,10 +6,10 @@ import { useConnection } from "wagmi";
 import { LoopSigil } from "@/components/home/motifs";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import { useProfile } from "@/hooks/useProfile";
+import { useMilestones } from "@/hooks/useMilestones";
 import ProfileHeader from "@/components/dashboard/profile/ProfileHeader";
 import { ProfileStat } from "@/components/dashboard/profile/ProfileStat";
-import { Milestones } from "@/components/dashboard/profile/Milestones";
-import { MILESTONE_TRACKS, resolveMilestone } from "@/lib/milestones";
+import { MilestonesInProgress } from "@/components/dashboard/milestones/MilestonesInProgress";
 
 type PointsData = {
   balance: number;
@@ -26,6 +27,7 @@ const Profile = () => {
   const { address } = useConnection();
 
   const { profile: data, error } = useProfile();
+  const { milestones } = useMilestones();
 
   const { data: points } = useQuery({
     queryKey: ["points", "balance", address ?? "anon"],
@@ -83,19 +85,13 @@ const Profile = () => {
   const leaderboardPoints = points?.leaderboard_points ?? 0;
   const contestRewardsG = contest?.summary?.total_g ?? 0;
 
-  const metrics: Record<string, number> = {
-    streak: data.currentStreak,
-    modules: data.modulesCompleted,
-    referrals: data.referralsQualified,
-  };
-  const milestones = MILESTONE_TRACKS.map((t) =>
-    resolveMilestone(t, metrics[t.metric] ?? 0),
-  );
-
-  const flagship = [...milestones].sort(
-    (a, b) => b.tierLevel - a.tierLevel || b.value - a.value,
-  )[0];
-  const flagshipLabel = flagship?.tierName ?? "Newcomer";
+  // The badge under your name is the latest milestone you've earned.
+  const latest = (milestones ?? [])
+    .filter((m) => m.achieved_at)
+    .sort((a, b) =>
+      (b.achieved_at ?? "").localeCompare(a.achieved_at ?? ""),
+    )[0];
+  const flagshipLabel = latest?.title ?? "Newcomer";
 
   return (
     <>
@@ -143,7 +139,7 @@ const Profile = () => {
         />
       </section>
 
-      <Milestones items={milestones} />
+      <MilestonesInProgress />
     </>
   );
 };

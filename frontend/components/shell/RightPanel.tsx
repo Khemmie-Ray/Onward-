@@ -16,7 +16,7 @@ type PanelEntry = {
 
 const RIGHT_PANELS: PanelEntry[] = [
   { match: (p) => p.startsWith("/play/"), Panel: GameRightPanel },
-  { match: (p) => p === "/play" || p === "/learn", Panel: PlayRightPanel },
+  { match: (p) => p === "/play" || p === "/learn" || p === "/courses", Panel: PlayRightPanel },
   {
     match: (p) => p === "/board" || p.startsWith("/board/"),
     Panel: BoardRightPanel,

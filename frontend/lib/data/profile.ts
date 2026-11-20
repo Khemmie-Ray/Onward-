@@ -1,3 +1,4 @@
+// frontend/lib/data/profile.ts
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { DbUser, ModuleCategory } from "@/lib/supabase/types";
 import { EXPLORER_BASE } from "@/constants/contracts/address";
@@ -40,6 +41,8 @@ export async function loadProfileData(user: DbUser): Promise<ProfileData> {
     { data: completions },
     { data: streakDays },
     { count: referralsQualifiedCount },
+    { count: learnCompletedCount },
+    { count: learnTotalCount },
   ] = await Promise.all([
     supabaseAdmin
       .from("modules")
@@ -63,6 +66,18 @@ export async function loadProfileData(user: DbUser): Promise<ProfileData> {
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("source", "referral"),
+
+    // Lesson counts come from the current learn flow, not the legacy
+    // modules tables.
+    supabaseAdmin
+      .from("learn_completions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id),
+
+    supabaseAdmin
+      .from("learn_modules")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "live"),
   ]);
 
   const roundsPlayed = (streakDays ?? []).reduce(
@@ -105,8 +120,8 @@ export async function loadProfileData(user: DbUser): Promise<ProfileData> {
     daysOnOnward,
     avatarId: user.avatar_id ?? null,
     totalGEarned: Number(user.total_g_earned),
-    modulesCompleted: badges.filter((b) => b.earned).length,
-    modulesTotal: badges.length,
+    modulesCompleted: learnCompletedCount ?? 0,
+    modulesTotal: learnTotalCount ?? 0,
     currentLevel: user.current_level,
     longestStreak: user.longest_streak,
     currentStreak: user.current_streak,
