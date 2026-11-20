@@ -7,7 +7,7 @@ import type { Address } from "viem";
 const FIRST_PRICE = 100;
 const SUBSEQUENT_PRICE = 200;
 
-const RESTORE_WINDOW_DAYS = 1;
+const RESTORE_WINDOW_DAYS = 2;
 
 function dayStr(d: Date): string {
   const c = new Date(d);
@@ -40,20 +40,16 @@ export async function GET(request: Request) {
     const d = new Date(today);
     d.setUTCDate(today.getUTCDate() - i);
     const ds = dayStr(d);
-    if (!passed.has(ds)) missedDays.push(ds);
+    if (passed.has(ds)) break;
+    missedDays.push(ds);
   }
+  if (missedDays.length === 0) return NextResponse.json({ restorable: false });
 
   const earliestMissed = missedDays[missedDays.length - 1];
-  let restorable = false;
-  if (earliestMissed) {
-    const before = new Date(earliestMissed + "T00:00:00Z");
-    before.setUTCDate(before.getUTCDate() - 1);
-    restorable = passed.has(dayStr(before));
-  }
-
-  if (!restorable) {
+  const before = new Date(earliestMissed + "T00:00:00Z");
+  before.setUTCDate(before.getUTCDate() - 1);
+  if (!passed.has(dayStr(before)))
     return NextResponse.json({ restorable: false });
-  }
 
   const wallet = (user.wallet_address as string | undefined)
     ?.split(":")
@@ -63,10 +59,18 @@ export async function GET(request: Request) {
     try {
       const owned = await freezesOwnedOnchain(wallet as Address);
       if (owned > 0n) {
-        return NextResponse.json({
-          restorable: false,
-          covered_by_freeze: true,
-        });
+        const { data: u2 } = await supabaseAdmin
+          .from("users")
+          .select("freeze_armed_on")
+          .eq("id", user.id)
+          .maybeSingle();
+        const armedOn = (u2?.freeze_armed_on as string | null) ?? null;
+        if (armedOn && earliestMissed >= armedOn) {
+          return NextResponse.json({
+            restorable: false,
+            covered_by_freeze: true,
+          });
+        }
       }
     } catch (e) {
       console.error("[restore-status] freeze read failed", e);
@@ -82,7 +86,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     restorable: true,
-    missed_days: missedDays,
+    missed_days: [...missedDays].sort(),
     price,
     current_streak: user.current_streak ?? 0,
   });

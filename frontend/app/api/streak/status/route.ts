@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
   const { data: claims } = await supabaseAdmin
     .from("streak_reward_claims")
-    .select("milestone_day, status, tx_hash")
+    .select("milestone_day, status, tx_hash, claimed_at, paid_at")
     .eq("user_id", user.id);
 
   const { data: cached } = await supabaseAdmin
@@ -44,6 +44,10 @@ export async function GET(request: Request) {
       amount_g: amountByDay.get(day) ?? 0,
       state,
       tx_hash: claim?.tx_hash ?? null,
+      claimed_at:
+        state === "claimed"
+          ? (claim?.paid_at ?? claim?.claimed_at ?? null)
+          : null,
     };
   });
 

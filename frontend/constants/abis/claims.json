@@ -16,6 +16,28 @@
   },
   {
     "type": "function",
+    "name": "batchContestReward",
+    "inputs": [
+      {
+        "name": "recipients",
+        "type": "address[]",
+        "internalType": "address[]"
+      },
+      { "name": "amounts", "type": "uint256[]", "internalType": "uint256[]" },
+      { "name": "batchRef", "type": "bytes32", "internalType": "bytes32" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "buyFreeze",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "claimCount",
     "inputs": [],
     "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
@@ -34,6 +56,31 @@
     "type": "function",
     "name": "claimedGloballyToday",
     "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "consumeFreeze",
+    "inputs": [
+      { "name": "user", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [
+      { "name": "remaining", "type": "uint256", "internalType": "uint256" }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "freezePrice",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "freezesOwned",
+    "inputs": [{ "name": "", "type": "address", "internalType": "address" }],
     "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
     "stateMutability": "view"
   },
@@ -198,6 +245,54 @@
   },
   {
     "type": "function",
+    "name": "restoreCount",
+    "inputs": [{ "name": "", "type": "address", "internalType": "address" }],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "restoreFirstPrice",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "restorePriceFor",
+    "inputs": [
+      { "name": "user", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "restoreStreak",
+    "inputs": [],
+    "outputs": [
+      { "name": "price", "type": "uint256", "internalType": "uint256" }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "restoreSubsequentPrice",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "setFreezePrice",
+    "inputs": [
+      { "name": "price", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setIdentity",
     "inputs": [
       { "name": "_identity", "type": "address", "internalType": "address" }
@@ -244,9 +339,33 @@
   },
   {
     "type": "function",
+    "name": "setRestorePrices",
+    "inputs": [
+      { "name": "firstPrice", "type": "uint256", "internalType": "uint256" },
+      {
+        "name": "subsequentPrice",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setSigner",
     "inputs": [
       { "name": "_signer", "type": "address", "internalType": "address" }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setStreakReward",
+    "inputs": [
+      { "name": "day", "type": "uint256", "internalType": "uint256" },
+      { "name": "amount", "type": "uint256", "internalType": "uint256" }
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -280,6 +399,35 @@
   },
   {
     "type": "function",
+    "name": "streakClaim",
+    "inputs": [
+      { "name": "user", "type": "address", "internalType": "address" },
+      { "name": "day", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [
+      { "name": "amount", "type": "uint256", "internalType": "uint256" }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "streakClaimed",
+    "inputs": [
+      { "name": "", "type": "address", "internalType": "address" },
+      { "name": "", "type": "uint256", "internalType": "uint256" }
+    ],
+    "outputs": [{ "name": "", "type": "bool", "internalType": "bool" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "streakRewards",
+    "inputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "totalClaimedG",
     "inputs": [],
     "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
@@ -287,7 +435,28 @@
   },
   {
     "type": "function",
+    "name": "totalContestPaidG",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "totalPointsSettled",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalStreakPaidG",
+    "inputs": [],
+    "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "totalStreakProtectionCollectedG",
     "inputs": [],
     "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
     "stateMutability": "view"
@@ -418,6 +587,94 @@
         "type": "bytes32",
         "indexed": true,
         "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ContestRewardPaid",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "batchRef",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FreezeConsumed",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "remaining",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FreezePriceSet",
+    "inputs": [
+      {
+        "name": "previous",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "current",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "FreezePurchased",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "price",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "nowOwned",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -576,6 +833,25 @@
   },
   {
     "type": "event",
+    "name": "RestorePricesSet",
+    "inputs": [
+      {
+        "name": "firstPrice",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "subsequentPrice",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "SignerChanged",
     "inputs": [
       {
@@ -589,6 +865,81 @@
         "type": "address",
         "indexed": true,
         "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "StreakRestorePaid",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "price",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "restoreNumber",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "StreakRewardClaimed",
+    "inputs": [
+      {
+        "name": "user",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "day",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "StreakRewardSet",
+    "inputs": [
+      {
+        "name": "day",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "previous",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "current",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -671,15 +1022,20 @@
     ]
   },
   { "type": "error", "name": "ERC1967NonPayable", "inputs": [] },
+  { "type": "error", "name": "EmptyBatch", "inputs": [] },
   { "type": "error", "name": "EnforcedPause", "inputs": [] },
   { "type": "error", "name": "ExceedsGlobalDailyCap", "inputs": [] },
   { "type": "error", "name": "ExceedsUserDailyCap", "inputs": [] },
   { "type": "error", "name": "ExceedsUserWeeklyCap", "inputs": [] },
   { "type": "error", "name": "ExpectedPause", "inputs": [] },
   { "type": "error", "name": "FailedCall", "inputs": [] },
+  { "type": "error", "name": "FreezeDisabled", "inputs": [] },
   { "type": "error", "name": "InsufficientReserve", "inputs": [] },
   { "type": "error", "name": "InvalidInitialization", "inputs": [] },
   { "type": "error", "name": "InvalidRate", "inputs": [] },
+  { "type": "error", "name": "LengthMismatch", "inputs": [] },
+  { "type": "error", "name": "MilestoneNotConfigured", "inputs": [] },
+  { "type": "error", "name": "NoFreezeToConsume", "inputs": [] },
   { "type": "error", "name": "NotInitializing", "inputs": [] },
   { "type": "error", "name": "NotSigner", "inputs": [] },
   { "type": "error", "name": "NotVerified", "inputs": [] },
@@ -698,6 +1054,7 @@
     ]
   },
   { "type": "error", "name": "ReentrancyGuardReentrantCall", "inputs": [] },
+  { "type": "error", "name": "RestoreNotPriced", "inputs": [] },
   {
     "type": "error",
     "name": "SafeERC20FailedOperation",
@@ -705,6 +1062,7 @@
       { "name": "token", "type": "address", "internalType": "address" }
     ]
   },
+  { "type": "error", "name": "StreakAlreadyClaimed", "inputs": [] },
   { "type": "error", "name": "UUPSUnauthorizedCallContext", "inputs": [] },
   {
     "type": "error",
