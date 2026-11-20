@@ -12,6 +12,7 @@ export function EndRoundModal({
   pointsAwarded,
   txPending,
   txHash,
+  error = null,
   onSeeMissed,
   onPlayAgain,
 }: {
@@ -23,35 +24,44 @@ export function EndRoundModal({
   pointsAwarded: number;
   txPending: boolean;
   txHash: string | null;
+  /** Scoring failed. Replaces the "Scoring…" state. */
+  error?: string | null;
   onSeeMissed: () => void;
   onPlayAgain: () => void;
 }) {
-  const waiting = passed === null;
+  const failed = passed === null && Boolean(error);
+  const waiting = passed === null && !failed;
   const didPass = passed === true;
 
-  const badge = waiting
-    ? "Scoring…"
-    : didPass
-      ? pointsAwarded > 0
-        ? `Round passed · +${pointsAwarded} pts`
-        : "Round passed"
-      : "Not passed yet";
+  const badge = failed
+    ? "Couldn't score"
+    : waiting
+      ? "Scoring…"
+      : didPass
+        ? pointsAwarded > 0
+          ? `Round passed · +${pointsAwarded} pts`
+          : "Round passed"
+        : "Not passed yet";
 
-  const title = waiting
-    ? "Checking your round…"
-    : didPass
-      ? `You caught the ${familyLabel.toLowerCase()}`
-      : "Close. A few slipped past you";
+  const title = failed
+    ? "We couldn't score this round"
+    : waiting
+      ? "Checking your round…"
+      : didPass
+        ? `You caught the ${familyLabel.toLowerCase()}`
+        : "Close. A few slipped past you";
 
   return (
     <div className="w-full">
       <span
         className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold ${
-          waiting
-            ? "bg-canvas-warm text-fg-soft"
-            : didPass
-              ? "bg-forest text-paper"
-              : "bg-mustard/25 text-[#9a6b12]"
+          failed
+            ? "bg-terracotta-tint text-terracotta"
+            : waiting
+              ? "bg-canvas-warm text-fg-soft"
+              : didPass
+                ? "bg-forest text-paper"
+                : "bg-mustard/25 text-[#9a6b12]"
         }`}
       >
         {waiting && (
@@ -63,6 +73,8 @@ export function EndRoundModal({
       <h2 className="display mt-3 text-[26px] font-bold leading-tight tracking-[-0.01em] text-indigo">
         {title}
       </h2>
+
+      {failed && <p className="mt-1.5 text-[13px] text-fg-soft">{error}</p>}
 
       <div className="mt-4 grid grid-cols-3 gap-2.5">
         <StatTile value={result.correctWhacks} label="caught" tone="forest" />

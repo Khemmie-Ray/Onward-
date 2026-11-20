@@ -18,7 +18,7 @@ export function ProfileStat({
 }) {
   return (
     <div
-      className={`w-full md:w-[calc(25%-9px)] rounded-[18px] px-4 py-3.5 ${TONE_BG[tone]}`}
+      className={`w-full md:w-[calc(33.333%-8px)] rounded-[18px] px-4 py-3.5 ${TONE_BG[tone]}`}
     >
       <div className="display text-[26px] font-bold leading-none tabular-nums text-indigo">
         {value}

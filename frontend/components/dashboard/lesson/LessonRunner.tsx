@@ -1,3 +1,4 @@
+// frontend/components/dashboard/lesson/LessonRunner.tsx
 "use client";
 
 import { useState } from "react";
@@ -152,6 +153,10 @@ export function LessonRunner({
       queryClient.invalidateQueries({ queryKey: ["me", "status"] });
       queryClient.invalidateQueries({ queryKey: ["learn"] });
       queryClient.invalidateQueries({ queryKey: ["modules"] });
+      queryClient.invalidateQueries({ queryKey: ["quests"] });
+      queryClient.invalidateQueries({ queryKey: ["leaderboard", "quests"] });
+      queryClient.invalidateQueries({ queryKey: ["milestones"] });
+      queryClient.invalidateQueries({ queryKey: ["streak", "rewards"] });
     } catch (err) {
       console.error("[submitCompletion]", err);
       setCompletion((prev) =>
