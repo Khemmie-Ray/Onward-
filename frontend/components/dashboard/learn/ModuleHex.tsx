@@ -1,8 +1,8 @@
 "use client";
 
-import { Check, Clock, Sparkles } from "lucide-react";
+import { Check, Clock, Moon, Sparkles } from "lucide-react";
 
-export type HexState = "done" | "in_progress" | "next" | "locked";
+export type HexState = "done" | "in_progress" | "next" | "tomorrow" | "locked";
 
 export type HexModule = {
   slug: string;
@@ -18,6 +18,7 @@ const FILL: Record<HexState, string> = {
   done: "#5CC27C",
   in_progress: "#241A4D",
   next: "transparent",
+  tomorrow: "#241A4D",
   locked: "rgba(255,255,255,0.03)",
 };
 
@@ -25,12 +26,14 @@ const STROKE: Record<HexState, string> = {
   done: "#2E7A4C",
   in_progress: "#E6B448",
   next: "rgba(255,255,255,0.6)",
+  tomorrow: "#CDC4FB",
   locked: "rgba(255,255,255,0.12)",
 };
 const STROKE_W: Record<HexState, number> = {
   done: 3,
   in_progress: 3,
   next: 3,
+  tomorrow: 3,
   locked: 2,
 };
 const HEX_POINTS = "50,1.5 99,29 99,86.5 50,114 1,86.5 1,29";
@@ -46,6 +49,9 @@ export function ModuleHex({
 }) {
   const height = Math.round(width * 1.1547);
   const isLocked = module.state === "locked";
+  const isTomorrow = module.state === "tomorrow";
+  // Up next opens once the section before it is done; until then it's a preview.
+  const isClosed = isLocked || isTomorrow || module.state === "next";
   const num = String(module.order).padStart(2, "0");
   const textColor =
     module.state === "done"
@@ -58,11 +64,11 @@ export function ModuleHex({
     <div className="group/hex relative" style={{ width, height }}>
       <button
         type="button"
-        disabled={isLocked}
-        onClick={() => !isLocked && onOpen?.(module.slug)}
-        aria-label={`Module ${num}: ${module.title}`}
+        disabled={isClosed}
+        onClick={() => !isClosed && onOpen?.(module.slug)}
+        aria-label={`Module ${num}: ${module.title}${isTomorrow ? ", opens tomorrow" : ""}`}
         className={`relative block h-full w-full transition-transform ${
-          isLocked ? "cursor-default" : "cursor-pointer hover:scale-[1.05]"
+          isClosed ? "cursor-default" : "cursor-pointer hover:scale-[1.05]"
         }`}
       >
         <svg
@@ -75,7 +81,9 @@ export function ModuleHex({
             fill={FILL[module.state]}
             stroke={STROKE[module.state]}
             strokeWidth={STROKE_W[module.state]}
-            strokeDasharray={module.state === "next" ? "5 5" : undefined}
+            strokeDasharray={
+              module.state === "next" || isTomorrow ? "5 5" : undefined
+            }
           />
         </svg>
         <span
@@ -93,6 +101,11 @@ export function ModuleHex({
           <p className="line-clamp-2 text-[12.5px] font-bold leading-tight text-indigo">
             {module.title}
           </p>
+          {isTomorrow && (
+            <p className="mt-1 text-[11.5px] font-semibold text-aubergine">
+              Opens tomorrow. Today&apos;s section is done.
+            </p>
+          )}
           <div className="mt-2 flex items-center gap-3 text-[11px] font-semibold text-fg-soft">
             <span className="flex items-center gap-1">
               <Clock size={12} strokeWidth={2.4} />
@@ -122,6 +135,13 @@ function HexLabel({ state, pct }: { state: HexState; pct?: number | null }) {
     return (
       <span className="mt-0.5 text-[9px] font-bold uppercase tracking-wide text-mustard">
         {pct != null ? `${pct}%` : "in progress"}
+      </span>
+    );
+  if (state === "tomorrow")
+    return (
+      <span className="mt-0.5 flex items-center gap-0.5 text-[9px] font-bold uppercase tracking-wide text-[#CDC4FB]">
+        <Moon size={9} strokeWidth={3} />
+        tomorrow
       </span>
     );
   if (state === "next")

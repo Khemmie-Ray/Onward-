@@ -7,6 +7,7 @@ import { GameRightPanel } from "./panels/GameRightPanel";
 import { BoardRightPanel } from "./panels/BoardRightPanel";
 import { ProfileRightPanel } from "./panels/ProfileRightPanel";
 import { WalletRightPanel } from "./panels/WalletRightPanel";
+import { LearnTrackRightPanel } from "./panels/LearnTrackRightPanel";
 import { StatBar } from "./StatBar";
 
 type PanelEntry = {
@@ -16,7 +17,11 @@ type PanelEntry = {
 
 const RIGHT_PANELS: PanelEntry[] = [
   { match: (p) => p.startsWith("/play/"), Panel: GameRightPanel },
-  { match: (p) => p === "/play" || p === "/learn" || p === "/courses", Panel: PlayRightPanel },
+  {
+    match: (p) => p === "/play" || p === "/learn" || p === "/courses",
+    Panel: PlayRightPanel,
+  },
+  { match: (p) => p.startsWith("/learn/"), Panel: LearnTrackRightPanel },
   {
     match: (p) => p === "/board" || p.startsWith("/board/"),
     Panel: BoardRightPanel,

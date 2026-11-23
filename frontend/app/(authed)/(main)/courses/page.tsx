@@ -1,78 +1,66 @@
+// frontend/app/(authed)/(main)/courses/page.tsx
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
-import { BookOpen, Clock, Lock, Bell, ArrowRight } from "lucide-react";
+import { useCourses } from "@/hooks/useCourses";
+import type { CourseCard } from "@/lib/data/courses";
+import { BookOpen, Clock, Lock, Bell, ArrowRight, Loader2 } from "lucide-react";
 
-// ── Integration points ──────────────────────────────
-const LEARN_ROUTE = "/learn"; // ← your learn page route
+const LEARN_ROUTE = "/learn";
 
-type CourseStatus = "available" | "coming-soon";
-type Course = {
-  id: string;
-  title: string;
-  description: string;
-  lessons: number;
-  minutesEach: number;
-  status: CourseStatus;
-};
-
-const COURSES: Course[] = [
-  {
-    id: "web3",
-    title: "Web3 & Blockchain",
-    description:
-      "Wallets, tokens, networks and how to stay safe while you use them.",
-    lessons: 36,
-    minutesEach: 5,
-    status: "available",
-  },
-  {
-    id: "coming-1",
-    title: "New course",
-    description:
-      "Another subject is on the way. We will tell you the moment it opens.",
-    lessons: 0,
-    minutesEach: 0,
-    status: "coming-soon",
-  },
-];
-
-// Per-user progress returned by the backend, keyed by course id.
-type Progress = {
-  lessonsThisWeek: number;
-  courses: Record<string, { enrolled: boolean; completed: number }>;
+/** Shown when no upcoming course has been added to the courses table yet. */
+const PLACEHOLDER: CourseCard = {
+  slug: "coming-soon",
+  title: "New course",
+  description:
+    "Another subject is on the way. We will tell you the moment it opens.",
+  image_url: null,
+  status: "coming_soon",
+  lessons: 0,
+  minutes_each: 0,
+  enrolled: false,
+  completed: 0,
 };
 
 export default function CoursesPage() {
   const router = useRouter();
   const authFetch = useAuthFetch();
+  const queryClient = useQueryClient();
+  const { data, isLoading, isError } = useCourses();
+  const [starting, setStarting] = useState<string | null>(null);
+  const [enrolError, setEnrolError] = useState<string | null>(null);
 
-  const { data } = useQuery({
-    queryKey: ["courses", "progress"],
-    queryFn: async () => {
-      const res = await authFetch("/api/courses/progress"); // ← your endpoint
-      if (!res.ok) throw new Error("Failed to load progress");
-      return (await res.json()) as Progress;
-    },
-    staleTime: 60_000,
-    retry: false,
-  });
+  const lessonsThisWeek = data?.lessons_this_week ?? 0;
+  const courses = data?.courses ?? [];
+  const available = courses.filter((c) => c.status === "available");
+  const upcoming = courses.filter((c) => c.status === "coming_soon");
 
-  const lessonsThisWeek = data?.lessonsThisWeek ?? 0;
-
-  const startCourse = async (course: Course, enrolled: boolean) => {
-    if (!enrolled) {
-      // Enrol the new user, then send them into the lessons.
+  const startCourse = async (course: CourseCard) => {
+    setEnrolError(null);
+    if (!course.enrolled) {
+      setStarting(course.slug);
       try {
-        await authFetch("/api/courses/enrol", {
+        const res = await authFetch("/api/courses/enrol", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ course_id: course.id }),
+          body: JSON.stringify({ course_slug: course.slug }),
         });
+        if (!res.ok) {
+          const d = (await res.json().catch(() => ({}))) as { error?: string };
+          setEnrolError(d.error ?? "We couldn't enrol you. Please try again.");
+          setStarting(null);
+          return;
+        }
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["courses"] }),
+          queryClient.invalidateQueries({ queryKey: ["learn"] }),
+        ]);
       } catch {
-        // non-blocking: still route them in
+        setEnrolError("We couldn't reach the server. Check your connection.");
+        setStarting(null);
+        return;
       }
     }
     router.push(LEARN_ROUTE);
@@ -91,10 +79,22 @@ export default function CoursesPage() {
             Short lessons on things worth knowing, at your own pace. New courses
             appear here as they launch.
           </p>
-          <span className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-2 text-[13px] font-bold text-white">
-            <span className="h-2 w-2 rounded-full bg-[#77C082]" />
-            {lessonsThisWeek} lessons done this week
-          </span>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-2 text-[13px] font-bold text-white">
+              <span className="h-2 w-2 rounded-full bg-[#77C082]" />
+              {lessonsThisWeek} lessons done this week
+            </span>
+            {data?.today_done !== undefined && (
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-2 text-[13px] font-bold text-white">
+                <span
+                  className={`h-2 w-2 rounded-full ${data.today_done ? "bg-[#CDC4FB]" : "bg-mustard"}`}
+                />
+                {data.today_done
+                  ? "Today's section done. Next one tomorrow"
+                  : "Today's section is ready"}
+              </span>
+            )}
+          </div>
         </div>
         <img
           src="/images/courses-banner-art.png"
@@ -103,38 +103,55 @@ export default function CoursesPage() {
         />
       </section>
 
+      {enrolError && (
+        <p className="mt-4 rounded-2xl border border-terracotta/30 bg-terracotta/10 px-4 py-3 text-[13px] font-semibold text-terracotta">
+          {enrolError}
+        </p>
+      )}
+
       {/* Course grid */}
-      <div className="mt-5 flex flex-wrap gap-x-[2%] gap-y-4">
-        {COURSES.map((course) => {
-          if (course.status === "coming-soon")
-            return <ComingSoonCard key={course.id} course={course} />;
-          const p = data?.courses?.[course.id];
-          return (
-            <ActiveCourseCard
-              key={course.id}
-              course={course}
-              enrolled={p?.enrolled ?? false}
-              completed={p?.completed ?? 0}
-              onStart={() => startCourse(course, p?.enrolled ?? false)}
+      {isLoading ? (
+        <div className="mt-5 flex flex-wrap gap-x-[2%] gap-y-4" aria-hidden>
+          {[0, 1].map((i) => (
+            <div
+              key={i}
+              className="h-80 w-full animate-pulse rounded-3xl bg-paper md:w-[48%]"
             />
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      ) : isError ? (
+        <div className="mt-5 rounded-3xl bg-paper p-6 text-center text-[14px] text-fg-soft">
+          We couldn&apos;t load courses. Refresh the page to try again.
+        </div>
+      ) : (
+        <div className="mt-5 flex flex-wrap gap-x-[2%] gap-y-4">
+          {available.map((course) => (
+            <ActiveCourseCard
+              key={course.slug}
+              course={course}
+              starting={starting === course.slug}
+              onStart={() => startCourse(course)}
+            />
+          ))}
+          {(upcoming.length > 0 ? upcoming : [PLACEHOLDER]).map((course) => (
+            <ComingSoonCard key={course.slug} course={course} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 function ActiveCourseCard({
   course,
-  enrolled,
-  completed,
+  starting,
   onStart,
 }: {
-  course: Course;
-  enrolled: boolean;
-  completed: number;
+  course: CourseCard;
+  starting: boolean;
   onStart: () => void;
 }) {
+  const { enrolled, completed } = course;
   const pct = course.lessons
     ? Math.min(100, Math.round((completed / course.lessons) * 100))
     : 0;
@@ -144,14 +161,17 @@ function ActiveCourseCard({
       <div className="flex items-start justify-between gap-3">
         {enrolled ? (
           <span className="inline-flex items-center gap-1.5 rounded-full bg-[#77C082]/15 px-3 py-1 text-[12px] font-bold text-[#2E5237]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#77C082]" /> Your course
+            <span className="h-1.5 w-1.5 rounded-full bg-[#77C082]" /> Your
+            course
           </span>
         ) : (
           <span className="inline-flex items-center rounded-full bg-indigo/10 px-3 py-1 text-[12px] font-bold text-indigo">
             Available now
           </span>
         )}
-        <img src="/images/course-web3-art.png" alt="" className="w-[110px] shrink-0" />
+        {course.image_url && (
+          <img src={course.image_url} alt="" className="w-[110px] shrink-0" />
+        )}
       </div>
 
       <h3 className="mt-2 text-[26px] font-extrabold tracking-[-0.03em] text-[#1B133B]">
@@ -166,7 +186,7 @@ function ActiveCourseCard({
           <BookOpen size={14} /> {course.lessons} lessons
         </span>
         <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo/5 px-3 py-1.5 text-[13px] font-semibold text-[#1B133B]">
-          <Clock size={14} /> {course.minutesEach} min each
+          <Clock size={14} /> {course.minutes_each} min each
         </span>
       </div>
 
@@ -190,17 +210,24 @@ function ActiveCourseCard({
       <div className="mt-auto pt-6">
         <button
           onClick={onStart}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-[#77C082] py-3.5 font-bold text-[#1B133B] transition duration-200 hover:-translate-y-0.5 hover:brightness-95 active:translate-y-0 active:scale-[0.99]"
+          disabled={starting}
+          className="flex w-full items-center justify-center gap-2 rounded-full bg-[#77C082] py-3.5 font-bold text-[#1B133B] transition duration-200 hover:-translate-y-0.5 hover:brightness-95 active:translate-y-0 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70 disabled:hover:translate-y-0"
         >
-          {enrolled ? "Continue learning" : "Enrol"}
-          <ArrowRight size={18} strokeWidth={2.5} />
+          {starting ? (
+            <Loader2 size={18} className="animate-spin" />
+          ) : (
+            <>
+              {enrolled ? "Continue learning" : "Enrol"}
+              <ArrowRight size={18} strokeWidth={2.5} />
+            </>
+          )}
         </button>
       </div>
     </div>
   );
 }
 
-function ComingSoonCard({ course }: { course: Course }) {
+function ComingSoonCard({ course }: { course: CourseCard }) {
   return (
     <div className="flex w-full flex-col overflow-hidden rounded-3xl border border-dashed border-fg-soft/25 bg-paper/40 p-6 md:w-[48%] lg:w-[48%]">
       <div className="flex items-start justify-between gap-3">
@@ -208,7 +235,7 @@ function ComingSoonCard({ course }: { course: Course }) {
           <Lock size={18} className="text-indigo" />
         </div>
         <img
-          src="/images/course-coming-soon-art.png"
+          src={course.image_url ?? "/images/course-coming-soon-art.png"}
           alt=""
           className="w-[110px] shrink-0 opacity-40 grayscale"
         />

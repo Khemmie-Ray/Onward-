@@ -23,7 +23,7 @@ export function ModuleHexMap({
   const rowCount = Math.max(1, Math.ceil(modules.length / COLS));
 
   const placed = modules.map((m, i) => {
-    const row = Math.floor(i / COLS); 
+    const row = Math.floor(i / COLS);
     const idxInRow = i % COLS;
     const col = row % 2 === 1 ? COLS - 1 - idxInRow : idxInRow;
     return { m, row, col };
@@ -40,7 +40,7 @@ export function ModuleHexMap({
 
   const badgeRow = rowCount;
   const badgeX = xFor(badgeRow, 1);
-  const badgeY = yFor(badgeRow); 
+  const badgeY = yFor(badgeRow);
 
   const drawOrder = [...placed].sort((a, b) => b.row - a.row);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -68,7 +68,6 @@ export function ModuleHexMap({
             transformOrigin: "top left",
           }}
         >
-          {/* Track badge, nested above the top row */}
           <Cell x={badgeX} y={badgeY} w={W} h={H}>
             <BadgeHex />
           </Cell>
@@ -141,6 +140,9 @@ export function HexLegend() {
       </LegendItem>
       <LegendItem label="Up next">
         <span className="h-3 w-3 rounded-[3px] border-2 border-dashed border-paper/60" />
+      </LegendItem>
+      <LegendItem label="Tomorrow">
+        <span className="h-3 w-3 rounded-[3px] border-2 border-dashed border-[#CDC4FB] bg-[#241A4D]" />
       </LegendItem>
       <LegendItem label="Locked">
         <span className="h-3 w-3 rounded-[3px] border-2 border-paper/15" />

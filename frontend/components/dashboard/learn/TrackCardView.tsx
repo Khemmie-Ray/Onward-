@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Lock, Check, ArrowRight, Clock, Sparkles } from "lucide-react";
+import { Lock, Check, ArrowRight, Clock, Moon, Sparkles } from "lucide-react";
 import { LoopSigil } from "@/components/home/motifs";
 
 export type TrackCard = {
@@ -23,6 +23,7 @@ export type TrackCard = {
     title: string;
     estimated_minutes: number;
     points_reward: number;
+    opens_tomorrow?: boolean;
   } | null;
 };
 
@@ -143,6 +144,12 @@ export const TrackCardView = ({
                   <Sparkles size={11} strokeWidth={2.4} />
                   {track.next_module.points_reward} pts
                 </span>
+                {track.next_module.opens_tomorrow && (
+                  <span className="flex items-center gap-1 text-aubergine">
+                    <Moon size={11} strokeWidth={2.4} />
+                    Opens tomorrow
+                  </span>
+                )}
               </div>
             )}
           </div>
