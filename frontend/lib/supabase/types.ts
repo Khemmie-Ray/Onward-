@@ -1,3 +1,4 @@
+// frontend/lib/supabase/types.ts
 export type FlipCardContent = {
   front: string;
   hint: string;
@@ -500,6 +501,75 @@ export type Database = {
         Update: Partial<DbStreakRewardCache>;
         Relationships: [];
       };
+      courses: {
+        Row: DbCourse;
+        Insert: Partial<DbCourse> & {
+          slug: string;
+          title: string;
+          order_index: number;
+        };
+        Update: Partial<DbCourse>;
+        Relationships: [];
+      };
+      course_enrollments: {
+        Row: DbCourseEnrollment;
+        Insert: Partial<DbCourseEnrollment> & {
+          user_id: string;
+          course_id: string;
+        };
+        Update: Partial<DbCourseEnrollment>;
+        Relationships: [];
+      };
+      course_modules: {
+        Row: DbCourseModule;
+        Insert: Partial<DbCourseModule> & {
+          course_id: string;
+          slug: string;
+          title: string;
+          order_index: number;
+        };
+        Update: Partial<DbCourseModule>;
+        Relationships: [];
+      };
+      course_sections: {
+        Row: DbCourseSection;
+        Insert: Partial<DbCourseSection> & {
+          module_id: string;
+          slug: string;
+          title: string;
+          order_in_module: number;
+        };
+        Update: Partial<DbCourseSection>;
+        Relationships: [];
+      };
+      section_versions: {
+        Row: DbSectionVersion;
+        Insert: Partial<DbSectionVersion> & {
+          section_id: string;
+          version: number;
+          items: unknown[];
+        };
+        Update: Partial<DbSectionVersion>;
+        Relationships: [];
+      };
+      section_completions: {
+        Row: DbSectionCompletion;
+        Insert: Partial<DbSectionCompletion> & {
+          user_id: string;
+          section_id: string;
+        };
+        Update: Partial<DbSectionCompletion>;
+        Relationships: [];
+      };
+      section_progress: {
+        Row: DbSectionProgress;
+        Insert: Partial<DbSectionProgress> & {
+          user_id: string;
+          section_id: string;
+        };
+        Update: Partial<DbSectionProgress>;
+        Relationships: [];
+      };
       learn_tracks: {
         Row: DbLearnTrack;
         Insert: Partial<DbLearnTrack> & {
@@ -664,6 +734,23 @@ export type Database = {
     };
     Views: {};
     Functions: {
+      copy_course_learn_history: {
+        Args: { p_course_slug: string };
+        Returns: {
+          modules_added: number;
+          sections_added: number;
+          completions_added: number;
+          progress_added: number;
+        }[];
+      };
+      compare_course_learn_history: {
+        Args: { p_course_slug: string };
+        Returns: {
+          user_id: string;
+          old_completions: number;
+          new_completions: number;
+        }[];
+      };
       award_points: {
         Args: {
           p_user_id: string;
@@ -693,11 +780,106 @@ export type ModuleDetail = DbModule & {
 };
 
 export type LearnTrackStatus = "available" | "coming_soon";
+
+export type CourseStatus = "available" | "coming_soon";
+
+export type DbCourse = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  order_index: number;
+  status: CourseStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CourseEnrollmentSource = "self" | "backfill";
+
+export type DbCourseEnrollment = {
+  user_id: string;
+  course_id: string;
+  enrolled_at: string;
+  source: CourseEnrollmentSource;
+};
+
+/** A module of a course (was a learn_tracks row). */
+export type DbCourseModule = {
+  id: string;
+  course_id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  order_index: number;
+  status: "available" | "coming_soon" | "draft";
+  icon: string | null;
+  legacy_track_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** A section of a module (was a learn_modules row, same slug). */
+export type DbCourseSection = {
+  id: string;
+  module_id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  order_in_module: number;
+  estimated_minutes: number;
+  points_reward: number;
+  first_card_tease: string | null;
+  what_you_will_learn: string[];
+  status: "draft" | "live";
+  legacy_module_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SectionVersionStatus = "draft" | "published" | "retired";
+
+/** One version of a section's exercises. items follow lib/learn/content-schema Item. */
+export type DbSectionVersion = {
+  id: string;
+  section_id: string;
+  version: number;
+  status: SectionVersionStatus;
+  items: unknown[];
+  notes: string | null;
+  created_at: string;
+  published_at: string | null;
+};
+
+export type DbSectionCompletion = {
+  id: string;
+  user_id: string;
+  section_id: string;
+  version_id: string | null;
+  completed_at: string;
+  score: number | null;
+  points_awarded: number;
+  badge_token_id: string | null;
+  badge_tx_hash: string | null;
+  source: "live" | "copied";
+  legacy_completion_id: string | null;
+};
+
+export type DbSectionProgress = {
+  user_id: string;
+  section_id: string;
+  current_card: number;
+  started_at: string;
+  last_active_at: string;
+};
+
 export type LearnModuleStatus = "draft" | "live";
 export type LearnCardType = "flip" | "choice" | "spotter" | "visual";
 
 export type DbLearnTrack = {
   id: string;
+  /** The course this track belongs to. */
+  course_id: string | null;
   slug: string;
   title: string;
   description: string | null;
