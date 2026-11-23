@@ -1,19 +1,40 @@
 import { NextResponse } from "next/server";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getEnrolledCourseIds } from "@/lib/server/enrollment";
+import { sectionContentEnabled } from "@/lib/learn/section-content";
+import { listModules } from "@/lib/learn/course-store";
 
 export async function GET(request: Request) {
   const auth = await requireCompletedProfile(request);
   if ("error" in auth) return auth.error;
   const { user } = auth;
 
+  if (sectionContentEnabled()) {
+    try {
+      return NextResponse.json(await listModules(user.id as string));
+    } catch (err) {
+      console.error("[learn tracks] load failed", err);
+      return NextResponse.json(
+        { error: "We couldn't load your lessons. Please try again." },
+        { status: 500 },
+      );
+    }
+  }
+
+  const enrolledCourses = await getEnrolledCourseIds(user.id as string);
+  if (enrolledCourses.size === 0) {
+    return NextResponse.json({ enrolled: false, tracks: [] });
+  }
+
   const { data: tracks } = await supabaseAdmin
     .from("learn_tracks")
     .select("id, slug, title, description, order_index, status, icon")
+    .in("course_id", [...enrolledCourses])
     .order("order_index", { ascending: true });
 
   if (!tracks) {
-    return NextResponse.json({ tracks: [] });
+    return NextResponse.json({ enrolled: true, tracks: [] });
   }
 
   const { data: modules } = await supabaseAdmin
@@ -90,5 +111,5 @@ export async function GET(request: Request) {
     };
   });
 
-  return NextResponse.json({ tracks: result });
+  return NextResponse.json({ enrolled: true, tracks: result });
 }
