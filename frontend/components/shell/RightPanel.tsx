@@ -9,6 +9,7 @@ import { ProfileRightPanel } from "./panels/ProfileRightPanel";
 import { WalletRightPanel } from "./panels/WalletRightPanel";
 import { LearnTrackRightPanel } from "./panels/LearnTrackRightPanel";
 import { StatBar } from "./StatBar";
+import { VoteCard } from "./VoterCard";
 
 type PanelEntry = {
   match: (pathname: string) => boolean;
@@ -60,6 +61,7 @@ export function RightPanelOutlet() {
   return (
     <aside className="no-scrollbar hidden h-full w-full flex-col gap-3 overflow-y-auto py-6 px-4 lg:flex md:flex">
       <StatBar />
+      <VoteCard />
       <Panel />
     </aside>
   );
