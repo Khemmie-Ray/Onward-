@@ -1,5 +1,6 @@
 "use client";
 
+import { HOME_ROUTE } from "@/lib/nav/routes";
 import { useEffect } from "react";
 import { useConnection } from "wagmi";
 import { useSession } from "next-auth/react";
@@ -22,27 +23,22 @@ export function SiweGate() {
     if (!isConnected || !address) return;
     if (status === "loading" || inFlight) return;
 
-    // KEY FIX: check whether the SESSION address matches the CONNECTED wallet.
-    // A stale session from a previous login can leave status="authenticated"
-    // for a DIFFERENT address than the wallet now connected. In that case we
-    // must run SIWE for the new wallet, not skip.
     const sessionAddress = session?.address?.toLowerCase();
     const connectedAddress = address.toLowerCase();
     const sessionMatchesWallet =
       status === "authenticated" && sessionAddress === connectedAddress;
 
     if (sessionMatchesWallet) {
-      // Correctly authenticated for THIS wallet — nothing to do.
       return;
     }
 
-    // Either unauthenticated, OR authenticated as a different (stale) address.
     if (attemptedAddresses.has(connectedAddress)) return;
 
     console.log("[SiweGate] FIRING SIWE for", connectedAddress, {
       status,
       sessionAddress,
-      reason: status === "authenticated" ? "stale-session-mismatch" : "no-session",
+      reason:
+        status === "authenticated" ? "stale-session-mismatch" : "no-session",
     });
 
     attemptedAddresses.add(connectedAddress);
@@ -52,7 +48,7 @@ export function SiweGate() {
       .then((ok) => {
         console.log("[SiweGate] SIWE result:", ok);
         if (ok) {
-          window.location.assign("/overview");
+          window.location.assign(HOME_ROUTE);
         } else {
           attemptedAddresses.delete(connectedAddress);
         }
