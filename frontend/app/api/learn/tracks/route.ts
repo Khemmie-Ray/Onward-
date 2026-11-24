@@ -1,25 +1,49 @@
 import { NextResponse } from "next/server";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { getEnrolledCourseIds } from "@/lib/server/enrollment";
+import { sectionContentEnabled } from "@/lib/learn/section-content";
+import { listModules } from "@/lib/learn/course-store";
 
 export async function GET(request: Request) {
   const auth = await requireCompletedProfile(request);
   if ("error" in auth) return auth.error;
   const { user } = auth;
 
+  if (sectionContentEnabled()) {
+    try {
+      return NextResponse.json(await listModules(user.id as string));
+    } catch (err) {
+      console.error("[learn tracks] load failed", err);
+      return NextResponse.json(
+        { error: "We couldn't load your lessons. Please try again." },
+        { status: 500 },
+      );
+    }
+  }
+
+  const enrolledCourses = await getEnrolledCourseIds(user.id as string);
+  if (enrolledCourses.size === 0) {
+    return NextResponse.json({ enrolled: false, tracks: [] });
+  }
+
   const { data: tracks } = await supabaseAdmin
     .from("learn_tracks")
     .select("id, slug, title, description, order_index, status, icon")
+    .in("course_id", [...enrolledCourses])
     .order("order_index", { ascending: true });
 
   if (!tracks) {
-    return NextResponse.json({ tracks: [] });
+    return NextResponse.json({ enrolled: true, tracks: [] });
   }
 
   const { data: modules } = await supabaseAdmin
     .from("learn_modules")
-    .select("id, track_id")
-    .eq("status", "live");
+    .select(
+      "id, track_id, slug, title, order_in_track, estimated_minutes, points_reward",
+    )
+    .eq("status", "live")
+    .order("order_in_track", { ascending: true });
 
   const { data: completions } = await supabaseAdmin
     .from("learn_completions")
@@ -28,17 +52,35 @@ export async function GET(request: Request) {
 
   const completedIds = new Set((completions ?? []).map((c) => c.module_id));
 
-  const modulesByTrack = new Map<string, string[]>();
+  const modulesByTrack = new Map<
+    string,
+    Array<{
+      id: string;
+      slug: string;
+      title: string;
+      estimated_minutes: number;
+      points_reward: number;
+    }>
+  >();
   for (const m of modules ?? []) {
     const list = modulesByTrack.get(m.track_id) ?? [];
-    list.push(m.id);
+    list.push({
+      id: m.id,
+      slug: m.slug,
+      title: m.title,
+      estimated_minutes: m.estimated_minutes,
+      points_reward: m.points_reward,
+    });
     modulesByTrack.set(m.track_id, list);
   }
 
   const result = tracks.map((t) => {
-    const moduleIds = modulesByTrack.get(t.id) ?? [];
-    const total = moduleIds.length;
-    const done = moduleIds.filter((id) => completedIds.has(id)).length;
+    const trackModules = modulesByTrack.get(t.id) ?? [];
+    const total = trackModules.length;
+    const done = trackModules.filter((m) => completedIds.has(m.id)).length;
+
+    const next = trackModules.find((m) => !completedIds.has(m.id)) ?? null;
+
     return {
       slug: t.slug,
       title: t.title,
@@ -57,8 +99,17 @@ export async function GET(request: Request) {
               : done === total
                 ? "complete"
                 : "in_progress",
+      next_module:
+        next && t.status !== "coming_soon"
+          ? {
+              slug: next.slug,
+              title: next.title,
+              estimated_minutes: next.estimated_minutes,
+              points_reward: next.points_reward,
+            }
+          : null,
     };
   });
 
-  return NextResponse.json({ tracks: result });
+  return NextResponse.json({ enrolled: true, tracks: result });
 }

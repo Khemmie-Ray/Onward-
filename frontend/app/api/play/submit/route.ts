@@ -1,12 +1,14 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { type Address } from "viem";
 import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { resolveRoundOnchain } from "@/lib/onchain/play";
 import { isVerifiedCached } from "@/lib/server/verification-cache";
 import { gradeRound, nextLevel, SCORING, type PlayMode } from "@/lib/scoring";
+import { loadTier, type TierKey } from "@/lib/scam/difficulty";
 import { awardPoints } from "@/lib/server/point";
 import { triggerReferralOnFirstActivity } from "@/lib/referral/trigger";
+import { evaluateQuests } from "@/lib/server/quest";
 
 type SubmitBody = {
   round_id?: string;
@@ -34,7 +36,6 @@ export async function POST(request: Request) {
     );
   }
 
-  // Cached: only hits the chain when the stored value has aged out.
   const isVerified = await isVerifiedCached(
     user.id,
     user.wallet_address as Address,
@@ -59,54 +60,67 @@ export async function POST(request: Request) {
 
   const mode = (session.mode ?? "free") as PlayMode;
 
-  if (body.whacks.length > SCORING.maxTotalWhacks) {
-    return NextResponse.json(
-      { error: "Too many whacks submitted" },
-      { status: 400 },
-    );
-  }
+  const whacks = body.whacks
+    .filter((pid): pid is string => typeof pid === "string")
+    .slice(0, SCORING.maxTotalWhacks);
 
   const items = session.items as Array<{
     pattern_id: string;
     is_scam: boolean;
   }>;
   const patternMap = new Map<string, boolean>();
+  const occurrences = new Map<string, number>();
   for (const item of items) {
     patternMap.set(item.pattern_id, item.is_scam);
-  }
-
-  const perPatternCount = new Map<string, number>();
-  for (const pid of body.whacks) {
-    if (!patternMap.has(pid)) {
-      return NextResponse.json(
-        { error: "Invalid pattern_id in whacks" },
-        { status: 400 },
-      );
-    }
-    const c = (perPatternCount.get(pid) ?? 0) + 1;
-    if (c > SCORING.maxPerPatternWhacks) {
-      return NextResponse.json(
-        { error: "Per-pattern whack cap exceeded" },
-        { status: 400 },
-      );
-    }
-    perPatternCount.set(pid, c);
+    occurrences.set(
+      item.pattern_id,
+      (occurrences.get(item.pattern_id) ?? 0) + 1,
+    );
   }
 
   let correctWhacks = 0;
   let wrongWhacks = 0;
-  for (const pid of body.whacks) {
-    if (patternMap.get(pid)) correctWhacks++;
+  let ignoredWhacks = 0;
+  const counted = new Map<string, number>();
+  for (const pid of whacks) {
+    const isScam = patternMap.get(pid);
+    const limit = (occurrences.get(pid) ?? 0) * SCORING.maxListPasses;
+    const c = counted.get(pid) ?? 0;
+    if (isScam === undefined || c >= limit) {
+      ignoredWhacks++;
+      continue;
+    }
+    counted.set(pid, c + 1);
+    if (isScam) correctWhacks++;
     else wrongWhacks++;
   }
+  if (ignoredWhacks > 0 || whacks.length < body.whacks.length) {
+    console.warn("[submit] whacks trimmed", {
+      round_id: session.id,
+      ignored: ignoredWhacks,
+      submitted: body.whacks.length,
+    });
+  }
 
-  const scamsInList = items.filter((it) => it.is_scam).length;
-  const reportedMissed = Math.max(0, body.missed_scams ?? 0);
-  const maxPossibleMissed = Math.max(0, scamsInList - correctWhacks);
-  const missedScams = Math.min(reportedMissed, maxPossibleMissed);
+  const reportedMissed = Math.max(
+    0,
+    Math.floor(Number(body.missed_scams) || 0),
+  );
+  const missedScams = Math.min(reportedMissed, SCORING.maxSpawnedScamsReported);
   const appearedScams = correctWhacks + missedScams;
 
-  const grade = gradeRound({ mode, correctWhacks, wrongWhacks, missedScams });
+  const tier = await loadTier((session.difficulty as TierKey) ?? "easy");
+  const grade = gradeRound({
+    mode,
+    correctWhacks,
+    wrongWhacks,
+    missedScams,
+    overrides: {
+      minPrecision: tier.minPrecision,
+      minCorrect: tier.minCorrect,
+      minRecall: tier.minRecall,
+    },
+  });
 
   const levelBefore = user.current_level;
   const levelAfter = nextLevel(levelBefore, grade.passed);
@@ -178,7 +192,9 @@ export async function POST(request: Request) {
     }
   }
 
-  // ─── Onchain resolution ─────────────────────────────────
+ 
+  after(() => evaluateQuests(user.id));
+
   let onchain = {
     rewardTxHash: null as string | null,
     stakeResolveTxHash: null as string | null,
@@ -212,10 +228,6 @@ export async function POST(request: Request) {
     await supabaseAdmin
       .from("game_sessions")
       .update({
-        // For premium rounds the payout happens in WhackStake.resolve, so
-        // rewardTxHash is always null there and the resolve hash is what
-        // matters. Persist whichever we got, otherwise the DB can never tell a
-        // settled premium round from an unresolved one.
         reward_tx_hash: r.rewardTxHash ?? r.stakeResolveTxHash,
         stake_resolve_tx_hash: r.stakeResolveTxHash,
         level_badge_tx_hash: r.levelBadgeTxHash,

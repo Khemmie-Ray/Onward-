@@ -1,6 +1,6 @@
 import type { ModuleCategory } from "../themes/tones";
 
-export type ModuleStatus = "complete" | "active" | "available" | "locked";
+export type ModuleStatus = "complete" | "active" | "available" | "tomorrow" | "locked";
 
 export type ModulePreview = {
   slug: string;

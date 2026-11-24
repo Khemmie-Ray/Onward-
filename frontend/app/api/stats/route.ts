@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getPlatformVolumeG } from "@/lib/onchain/volume";
+import { countAllCompletions } from "@/lib/learn/learn-stats";
 
 export const revalidate = 60;
 
@@ -14,14 +15,11 @@ export async function GET() {
         supabaseAdmin
           .from("module_completions")
           .select("id", { count: "exact", head: true }),
-        supabaseAdmin
-          .from("learn_completions")
-          .select("id", { count: "exact", head: true }),
+        countAllCompletions(),
         getPlatformVolumeG(),
       ]);
 
-    const modulesDone =
-      (moduleCompletions.count ?? 0) + (learnCompletions.count ?? 0);
+    const modulesDone = (moduleCompletions.count ?? 0) + learnCompletions;
 
     return NextResponse.json({
       learners: usersCount.count ?? 0,

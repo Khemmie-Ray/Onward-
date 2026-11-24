@@ -1,5 +1,11 @@
-import { Folder, BookOpen, Target, Trophy, User } from "lucide-react";
-import type { Tone } from "../themes/tones";
+import {
+  BookOpen,
+  Gamepad2,
+  Wallet,
+  BarChart3,
+  User,
+  GraduationCap,
+} from "lucide-react";
 
 export type NavBadge = {
   text?: string;
@@ -12,17 +18,16 @@ export type NavDestination = {
   icon: React.ComponentType<
     React.SVGProps<SVGSVGElement> & { size?: number; strokeWidth?: number }
   >;
-  tone: Tone;
   badge?: NavBadge;
 };
 
 export const NAV_DESTINATIONS: NavDestination[] = [
-  { href: "/overview", label: "Overview", icon: Folder, tone: "indigo" },
-  { href: "/learn", label: "Learn", icon: BookOpen, tone: "mustard" },
-  { href: "/play", label: "Play", icon: Target, tone: "terracotta" },
-  // { href: "/ecosystem", label: "Ecosystem", icon: Globe, tone: "forest" },
-  { href: "/profile", label: "Profile", icon: User, tone: "aubergine" },
-  { href: "/board", label: "Leaderboard", icon: Trophy, tone: "forest" },
+  { href: "/courses", label: "Courses", icon: GraduationCap },
+  { href: "/learn", label: "Learn", icon: BookOpen },
+  { href: "/play", label: "Play", icon: Gamepad2 },
+  { href: "/wallet", label: "Wallet", icon: Wallet },
+  { href: "/board", label: "Leaderboard", icon: BarChart3 },
+  { href: "/profile", label: "Profile", icon: User },
 ];
 
 export function isActiveDestination(pathname: string, href: string): boolean {

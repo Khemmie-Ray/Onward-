@@ -30,10 +30,22 @@ export async function GET(request: Request) {
     0,
   );
 
+  const { data: leaderboardRows } = await supabaseAdmin
+    .from("point_transactions")
+    .select("delta")
+    .eq("user_id", user.id)
+    .eq("source", "leaderboard_weekly");
+
+  const leaderboardPoints = (leaderboardRows ?? []).reduce(
+    (sum, r) => sum + (r.delta ?? 0),
+    0,
+  );
+
   return NextResponse.json({
     balance,
     lifetime_earned: lifetimeEarned,
     lifetime_claimed: lifetimeClaimed,
+    leaderboard_points: leaderboardPoints,
     claimed_this_week: claimedThisWeek,
     weekly_cap: 1000,
     thresholds: {

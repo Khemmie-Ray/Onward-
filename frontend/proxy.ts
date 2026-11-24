@@ -1,8 +1,9 @@
+import { HOME_ROUTE } from "@/lib/nav/routes";
 import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/", "/leaderboard"] as const;
+const PUBLIC_PATHS = ["/", "/login"] as const;
 
 const AUTH_API_PREFIX = "/api/auth";
 
@@ -38,7 +39,7 @@ export async function proxy(req: NextRequest) {
   }
 
   if (isAuthenticated && isPublic) {
-    return NextResponse.redirect(new URL("/overview", req.url));
+    return NextResponse.redirect(new URL(HOME_ROUTE, req.url));
   }
 
   return NextResponse.next();

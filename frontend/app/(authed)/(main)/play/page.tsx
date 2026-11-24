@@ -4,7 +4,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
-import { GameCardView, type GameCard } from "@/components/dashboard/play/GameCardView";
+import {
+  GameCardView,
+  type GameCard,
+} from "@/components/dashboard/play/GameCardView";
+import { PlayHero } from "@/components/dashboard/play/PlayHero";
 
 export default function PlayPage() {
   const authFetch = useAuthFetch();
@@ -21,7 +25,7 @@ export default function PlayPage() {
 
   if (isLoading || !data) {
     return (
-      <div className="min-h-[500px] flex items-center justify-center">
+      <div className="flex min-h-[500px] items-center justify-center">
         <Loader2 size={24} className="animate-spin text-fg-soft" />
       </div>
     );
@@ -32,23 +36,28 @@ export default function PlayPage() {
     router.push(`/play/${game.slug}`);
   };
 
+  const liveCount = data.games.filter((g) => g.status === "available").length;
+
   return (
-    <div className="my-4">
-      <div className="mb-8 animate-[fade-up_0.6s_ease_both]">
-        <h1 className="display text-[28px] font-semibold tracking-[-0.015em] text-indigo mb-1.5">
-          Play and earn
-        </h1>
-        <p className="text-[13.5px] text-fg-soft max-w-[520px]">
-          Sharpen your instincts with quick games. Spot scams, keep your streak,
-          and earn real rewards for playing well.
-        </p>
+    <div className="">
+     
+      <PlayHero />
+
+      <div className="mb-4 mt-8">
+        <h2 className="display text-[22px] font-semibold text-indigo">
+          All games
+        </h2>
+        <span className="text-[12px] text-fg-soft">
+          {liveCount} live · more on the way
+        </span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-[fade-up_0.7s_0.1s_ease_both]">
-        {data.games.map((game) => (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {data.games.map((game, i) => (
           <GameCardView
             key={game.slug}
             game={game}
+            index={i}
             onOpen={() => openGame(game)}
           />
         ))}

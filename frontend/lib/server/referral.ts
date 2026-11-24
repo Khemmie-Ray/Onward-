@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { countUserCompletions } from "@/lib/learn/learn-stats";
 
 export async function attributeReferral(
   newUserId: string,
@@ -54,7 +55,7 @@ export async function maybeAwardReferralBonus(
       referredIsVerified = await isVerifiedOnchainSafe(
         referredUser.wallet_address as `0x${string}`,
       );
-     
+
       if (referredIsVerified) {
         await supabaseAdmin
           .from("users")
@@ -93,12 +94,8 @@ export async function maybeAwardReferralBonus(
 }
 
 async function referredUserHasActivity(userId: string): Promise<boolean> {
-  const [lesson, round] = await Promise.all([
-    supabaseAdmin
-      .from("learn_completions")
-      .select("id", { head: true, count: "exact" })
-      .eq("user_id", userId)
-      .limit(1),
+  const [lessonCount, round] = await Promise.all([
+    countUserCompletions(userId),
     supabaseAdmin
       .from("game_sessions")
       .select("id", { head: true, count: "exact" })
@@ -107,7 +104,6 @@ async function referredUserHasActivity(userId: string): Promise<boolean> {
       .limit(1),
   ]);
 
-  const lessonCount = lesson.count ?? 0;
   const roundCount = round.count ?? 0;
   return lessonCount > 0 || roundCount > 0;
 }

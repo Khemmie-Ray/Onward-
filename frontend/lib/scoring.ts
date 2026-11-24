@@ -7,16 +7,16 @@ export const SCORING = {
   free: {
     minPrecision: 0.6,
     minCorrect: 7,
-    minRecall: 0.5, 
+    minRecall: 0.5,
   },
   premium: {
     minPrecision: 0.6,
     minCorrect: 12,
-    minRecall: 0.7, 
+    minRecall: 0.7,
   },
 
   maxTotalWhacks: 200,
-  maxPerPatternWhacks: 20,
+  maxListPasses: 3,
   maxSpawnedScamsReported: 100,
 
   maxLevel: 100,
@@ -27,6 +27,11 @@ export type GradeInput = {
   correctWhacks: number;
   wrongWhacks: number;
   missedScams: number;
+  overrides?: {
+    minPrecision?: number | null;
+    minCorrect?: number | null;
+    minRecall?: number | null;
+  };
 };
 
 export type GradeResult = {
@@ -54,11 +59,19 @@ export function gradeRound(input: GradeInput): GradeResult {
   const totalScams = correctWhacks + missedScams;
   const recall = totalScams > 0 ? correctWhacks / totalScams : 0;
 
-  const config = mode === "premium" ? SCORING.premium : SCORING.free;
+  // A tier can only make a round harder. Each rule takes the stricter of the
+  // mode's base and the tier's value, so a hard tier never lowers the bar a
+  // premium round already has.
+  const base = mode === "premium" ? SCORING.premium : SCORING.free;
+  const o = input.overrides;
+  const minPrecision = Math.max(base.minPrecision, o?.minPrecision ?? 0);
+  const minCorrect = Math.max(base.minCorrect, o?.minCorrect ?? 0);
+  const minRecall = Math.max(base.minRecall, o?.minRecall ?? 0);
+
   const passed =
-    precision >= config.minPrecision &&
-    correctWhacks >= config.minCorrect &&
-    recall >= config.minRecall;
+    precision >= minPrecision &&
+    correctWhacks >= minCorrect &&
+    recall >= minRecall;
 
   const score = Math.max(0, correctWhacks - wrongWhacks);
   const rewardAmount = passed
@@ -76,11 +89,11 @@ export function gradeRound(input: GradeInput): GradeResult {
     passed,
     rewardAmount,
     threshold: {
-      minPrecision: config.minPrecision,
-      minPrecisionPercent: Math.round(config.minPrecision * 100),
-      minCorrect: config.minCorrect,
-      minRecall: config.minRecall,
-      minRecallPercent: Math.round(config.minRecall * 100),
+      minPrecision,
+      minPrecisionPercent: Math.round(minPrecision * 100),
+      minCorrect,
+      minRecall,
+      minRecallPercent: Math.round(minRecall * 100),
     },
   };
 }

@@ -49,10 +49,15 @@ export type PointSource =
   | "daily_login"
   | "referral"
   | "leaderboard_weekly"
+  | "leaderboard_quests"
   | "streak_milestone"
   | "contest_win"
   | "claim_redemption"
-  | "manual_adjustment";
+  | "manual_adjustment"
+  | "daily_quest"
+  | "monthly_quest"
+  | "milestone"
+  | "referral_quality";
 
 export type ClaimStatus = "pending" | "submitted" | "confirmed" | "failed";
 
@@ -75,16 +80,17 @@ export type DbUser = {
   last_active_at: string;
   current_streak: number;
   longest_streak: number;
+  freeze_armed_on: string | null;
   total_g_earned: number;
   current_level: number;
   referral_code: string | null;
   referred_by_user_id: string | null;
   is_verified: boolean | null;
   verified_checked_at: string | null;
-   verified_on_onward: boolean | null;
+  verified_on_onward: boolean | null;
   onward_verified_at: string | null;
   onward_verify_checked_at: string | null;
-  contest_qualified: boolean;         
+  contest_qualified: boolean;
   contest_qualified_at: string | null;
 };
 
@@ -142,9 +148,10 @@ export type DbScamPattern = {
   difficulty: number;
   kind: "dm" | "tweet" | "wallet_popup" | "page";
   content: Record<string, unknown>;
-  icon_id: string | null;
   teaching: string;
   created_at: string;
+  /** Order the pattern was added. Drives the daily rotation. */
+  seq: number;
 };
 
 export type DbGameSession = {
@@ -157,6 +164,7 @@ export type DbGameSession = {
   status: "pending" | "active" | "submitted" | "expired";
   last_heartbeat_at: string | null;
   mode: "free" | "premium";
+  difficulty: "easy" | "hard" | "superhard";
   started_at: string;
   completed_at: string | null;
   appeared_scams: number | null;
@@ -173,11 +181,14 @@ export type DbGameSession = {
   level_after: number | null;
 };
 
+export type StreakDaySource = "played" | "freeze" | "restore" | "manual";
+
 export type DbStreakDay = {
   user_id: string;
   day: string;
   passed: boolean;
   rounds_played: number;
+  source: StreakDaySource;
 };
 
 export type DbLeaderboardPeriod = {
@@ -230,6 +241,137 @@ export type DbSpendEvent = {
   metadata: Record<string, unknown> | null;
   tx_hash: string | null;
   created_at: string;
+};
+
+export type StreakClaimStatus = "pending" | "paid" | "failed";
+
+export type DbStreakRewardClaim = {
+  id: string;
+  user_id: string;
+  milestone_day: number;
+  amount_g: number;
+  status: StreakClaimStatus;
+  tx_hash: string | null;
+  claimed_at: string;
+  paid_at: string | null;
+};
+
+export type DbStreakRewardCache = {
+  milestone_day: number;
+  amount_g: number;
+  refreshed_at: string;
+};
+
+// ─── Quests and milestones ──────────────────────────────────────────────────
+
+export type QuestTier = "easy" | "medium" | "stretch";
+
+export type QuestMetric =
+  | "modules_completed"
+  | "rounds_played"
+  | "rounds_passed"
+  | "correct_whacks"
+  | "activity_points";
+
+export type DbQuestDefinition = {
+  id: string;
+  title: string;
+  tier: QuestTier;
+  metric: QuestMetric;
+  target: number;
+  params: Record<string, unknown>;
+  weight: number;
+  active: boolean;
+  created_at: string;
+};
+
+export type DbUserDailyQuest = {
+  id: string;
+  user_id: string;
+  quest_day: string;
+  tier: QuestTier;
+  quest_id: string;
+  target: number;
+  progress: number;
+  completed_at: string | null;
+  created_at: string;
+};
+
+export type DbMonthlyQuest = {
+  month: string;
+  title: string;
+  description: string | null;
+  target_quest_points: number;
+  reward_points: number;
+  badge_slug: string | null;
+  created_at: string;
+};
+
+export type DbUserMonthlyQuest = {
+  user_id: string;
+  month: string;
+  completed_at: string;
+  badge_tx_hash: string | null;
+};
+
+export type MilestoneCategory =
+  | "getting_started"
+  | "learning"
+  | "quests"
+  | "seasonal";
+
+export type DbMilestoneMetric =
+  | "verified"
+  | "modules_completed"
+  | "track_completed"
+  | "full_clear_days"
+  | "monthly_quests_completed"
+  | "season_participant";
+
+export type DbMilestoneDefinition = {
+  id: string;
+  category: MilestoneCategory;
+  title: string;
+  description: string | null;
+  metric: DbMilestoneMetric;
+  threshold: number;
+  params: Record<string, unknown>;
+  reward_points: number;
+  badge_slug: string | null;
+  sort_order: number;
+  active: boolean;
+  created_at: string;
+};
+
+export type DbUserMilestone = {
+  user_id: string;
+  milestone_id: string;
+  achieved_at: string;
+  points_awarded: number;
+  badge_tx_hash: string | null;
+  /** When the user claimed the points. Null = earned, not yet claimed. */
+  claimed_at: string | null;
+};
+
+export type DbDifficultyTier = {
+  key: "easy" | "hard" | "superhard";
+  label: string;
+  rank: number;
+  total_seconds: number;
+  popup_duration_ms: number;
+  base_spawn_delay: number;
+  spawn_jitter: number;
+  board_size: number;
+  list_size: number;
+  scam_ratio: number;
+  min_pattern_difficulty: number;
+  max_pattern_difficulty: number;
+  min_precision: number | null;
+  min_correct: number | null;
+  min_recall: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Database = {
@@ -342,6 +484,94 @@ export type Database = {
         Update: Partial<DbSpendEvent>;
         Relationships: [];
       };
+      streak_reward_claims: {
+        Row: DbStreakRewardClaim;
+        Insert: Partial<DbStreakRewardClaim> & {
+          user_id: string;
+          milestone_day: number;
+          amount_g: number;
+        };
+        Update: Partial<DbStreakRewardClaim>;
+        Relationships: [];
+      };
+      streak_reward_cache: {
+        Row: DbStreakRewardCache;
+        Insert: Partial<DbStreakRewardCache> & {
+          milestone_day: number;
+          amount_g: number;
+        };
+        Update: Partial<DbStreakRewardCache>;
+        Relationships: [];
+      };
+      courses: {
+        Row: DbCourse;
+        Insert: Partial<DbCourse> & {
+          slug: string;
+          title: string;
+          order_index: number;
+        };
+        Update: Partial<DbCourse>;
+        Relationships: [];
+      };
+      course_enrollments: {
+        Row: DbCourseEnrollment;
+        Insert: Partial<DbCourseEnrollment> & {
+          user_id: string;
+          course_id: string;
+        };
+        Update: Partial<DbCourseEnrollment>;
+        Relationships: [];
+      };
+      course_modules: {
+        Row: DbCourseModule;
+        Insert: Partial<DbCourseModule> & {
+          course_id: string;
+          slug: string;
+          title: string;
+          order_index: number;
+        };
+        Update: Partial<DbCourseModule>;
+        Relationships: [];
+      };
+      course_sections: {
+        Row: DbCourseSection;
+        Insert: Partial<DbCourseSection> & {
+          module_id: string;
+          slug: string;
+          title: string;
+          order_in_module: number;
+        };
+        Update: Partial<DbCourseSection>;
+        Relationships: [];
+      };
+      section_versions: {
+        Row: DbSectionVersion;
+        Insert: Partial<DbSectionVersion> & {
+          section_id: string;
+          version: number;
+          items: unknown[];
+        };
+        Update: Partial<DbSectionVersion>;
+        Relationships: [];
+      };
+      section_completions: {
+        Row: DbSectionCompletion;
+        Insert: Partial<DbSectionCompletion> & {
+          user_id: string;
+          section_id: string;
+        };
+        Update: Partial<DbSectionCompletion>;
+        Relationships: [];
+      };
+      section_progress: {
+        Row: DbSectionProgress;
+        Insert: Partial<DbSectionProgress> & {
+          user_id: string;
+          section_id: string;
+        };
+        Update: Partial<DbSectionProgress>;
+        Relationships: [];
+      };
       learn_tracks: {
         Row: DbLearnTrack;
         Insert: Partial<DbLearnTrack> & {
@@ -431,9 +661,94 @@ export type Database = {
         Update: Partial<DbContestConfig>;
         Relationships: [];
       };
+      quest_definitions: {
+        Row: DbQuestDefinition;
+        Insert: Partial<DbQuestDefinition> & {
+          id: string;
+          title: string;
+          tier: QuestTier;
+          metric: QuestMetric;
+          target: number;
+        };
+        Update: Partial<DbQuestDefinition>;
+        Relationships: [];
+      };
+      user_daily_quests: {
+        Row: DbUserDailyQuest;
+        Insert: Partial<DbUserDailyQuest> & {
+          user_id: string;
+          quest_day: string;
+          tier: QuestTier;
+          quest_id: string;
+          target: number;
+        };
+        Update: Partial<DbUserDailyQuest>;
+        Relationships: [];
+      };
+      monthly_quests: {
+        Row: DbMonthlyQuest;
+        Insert: Partial<DbMonthlyQuest> & {
+          month: string;
+          title: string;
+        };
+        Update: Partial<DbMonthlyQuest>;
+        Relationships: [];
+      };
+      user_monthly_quests: {
+        Row: DbUserMonthlyQuest;
+        Insert: Partial<DbUserMonthlyQuest> & {
+          user_id: string;
+          month: string;
+        };
+        Update: Partial<DbUserMonthlyQuest>;
+        Relationships: [];
+      };
+      milestone_definitions: {
+        Row: DbMilestoneDefinition;
+        Insert: Partial<DbMilestoneDefinition> & {
+          id: string;
+          category: MilestoneCategory;
+          title: string;
+          metric: DbMilestoneMetric;
+        };
+        Update: Partial<DbMilestoneDefinition>;
+        Relationships: [];
+      };
+      user_milestones: {
+        Row: DbUserMilestone;
+        Insert: Partial<DbUserMilestone> & {
+          user_id: string;
+          milestone_id: string;
+        };
+        Update: Partial<DbUserMilestone>;
+        Relationships: [];
+      };
+      difficulty_tiers: {
+        Row: DbDifficultyTier;
+        Insert: Partial<DbDifficultyTier> & {
+          key: DbDifficultyTier["key"];
+          label: string;
+          rank: number;
+        };
+        Update: Partial<DbDifficultyTier>;
+        Relationships: [];
+      };
     };
     Views: {};
     Functions: {
+      copy_course_learn_history: {
+        Args: { p_course_slug: string };
+        Returns: {
+          modules_added: number;
+          sections_added: number;
+          completions_added: number;
+          progress_added: number;
+        }[];
+      };
+      compare_course_learn_history: {
+        Args: { p_course_slug: string };
+        Returns: { user_id: string; old_completions: number; new_completions: number }[];
+      };
       award_points: {
         Args: {
           p_user_id: string;
@@ -463,11 +778,106 @@ export type ModuleDetail = DbModule & {
 };
 
 export type LearnTrackStatus = "available" | "coming_soon";
+
+export type CourseStatus = "available" | "coming_soon";
+
+export type DbCourse = {
+  id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  image_url: string | null;
+  order_index: number;
+  status: CourseStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CourseEnrollmentSource = "self" | "backfill";
+
+export type DbCourseEnrollment = {
+  user_id: string;
+  course_id: string;
+  enrolled_at: string;
+  source: CourseEnrollmentSource;
+};
+
+/** A module of a course (was a learn_tracks row). */
+export type DbCourseModule = {
+  id: string;
+  course_id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  order_index: number;
+  status: "available" | "coming_soon" | "draft";
+  icon: string | null;
+  legacy_track_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** A section of a module (was a learn_modules row, same slug). */
+export type DbCourseSection = {
+  id: string;
+  module_id: string;
+  slug: string;
+  title: string;
+  description: string | null;
+  order_in_module: number;
+  estimated_minutes: number;
+  points_reward: number;
+  first_card_tease: string | null;
+  what_you_will_learn: string[];
+  status: "draft" | "live";
+  legacy_module_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SectionVersionStatus = "draft" | "published" | "retired";
+
+/** One version of a section's exercises. items follow lib/learn/content-schema Item. */
+export type DbSectionVersion = {
+  id: string;
+  section_id: string;
+  version: number;
+  status: SectionVersionStatus;
+  items: unknown[];
+  notes: string | null;
+  created_at: string;
+  published_at: string | null;
+};
+
+export type DbSectionCompletion = {
+  id: string;
+  user_id: string;
+  section_id: string;
+  version_id: string | null;
+  completed_at: string;
+  score: number | null;
+  points_awarded: number;
+  badge_token_id: string | null;
+  badge_tx_hash: string | null;
+  source: "live" | "copied";
+  legacy_completion_id: string | null;
+};
+
+export type DbSectionProgress = {
+  user_id: string;
+  section_id: string;
+  current_card: number;
+  started_at: string;
+  last_active_at: string;
+};
+
 export type LearnModuleStatus = "draft" | "live";
 export type LearnCardType = "flip" | "choice" | "spotter" | "visual";
 
 export type DbLearnTrack = {
   id: string;
+  /** The course this track belongs to. */
+  course_id: string | null;
   slug: string;
   title: string;
   description: string | null;

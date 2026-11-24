@@ -3,6 +3,15 @@ import { requireCompletedProfile } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { assertModulePlayable } from "@/lib/learn/lock";
 import type { LessonContent, LessonCard } from "@/lib/lessons/lesson-data";
+import { toLessonCard } from "@/lib/learn/lesson-cards";
+import {
+  getPublishedSection,
+  sectionContentEnabled,
+} from "@/lib/learn/section-content";
+import {
+  checkSectionAccess,
+  touchSectionProgress,
+} from "@/lib/learn/course-store";
 
 export async function GET(
   request: Request,
@@ -14,8 +23,16 @@ export async function GET(
 
   const { slug } = await params;
 
+  if (sectionContentEnabled()) return sectionLesson(slug, user.id as string);
+
   const playable = await assertModulePlayable(slug, user.id);
   if (!playable.ok) {
+    if (playable.reason === "not_enrolled") {
+      return NextResponse.json(
+        { error: "Enrol in this course to start its lessons." },
+        { status: 403 },
+      );
+    }
     return NextResponse.json({ error: "Not available" }, { status: 404 });
   }
 
@@ -38,78 +55,27 @@ export async function GET(
     .eq("id", module.track_id)
     .maybeSingle();
 
-  const { data: cards } = await supabaseAdmin
-    .from("learn_cards")
-    .select("order_index, type, content")
-    .eq("module_id", module.id)
-    .order("order_index", { ascending: true });
+  // A rewritten section, when this app reads them; otherwise learn_cards.
+  const rewritten = await getPublishedSection(slug);
 
-  const lessonCards: LessonCard[] = (cards ?? []).map((card) => {
-    if (card.type === "flip") {
-      const c = card.content as {
-        front: string;
-        hint: string;
-        back: string;
-        icon?: string;
-      };
-      return {
-        type: "flip",
-        front: c.front,
-        hint: c.hint,
-        back: c.back,
-        icon: c.icon,
-      };
-    }
-    if (card.type === "choice") {
-      const c = card.content as {
-        question: string;
-        options: string[];
-        correct_index: number;
-        explanation: string;
-      };
-      return {
-        type: "choice",
-        question: c.question,
-        options: c.options,
-        correctIndex: c.correct_index,
-        explanation: c.explanation,
-      };
-    }
-    
-    if (card.type === "visual") {
-      const c = card.content as {
-        title: string;
-        image: string;
-        caption?: string;
-        alt?: string;
-      };
-      return {
-        type: "visual",
-        title: c.title,
-        image: c.image,
-        caption: c.caption,
-        alt: c.alt,
-      };
-    }
+  const { data: cards } = rewritten
+    ? { data: rewritten.cards }
+    : await supabaseAdmin
+        .from("learn_cards")
+        .select("order_index, type, content")
+        .eq("module_id", module.id)
+        .order("order_index", { ascending: true });
 
-    const c = card.content as {
-      scenario: string;
-      correct_answer: "scam" | "real";
-      teaching: string;
-    };
-    return {
-      type: "spotter",
-      scenario: c.scenario,
-      correctAnswer: c.correct_answer,
-      teaching: c.teaching,
-    };
-  });
+  const lessonCards: LessonCard[] = (cards ?? []).map((card) =>
+    toLessonCard(card.type, card.content as Record<string, unknown>),
+  );
 
   const lesson: LessonContent = {
     module: {
       slug: module.slug,
       title: module.title,
-      category: (track?.title ?? "Learn") as LessonContent["module"]["category"],
+      category: (track?.title ??
+        "Learn") as LessonContent["module"]["category"],
       minutes: module.estimated_minutes,
       reward: module.points_reward,
       status: "available",
@@ -118,6 +84,61 @@ export async function GET(
       firstCardTease: module.first_card_tease ?? "",
     },
     cards: lessonCards,
+    versionId: rewritten?.versionId,
+  };
+
+  return NextResponse.json(lesson);
+}
+
+async function sectionLesson(slug: string, userId: string) {
+  const access = await checkSectionAccess(slug, userId);
+  if (!access.ok) {
+    if (access.reason === "not_enrolled") {
+      return NextResponse.json(
+        { error: "Enrol in this course to start its lessons." },
+        { status: 403 },
+      );
+    }
+    if (access.reason === "daily_limit") {
+      return NextResponse.json(
+        {
+          error:
+            "You've finished today's section. The next one opens tomorrow.",
+          resets_at: access.resets_at,
+        },
+        { status: 429 },
+      );
+    }
+    return NextResponse.json({ error: "Not available" }, { status: 404 });
+  }
+
+  const published = await getPublishedSection(slug);
+  if (!published) {
+    return NextResponse.json(
+      { error: "This section isn't ready yet" },
+      { status: 404 },
+    );
+  }
+
+  const review = access.completion !== null;
+  if (!review) await touchSectionProgress(userId, access.section.id);
+
+  const { section, module } = access;
+  const lesson: LessonContent = {
+    module: {
+      slug: section.slug,
+      title: section.title,
+      category: module.title as LessonContent["module"]["category"],
+      minutes: section.estimated_minutes,
+      reward: review ? 0 : section.points_reward,
+      status: review ? "complete" : "available",
+      description: section.description ?? "",
+      whatYouWillLearn: section.what_you_will_learn ?? [],
+      firstCardTease: section.first_card_tease ?? "",
+    },
+    cards: published.cards.map((card) => toLessonCard(card.type, card.content)),
+    versionId: published.versionId,
+    review,
   };
 
   return NextResponse.json(lesson);

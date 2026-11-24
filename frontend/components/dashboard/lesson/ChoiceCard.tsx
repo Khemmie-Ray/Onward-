@@ -2,97 +2,90 @@
 
 import { useState } from "react";
 import { Check, X } from "lucide-react";
-import { MudclothPattern } from "@/components/home/motifs";
 import type { ChoiceCard as ChoiceCardData } from "@/lib/lessons/lesson-data";
+import { seededOrder } from "@/lib/learn/shuffle";
+import {
+  ExerciseFrame,
+  tileClass,
+  type TileState,
+} from "./exercises/ExerciseFrame";
 
 export function ChoiceCard({
   data,
-  onAnswer,
+  verdict,
+  onDraft,
 }: {
   data: ChoiceCardData;
-  onAnswer: (selectedIndex: number, correct: boolean) => void;
+  verdict: boolean | null;
+  onDraft: (answer: number | null) => void;
 }) {
   const [selected, setSelected] = useState<number | null>(null);
+  const checked = verdict !== null;
 
-  const handleSelect = (index: number) => {
-    if (selected !== null) return;
+  const order = data.optionFeedback
+    ? seededOrder(data.options.length, data.question)
+    : data.options.map((_, i) => i);
+
+  const pick = (index: number) => {
+    if (checked) return;
     setSelected(index);
-    onAnswer(index, index === data.correctIndex);
+    onDraft(index);
   };
 
-  const locked = selected !== null;
-  const wasCorrect = selected === data.correctIndex;
+  const stateOf = (index: number): TileState => {
+    if (!checked) return selected === index ? "selected" : "idle";
+    if (index === data.correctIndex) return "correct";
+    if (index === selected) return "wrong";
+    return "muted";
+  };
 
   return (
-    <div className="w-full max-w-120 mx-auto">
-      <div className="relative rounded-[24px] bg-paper p-7 shadow-[0_20px_50px_rgba(31,58,110,0.10)] overflow-hidden">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 text-indigo opacity-[0.03]"
-        >
-          <MudclothPattern />
-        </div>
-
-        <div className="relative">
-          <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-terracotta mb-3">
-            Quick check
-          </div>
-          <h2 className="display text-[22px] md:text-[26px] font-semibold leading-tight tracking-[-0.015em] text-indigo mb-6">
-            {data.question}
-          </h2>
-
-          <div className="flex flex-col gap-2.5">
-            {data.options.map((option, i) => {
-              const isThisSelected = selected === i;
-              const isCorrect = i === data.correctIndex;
-              const showCorrect = locked && isCorrect;
-              const showWrong = locked && isThisSelected && !isCorrect;
-
-              return (
-                <button
-                  key={i}
-                  onClick={() => handleSelect(i)}
-                  disabled={locked}
-                  className={`group text-left p-4 rounded-[14px] text-[14px] font-medium transition-all ${
-                    showCorrect
-                      ? "bg-forest text-paper"
-                      : showWrong
-                        ? "bg-terracotta text-paper"
-                        : locked
-                          ? "bg-canvas-warm text-fg-soft opacity-60"
-                          : "bg-canvas-warm text-indigo hover:bg-mustard-tint hover:-translate-y-0.5"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span>{option}</span>
-                    {showCorrect && (
-                      <Check size={18} strokeWidth={3} className="shrink-0" />
-                    )}
-                    {showWrong && (
-                      <X size={18} strokeWidth={3} className="shrink-0" />
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          {locked && (
-            <div
-              className={`mt-5 p-4 rounded-[14px] text-[13px] leading-[1.55] animate-[fade-up_0.4s_ease_both] ${
-                wasCorrect
-                  ? "bg-forest-tint text-forest"
-                  : "bg-terracotta-tint text-terracotta"
-              }`}
+    <ExerciseFrame label="Pick one" title={data.question}>
+      <div className="flex flex-col gap-2.5">
+        {order.map((i) => {
+          const state = stateOf(i);
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => pick(i)}
+              disabled={checked}
+              aria-pressed={selected === i}
+              className={`flex min-h-14 items-center gap-3 px-3.5 py-2.5 text-left text-[14.5px] font-semibold leading-snug ${tileClass(state)}`}
             >
-              <div className="font-bold mb-1 text-[11px] uppercase tracking-widest">
-                {wasCorrect ? "Right" : "Not quite"}
-              </div>
-              {data.explanation}
-            </div>
-          )}
-        </div>
+              <Marker state={state} />
+              <span>{data.options[i]}</span>
+            </button>
+          );
+        })}
       </div>
-    </div>
+    </ExerciseFrame>
+  );
+}
+
+function Marker({ state }: { state: TileState }) {
+  if (state === "correct") {
+    return (
+      <span className="flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-full bg-forest text-paper">
+        <Check size={13} strokeWidth={3.5} />
+      </span>
+    );
+  }
+  if (state === "wrong") {
+    return (
+      <span className="flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-full bg-terracotta text-paper">
+        <X size={13} strokeWidth={3.5} />
+      </span>
+    );
+  }
+  if (state === "selected") {
+    return (
+      <span className="flex h-6.5 w-6.5 shrink-0 items-center justify-center rounded-full border-2 border-indigo">
+        <span className="h-3 w-3 rounded-full bg-indigo" />
+      </span>
+    );
+  }
+  return (
+    <span className="h-6.5 w-6.5 shrink-0 rounded-full border-2 border-shadow" />
   );
 }

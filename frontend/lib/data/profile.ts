@@ -2,6 +2,10 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { DbUser, ModuleCategory } from "@/lib/supabase/types";
 import { EXPLORER_BASE } from "@/constants/contracts/address";
 import { getBadgeImageIpfs } from "@/lib/badges/badgeImage";
+import {
+  countLiveLessons,
+  countUserCompletions,
+} from "@/lib/learn/learn-stats";
 
 export type ProfileBadge = {
   moduleSlug: string;
@@ -28,12 +32,21 @@ export type ProfileData = {
   currentLevel: number;
   longestStreak: number;
   currentStreak: number;
+  roundsPlayed: number;
+  referralsQualified: number;
 
   badges: ProfileBadge[];
 };
 
 export async function loadProfileData(user: DbUser): Promise<ProfileData> {
-  const [{ data: modules }, { data: completions }] = await Promise.all([
+  const [
+    { data: modules },
+    { data: completions },
+    { data: streakDays },
+    { count: referralsQualifiedCount },
+    learnCompletedCount,
+    learnTotalCount,
+  ] = await Promise.all([
     supabaseAdmin
       .from("modules")
       .select("*")
@@ -45,10 +58,29 @@ export async function loadProfileData(user: DbUser): Promise<ProfileData> {
       .from("module_completions")
       .select("module_id, completed_at, reward_tx_hash, badge_token_id")
       .eq("user_id", user.id),
+
+    supabaseAdmin
+      .from("streak_days")
+      .select("rounds_played")
+      .eq("user_id", user.id),
+
+    supabaseAdmin
+      .from("point_transactions")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("source", "referral"),
+
+    countUserCompletions(user.id),
+    countLiveLessons(),
   ]);
 
+  const roundsPlayed = (streakDays ?? []).reduce(
+    (sum, r) => sum + (r.rounds_played ?? 0),
+    0,
+  );
+
   const completionByModule = new Map(
-    (completions ?? []).map((c) => [c.module_id, c])
+    (completions ?? []).map((c) => [c.module_id, c]),
   );
 
   const badges: ProfileBadge[] = (modules ?? []).map((m) => {
@@ -72,7 +104,7 @@ export async function loadProfileData(user: DbUser): Promise<ProfileData> {
   const now = Date.now();
   const daysOnOnward = Math.max(
     1,
-    Math.floor((now - joinedDate.getTime()) / (1000 * 60 * 60 * 24))
+    Math.floor((now - joinedDate.getTime()) / (1000 * 60 * 60 * 24)),
   );
 
   return {
@@ -82,11 +114,13 @@ export async function loadProfileData(user: DbUser): Promise<ProfileData> {
     daysOnOnward,
     avatarId: user.avatar_id ?? null,
     totalGEarned: Number(user.total_g_earned),
-    modulesCompleted: badges.filter((b) => b.earned).length,
-    modulesTotal: badges.length,
+    modulesCompleted: learnCompletedCount,
+    modulesTotal: learnTotalCount,
     currentLevel: user.current_level,
     longestStreak: user.longest_streak,
     currentStreak: user.current_streak,
+    roundsPlayed,
+    referralsQualified: referralsQualifiedCount ?? 0,
     badges,
   };
 }

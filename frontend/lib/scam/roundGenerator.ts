@@ -1,7 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import type { WhackIcon } from "./whackIcon";
-import { iconById } from "./whackIcon";
 import type { PlayMode } from "@/lib/scoring";
+import { loadTier, type DifficultyTier, type TierKey } from "./difficulty";
+import { getTodaysPattern } from "./rotation";
 
 export type RoundItem = {
   pattern_id: string;
@@ -19,11 +19,6 @@ export type PatternRow = {
   kind: string;
   content: Record<string, unknown>;
   teaching: string;
-  icon_id: string | null;
-};
-
-export type PatternWithIcon = PatternRow & {
-  icon: WhackIcon;
 };
 
 export type GeneratedRound = {
@@ -31,119 +26,103 @@ export type GeneratedRound = {
   family_label: string;
   family_description: string;
   exemplar: PatternRow;
-  exemplar_icon: WhackIcon;
   items: RoundItem[];
-  full_patterns: PatternWithIcon[];
+  full_patterns: PatternRow[];
   popup_duration_ms: number;
   total_seconds: number;
   board_progression: number[];
   base_spawn_delay: number;
   spawn_jitter: number;
+  tier: DifficultyTier;
 };
 
 export { type PlayMode };
 
-const PACING = {
-  totalSeconds: 60,
-  popupDurationMs: 1550,
-  baseSpawnDelay: 450,
-  spawnJitter: 300,
-  boardProgression: [6],
-  listSize: 100,
-  scamRatio: 0.4,
-} as const;
-
-function todayFeaturedIndex(familyCount: number): number {
-  const msPerDay = 86_400_000;
-  const today = Math.floor(Date.now() / msPerDay);
-  return ((today % familyCount) + familyCount) % familyCount;
+function shuffle<T>(items: T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
 }
 
-async function pickFamily(): Promise<string> {
-  const { data } = await supabaseAdmin
-    .from("scam_patterns")
-    .select("family")
-    .eq("is_scam", true);
-
-  const families = Array.from(
-    new Set((data ?? []).map((r) => r.family)),
-  ).sort();
-  if (families.length === 0) {
-    throw new Error("No scam families found — run seed script");
+function spreadPick<T>(pool: T[], n: number): T[] {
+  const out: T[] = [];
+  let deck: T[] = [];
+  while (out.length < n) {
+    if (deck.length === 0) deck = shuffle(pool);
+    out.push(deck.pop() as T);
   }
-  return families[todayFeaturedIndex(families.length)];
+  return out;
 }
 
 export async function generateRound(
-  _mode: PlayMode,
-  _userLevel: number,
-  previewId: string,
+  tier: DifficultyTier,
 ): Promise<GeneratedRound> {
-  const family = await pickFamily();
+  // Content is today's pattern from the rotation. Difficulty belongs to the
+  // game, not the content: the tier only sets speed, list size, scam ratio
+  // and pass rules. Every scam on the board is today's pattern.
+  const pattern = await getTodaysPattern();
 
-  const { data: exemplarData } = await supabaseAdmin
-    .from("scam_patterns")
-    .select("*")
-    .eq("family", family)
-    .eq("is_exemplar", true)
-    .single();
-
-  if (!exemplarData) throw new Error(`No exemplar for family ${family}`);
-  const exemplar = exemplarData as PatternRow;
-
-  const numScams = Math.floor(PACING.listSize * PACING.scamRatio);
-  const numLegits = PACING.listSize - numScams;
-
-  const { data: scamVariants } = await supabaseAdmin
-    .from("scam_patterns")
-    .select("*")
-    .eq("family", family)
-    .eq("is_scam", true)
-    .eq("is_exemplar", false);
+  const numScams = Math.floor(tier.listSize * tier.scamRatio);
+  const numLegits = tier.listSize - numScams;
 
   const { data: legitPool } = await supabaseAdmin
     .from("scam_patterns")
     .select("*")
     .eq("is_scam", false);
 
-  if (!scamVariants?.length) throw new Error(`No scam variants for ${family}`);
   if (!legitPool?.length) throw new Error("No legit patterns");
 
-  const sampleN = <T>(pool: T[], n: number): T[] => {
-    const out: T[] = [];
-    for (let i = 0; i < n; i++) {
-      out.push(pool[Math.floor(Math.random() * pool.length)]);
-    }
-    return out;
-  };
-
-  const chosenScams = sampleN(scamVariants as PatternRow[], numScams);
-  const chosenLegits = sampleN(legitPool as PatternRow[], numLegits);
-  const sequence = [...chosenScams, ...chosenLegits].sort(
-    () => Math.random() - 0.5,
+  const chosenScams: PatternRow[] = Array.from(
+    { length: numScams },
+    () => pattern,
   );
-
-  const featuredScamIconId = (exemplar as PatternRow).icon_id;
-  const sequenceWithIcons: PatternWithIcon[] = sequence.map((p) => ({
-    ...p,
-    icon: p.is_scam
-      ? iconById(featuredScamIconId, true)
-      : iconById(p.icon_id, false),
-  }));
+  const chosenLegits = spreadPick(legitPool as PatternRow[], numLegits);
+  const sequence = shuffle([...chosenScams, ...chosenLegits]);
 
   return {
-    featured_family: family,
-    family_label: exemplar.family_label,
-    family_description: exemplar.family_description,
-    exemplar,
-    exemplar_icon: iconById((exemplar as PatternRow).icon_id, true),
+    featured_family: pattern.family,
+    family_label: pattern.family_label,
+    family_description: pattern.family_description,
+    exemplar: pattern,
     items: sequence.map((p) => ({ pattern_id: p.id, is_scam: p.is_scam })),
-    full_patterns: sequenceWithIcons,
-    popup_duration_ms: PACING.popupDurationMs,
-    total_seconds: PACING.totalSeconds,
-    board_progression: [...PACING.boardProgression],
-    base_spawn_delay: PACING.baseSpawnDelay,
-    spawn_jitter: PACING.spawnJitter,
+    full_patterns: sequence,
+    popup_duration_ms: tier.popupDurationMs,
+    total_seconds: tier.totalSeconds,
+    board_progression: [tier.boardSize],
+    base_spawn_delay: tier.baseSpawnDelay,
+    spawn_jitter: tier.spawnJitter,
+    tier,
+  };
+}
+
+export type TodayPattern = {
+  featured_family: string;
+  family_label: string;
+  family_description: string;
+  difficulty: number;
+  exemplar: {
+    kind: string;
+    content: Record<string, unknown>;
+    teaching: string;
+  };
+};
+
+export async function getTodayPattern(): Promise<TodayPattern> {
+  const pattern = await getTodaysPattern();
+
+  return {
+    featured_family: pattern.family,
+    family_label: pattern.family_label,
+    family_description: pattern.family_description,
+    difficulty: pattern.difficulty,
+    exemplar: {
+      kind: pattern.kind,
+      content: pattern.content,
+      teaching: pattern.teaching,
+    },
   };
 }
 
@@ -154,21 +133,11 @@ export async function rebuildRoundFromSession(session: {
   popup_duration_ms: number;
   total_seconds: number;
   mode: string;
+  difficulty: string;
 }): Promise<GeneratedRound> {
-  const { data: exemplar } = await supabaseAdmin
-    .from("scam_patterns")
-    .select("*")
-    .eq("family", session.featured_family)
-    .eq("is_exemplar", true)
-    .single();
+  const tier = await loadTier((session.difficulty as TierKey) ?? "easy");
 
-  if (!exemplar) {
-    throw new Error(
-      `Cannot rebuild session: exemplar missing for ${session.featured_family}`,
-    );
-  }
-
-  const patternIds = session.items.map((i) => i.pattern_id);
+  const patternIds = [...new Set(session.items.map((i) => i.pattern_id))];
   const { data: patterns } = await supabaseAdmin
     .from("scam_patterns")
     .select("*")
@@ -178,33 +147,27 @@ export async function rebuildRoundFromSession(session: {
 
   const patternMap = new Map(patterns.map((p) => [p.id, p]));
 
-  const featuredScamIconId = (exemplar as PatternRow).icon_id;
-  const sequence: PatternWithIcon[] = session.items
-    .map((item) => {
-      const p = patternMap.get(item.pattern_id);
-      if (!p) return null;
-      const row = p as PatternRow;
-      return {
-        ...row,
-        icon: row.is_scam
-          ? iconById(featuredScamIconId, true)
-          : iconById(row.icon_id, false),
-      };
-    })
-    .filter((x): x is PatternWithIcon => x !== null);
+  const sequence: PatternRow[] = session.items
+    .map((item) => patternMap.get(item.pattern_id) as PatternRow | undefined)
+    .filter((x): x is PatternRow => Boolean(x));
+
+  const featured = sequence.find((p) => p.is_scam);
+  if (!featured) {
+    throw new Error(`Cannot rebuild session ${session.id}: no scam items`);
+  }
 
   return {
     featured_family: session.featured_family,
-    family_label: (exemplar as PatternRow).family_label,
-    family_description: (exemplar as PatternRow).family_description,
-    exemplar: exemplar as PatternRow,
-    exemplar_icon: iconById((exemplar as PatternRow).icon_id, true),
+    family_label: featured.family_label,
+    family_description: featured.family_description,
+    exemplar: featured,
     items: session.items,
     full_patterns: sequence,
     popup_duration_ms: session.popup_duration_ms,
     total_seconds: session.total_seconds,
-    board_progression: [...PACING.boardProgression],
-    base_spawn_delay: PACING.baseSpawnDelay,
-    spawn_jitter: PACING.spawnJitter,
+    board_progression: [tier.boardSize],
+    base_spawn_delay: tier.baseSpawnDelay,
+    spawn_jitter: tier.spawnJitter,
+    tier,
   };
 }

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { isEnrolledForTrack } from "@/lib/server/enrollment";
 
 export type ModuleLockState = "completed" | "current" | "locked";
 
@@ -28,7 +29,7 @@ export function computeLockStates(
   );
   const states = new Map<string, ModuleLockState>();
 
-  let previousCompleted = true; 
+  let previousCompleted = true;
 
   for (const mod of ordered) {
     if (completedModuleIds.has(mod.id)) {
@@ -36,9 +37,9 @@ export function computeLockStates(
       previousCompleted = true;
       continue;
     }
-    
+
     states.set(mod.id, previousCompleted ? "current" : "locked");
-    previousCompleted = false; 
+    previousCompleted = false;
   }
 
   return states;
@@ -90,7 +91,7 @@ export async function assertModulePlayable(
   userId: string,
 ): Promise<
   | { ok: true; moduleId: string; lockState: ModuleLockState }
-  | { ok: false; reason: "not_found" | "locked" }
+  | { ok: false; reason: "not_found" | "locked" | "not_enrolled" }
 > {
   const { data: mod } = await supabaseAdmin
     .from("learn_modules")
@@ -99,6 +100,10 @@ export async function assertModulePlayable(
     .maybeSingle();
 
   if (!mod) return { ok: false, reason: "not_found" };
+
+  if (!(await isEnrolledForTrack(userId, mod.track_id))) {
+    return { ok: false, reason: "not_enrolled" };
+  }
 
   const { data: siblings } = await supabaseAdmin
     .from("learn_modules")

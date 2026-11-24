@@ -1,5 +1,6 @@
 "use client";
 
+import { HOME_ROUTE } from "@/lib/nav/routes";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -13,7 +14,7 @@ export function PublicGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isAuthenticated) {
-      router.replace("/overview");
+      router.replace(HOME_ROUTE);
     }
   }, [isAuthenticated, router]);
 
