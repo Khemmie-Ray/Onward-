@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Pencil, Bell, Lock } from "lucide-react";
+import { Pencil, Lock } from "lucide-react";
 
 export type GameCard = {
   slug: string;
@@ -13,7 +13,6 @@ export type GameCard = {
   holes: number | null;
   difficulty: number | null;
 };
-
 
 const COMING_SOON_ART = "/images/play-coming-soon.svg";
 const GAME_ART: Record<string, string> = {
@@ -99,17 +98,8 @@ export const GameCardView = ({
           />
         </div>
 
-        <div className="mt-4">
-          {isComingSoon ? (
-            <button
-              type="button"
-              onClick={onOpen}
-              className="flex w-full items-center justify-center gap-2 rounded-full border-2 border-indigo/20 py-2.5 text-[13px] font-bold text-indigo transition hover:border-indigo/40 hover:bg-canvas-warm"
-            >
-              <Bell size={14} strokeWidth={2.6} />
-              Notify me
-            </button>
-          ) : (
+        {!isComingSoon && (
+          <div className="mt-4">
             <button
               type="button"
               onClick={onOpen}
@@ -118,8 +108,8 @@ export const GameCardView = ({
               <Pencil size={14} strokeWidth={2.8} />
               Play now
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </motion.div>
   );
