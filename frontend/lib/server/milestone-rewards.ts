@@ -2,6 +2,10 @@ import { getAddress } from "viem";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { awardPoints } from "@/lib/server/point";
 import { isVerifiedCached } from "@/lib/server/verification-cache";
+import {
+  countUserCompletions,
+  hasFinishedModule,
+} from "@/lib/learn/learn-stats";
 import type {
   DbMilestoneDefinition,
   DbMilestoneMetric,
@@ -9,9 +13,9 @@ import type {
 } from "@/lib/supabase/types";
 
 type MilestoneParams = {
-  track_slug?: string; // track_completed: one track; omitted = every live lesson
-  starts_on?: string; // season_participant: YYYY-MM-DD
-  ends_on?: string; //   season_participant: YYYY-MM-DD, optional
+  track_slug?: string; 
+  starts_on?: string; 
+  ends_on?: string; 
 };
 
 export type MilestoneView = {
@@ -143,49 +147,13 @@ async function measureMilestone(
       }
     }
 
-    case "modules_completed": {
-      const { count, error } = await supabaseAdmin
-        .from("learn_completions")
-        .select("id", { head: true, count: "exact" })
-        .eq("user_id", userId);
-      if (error) throw new Error(`lessons count failed: ${error.message}`);
-      return count ?? 0;
-    }
+    case "modules_completed":
+      return countUserCompletions(userId);
 
-    case "track_completed": {
-      let modulesQuery = supabaseAdmin
-        .from("learn_modules")
-        .select("id")
-        .eq("status", "live");
-
-      if (params.track_slug) {
-        const { data: track } = await supabaseAdmin
-          .from("learn_tracks")
-          .select("id")
-          .eq("slug", params.track_slug)
-          .maybeSingle();
-        if (!track) return 0;
-        modulesQuery = modulesQuery.eq("track_id", track.id);
-      }
-
-      const { data: modules, error } = await modulesQuery;
-      if (error) throw new Error(`track modules load failed: ${error.message}`);
-      const moduleIds = (modules ?? []).map((m) => m.id);
-      if (moduleIds.length === 0) return 0;
-
-      const { data: done, error: doneErr } = await supabaseAdmin
-        .from("learn_completions")
-        .select("module_id")
-        .eq("user_id", userId)
-        .in("module_id", moduleIds);
-      if (doneErr) throw new Error(`track progress failed: ${doneErr.message}`);
-
-      const completed = new Set((done ?? []).map((c) => c.module_id));
-      return moduleIds.every((id) => completed.has(id)) ? 1 : 0;
-    }
+    case "track_completed":
+      return (await hasFinishedModule(userId, params.track_slug)) ? 1 : 0;
 
     case "full_clear_days": {
-      // Each fully cleared day pays exactly one daily_quest bonus.
       const { count, error } = await supabaseAdmin
         .from("point_transactions")
         .select("id", { head: true, count: "exact" })
@@ -205,7 +173,6 @@ async function measureMilestone(
     }
 
     case "season_participant": {
-      // Needs a start date in params, e.g. {"season": 5, "starts_on": "2026-11-17"}.
       if (!params.starts_on) return 0;
       let query = supabaseAdmin
         .from("streak_days")
@@ -236,10 +203,7 @@ export type ClaimMilestoneResult =
   | { ok: true; points: number }
   | { ok: false; status: 404 | 409; error: string };
 
-/**
- * Pays an earned milestone's points. Safe to call twice: the payment is keyed
- * on "milestone:<id>", and claimed_at is only set once.
- */
+
 export async function claimMilestone(
   userId: string,
   milestoneId: string,

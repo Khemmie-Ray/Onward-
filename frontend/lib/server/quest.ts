@@ -1,6 +1,10 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { awardPoints } from "@/lib/server/point";
 import { evaluateMilestones } from "@/lib/server/milestone-rewards";
+import {
+  countLiveLessons,
+  countUserCompletions,
+} from "@/lib/learn/learn-stats";
 import type {
   DbQuestDefinition,
   DbUserDailyQuest,
@@ -49,15 +53,12 @@ export type QuestsView = {
   monthly: MonthlyQuestView | null;
 };
 
-// ─── Public API ──────────────────────────────────────────────────────────────
-
 export async function evaluateQuests(userId: string): Promise<void> {
   await safely("daily quests", () => evaluateDailyQuests(userId));
   await safely("monthly quest", () => evaluateMonthlyQuest(userId));
   await safely("milestones", () => evaluateMilestones(userId));
 }
 
-/** Everything the quests panel needs. Assigns today's quests if needed. */
 export async function getQuestsView(userId: string): Promise<QuestsView> {
   const day = todayUtc();
   const quests = await evaluateDailyQuests(userId);
@@ -72,15 +73,11 @@ export async function getQuestsView(userId: string): Promise<QuestsView> {
   };
 }
 
-// ─── Daily quests ────────────────────────────────────────────────────────────
-
 async function evaluateDailyQuests(userId: string): Promise<DailyQuest[]> {
   const day = todayUtc();
   const quests = await getOrAssignDailyQuests(userId, day);
   const since = `${day}T00:00:00.000Z`;
 
-  // Two of today's quests can share a metric (e.g. "Earn 100 points" and
-  // "Earn 300 points"), so measure each metric once.
   const measured = new Map<string, Promise<number>>();
   const measure = (q: DailyQuest, params: QuestParams) => {
     const key = `${q.metric}:${params.mode ?? "any"}`;
@@ -146,8 +143,6 @@ async function getOrAssignDailyQuests(
     .eq("active", true);
   if (error) throw new Error(`quest pool load failed: ${error.message}`);
 
-  // Never hand out a lesson quest the user can't finish because they have
-  // run out of lessons.
   const lessonsLeft = await remainingLessons(userId);
   const assignedTiers = new Set(existing.map((q) => q.tier));
 
@@ -173,8 +168,6 @@ async function getOrAssignDailyQuests(
   );
 
   if (rows.length > 0) {
-    // The unique (user_id, quest_day, tier) constraint makes a double tap
-    // harmless: the second insert is ignored.
     const { error: insErr } = await supabaseAdmin
       .from("user_daily_quests")
       .upsert(rows, {
@@ -234,15 +227,8 @@ async function measureToday(
   since: string,
 ): Promise<number> {
   switch (metric) {
-    case "modules_completed": {
-      const { count, error } = await supabaseAdmin
-        .from("learn_completions")
-        .select("id", { head: true, count: "exact" })
-        .eq("user_id", userId)
-        .gte("completed_at", since);
-      if (error) throw new Error(`lessons count failed: ${error.message}`);
-      return count ?? 0;
-    }
+    case "modules_completed":
+      return countUserCompletions(userId, since);
 
     case "rounds_played":
     case "rounds_passed": {
@@ -288,16 +274,10 @@ async function measureToday(
 
 async function remainingLessons(userId: string): Promise<number> {
   const [live, done] = await Promise.all([
-    supabaseAdmin
-      .from("learn_modules")
-      .select("id", { head: true, count: "exact" })
-      .eq("status", "live"),
-    supabaseAdmin
-      .from("learn_completions")
-      .select("id", { head: true, count: "exact" })
-      .eq("user_id", userId),
+    countLiveLessons(),
+    countUserCompletions(userId),
   ]);
-  return Math.max(0, (live.count ?? 0) - (done.count ?? 0));
+  return Math.max(0, live - done);
 }
 
 // ─── Monthly quest ───────────────────────────────────────────────────────────
@@ -319,7 +299,7 @@ async function evaluateMonthlyQuest(
     .eq("month", month)
     .maybeSingle();
   if (error) throw new Error(`monthly quest load failed: ${error.message}`);
-  if (!config) return null; // no theme set for this month
+  if (!config) return null; 
 
   const [{ count, error: countErr }, { data: done, error: doneErr }] =
     await Promise.all([
@@ -346,8 +326,6 @@ async function evaluateMonthlyQuest(
   let completedAt = done?.completed_at ?? null;
 
   if (!completedAt && questPoints >= config.target_quest_points) {
-    // Pay first (idempotent), then record. If the record fails, the next
-    // evaluation retries both and the payment is a no-op.
     if (config.reward_points > 0) {
       await awardPoints({
         userId,
