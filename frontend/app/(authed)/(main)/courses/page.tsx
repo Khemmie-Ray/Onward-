@@ -1,4 +1,3 @@
-// frontend/app/(authed)/(main)/courses/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -7,7 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuthFetch } from "@/hooks/useAuthFetch";
 import { useCourses } from "@/hooks/useCourses";
 import type { CourseCard } from "@/lib/data/courses";
-import { BookOpen, Clock, Lock, Bell, ArrowRight, Loader2 } from "lucide-react";
+import { BookOpen, Clock, Lock, ArrowRight, Loader2 } from "lucide-react";
 
 const LEARN_ROUTE = "/learn";
 
@@ -251,12 +250,6 @@ function ComingSoonCard({ course }: { course: CourseCard }) {
       <p className="mt-2 text-[15px] leading-snug text-fg-dim">
         {course.description}
       </p>
-
-      <div className="mt-auto pt-6">
-        <button className="flex w-full items-center justify-center gap-2 rounded-full border border-fg-soft/20 bg-white py-3.5 font-semibold text-fg-dim transition hover:border-indigo/30 hover:text-indigo">
-          <Bell size={16} /> Notify me
-        </button>
-      </div>
     </div>
   );
 }

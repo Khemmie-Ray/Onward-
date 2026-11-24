@@ -131,7 +131,7 @@ export function Sidebar({
             )}
           </span>
 
-          <p className="truncate text-[15px] font-bold text-blue">{username}</p>
+          <p className="truncate text-[15px] font-bold text-blue capitalize">{username}</p>
           {shortAddress && (
             <p className="mt-0.5 truncate font-mono text-[11px] ">
               {shortAddress}

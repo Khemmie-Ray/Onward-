@@ -64,7 +64,7 @@ const ProfileHeader = ({
           />
 
           <div className="min-w-0 flex-1">
-            <h1 className="display truncate text-[26px] font-bold leading-tight text-cream sm:text-[30px]">
+            <h1 className="display truncate text-[26px] font-bold leading-tight text-cream sm:text-[30px] capitalize">
               {displayName}
             </h1>
             <p className="mt-0.5 text-[13px] text-cream/70">
