@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { PlayMode } from "@/lib/scoring";
 import { loadTier, type DifficultyTier, type TierKey } from "./difficulty";
+import { getTodaysPattern } from "./rotation";
 
 export type RoundItem = {
   pattern_id: string;
@@ -37,101 +38,55 @@ export type GeneratedRound = {
 
 export { type PlayMode };
 
-function pickBandPool(
-  pool: PatternRow[],
-  min: number,
-  max: number,
-): PatternRow[] {
-  let lo = min;
-  let hi = max;
-  for (;;) {
-    const inBand = pool.filter((p) => p.difficulty >= lo && p.difficulty <= hi);
-    if (inBand.length > 0) return inBand;
-    if (lo <= 1 && hi >= 5) return pool;
-    lo = Math.max(1, lo - 1);
-    hi = Math.min(5, hi + 1);
+function shuffle<T>(items: T[]): T[] {
+  const out = [...items];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
   }
+  return out;
 }
 
-function todayFeaturedIndex(familyCount: number): number {
-  const msPerDay = 86_400_000;
-  const today = Math.floor(Date.now() / msPerDay);
-  return ((today % familyCount) + familyCount) % familyCount;
-}
-
-async function pickFamily(): Promise<string> {
-  const { data } = await supabaseAdmin
-    .from("scam_patterns")
-    .select("family")
-    .eq("is_scam", true);
-
-  const families = Array.from(
-    new Set((data ?? []).map((r) => r.family)),
-  ).sort();
-  if (families.length === 0) {
-    throw new Error("No scam families found — run seed script");
+function spreadPick<T>(pool: T[], n: number): T[] {
+  const out: T[] = [];
+  let deck: T[] = [];
+  while (out.length < n) {
+    if (deck.length === 0) deck = shuffle(pool);
+    out.push(deck.pop() as T);
   }
-  return families[todayFeaturedIndex(families.length)];
+  return out;
 }
 
 export async function generateRound(
   tier: DifficultyTier,
 ): Promise<GeneratedRound> {
-  const family = await pickFamily();
-
-  const { data: exemplarData } = await supabaseAdmin
-    .from("scam_patterns")
-    .select("*")
-    .eq("family", family)
-    .eq("is_exemplar", true)
-    .single();
-
-  if (!exemplarData) throw new Error(`No exemplar for family ${family}`);
-  const exemplar = exemplarData as PatternRow;
+  // Content is today's pattern from the rotation. Difficulty belongs to the
+  // game, not the content: the tier only sets speed, list size, scam ratio
+  // and pass rules. Every scam on the board is today's pattern.
+  const pattern = await getTodaysPattern();
 
   const numScams = Math.floor(tier.listSize * tier.scamRatio);
   const numLegits = tier.listSize - numScams;
-
-  const { data: scamVariants } = await supabaseAdmin
-    .from("scam_patterns")
-    .select("*")
-    .eq("family", family)
-    .eq("is_scam", true)
-    .eq("is_exemplar", false);
 
   const { data: legitPool } = await supabaseAdmin
     .from("scam_patterns")
     .select("*")
     .eq("is_scam", false);
 
-  if (!scamVariants?.length) throw new Error(`No scam variants for ${family}`);
   if (!legitPool?.length) throw new Error("No legit patterns");
 
-  const sampleN = <T>(pool: T[], n: number): T[] => {
-    const out: T[] = [];
-    for (let i = 0; i < n; i++) {
-      out.push(pool[Math.floor(Math.random() * pool.length)]);
-    }
-    return out;
-  };
-
-  const scamPool = pickBandPool(
-    scamVariants as PatternRow[],
-    tier.minPatternDifficulty,
-    tier.maxPatternDifficulty,
+  const chosenScams: PatternRow[] = Array.from(
+    { length: numScams },
+    () => pattern,
   );
-
-  const chosenScams = sampleN(scamPool, numScams);
-  const chosenLegits = sampleN(legitPool as PatternRow[], numLegits);
-  const sequence = [...chosenScams, ...chosenLegits].sort(
-    () => Math.random() - 0.5,
-  );
+  const chosenLegits = spreadPick(legitPool as PatternRow[], numLegits);
+  const sequence = shuffle([...chosenScams, ...chosenLegits]);
 
   return {
-    featured_family: family,
-    family_label: exemplar.family_label,
-    family_description: exemplar.family_description,
-    exemplar,
+    featured_family: pattern.family,
+    family_label: pattern.family_label,
+    family_description: pattern.family_description,
+    exemplar: pattern,
     items: sequence.map((p) => ({ pattern_id: p.id, is_scam: p.is_scam })),
     full_patterns: sequence,
     popup_duration_ms: tier.popupDurationMs,
@@ -156,27 +111,17 @@ export type TodayPattern = {
 };
 
 export async function getTodayPattern(): Promise<TodayPattern> {
-  const family = await pickFamily();
-
-  const { data: exemplarData } = await supabaseAdmin
-    .from("scam_patterns")
-    .select("*")
-    .eq("family", family)
-    .eq("is_exemplar", true)
-    .single();
-
-  if (!exemplarData) throw new Error(`No exemplar for family ${family}`);
-  const ex = exemplarData as PatternRow;
+  const pattern = await getTodaysPattern();
 
   return {
-    featured_family: family,
-    family_label: ex.family_label,
-    family_description: ex.family_description,
-    difficulty: ex.difficulty,
+    featured_family: pattern.family,
+    family_label: pattern.family_label,
+    family_description: pattern.family_description,
+    difficulty: pattern.difficulty,
     exemplar: {
-      kind: ex.kind,
-      content: ex.content,
-      teaching: ex.teaching,
+      kind: pattern.kind,
+      content: pattern.content,
+      teaching: pattern.teaching,
     },
   };
 }
@@ -192,20 +137,7 @@ export async function rebuildRoundFromSession(session: {
 }): Promise<GeneratedRound> {
   const tier = await loadTier((session.difficulty as TierKey) ?? "easy");
 
-  const { data: exemplar } = await supabaseAdmin
-    .from("scam_patterns")
-    .select("*")
-    .eq("family", session.featured_family)
-    .eq("is_exemplar", true)
-    .single();
-
-  if (!exemplar) {
-    throw new Error(
-      `Cannot rebuild session: exemplar missing for ${session.featured_family}`,
-    );
-  }
-
-  const patternIds = session.items.map((i) => i.pattern_id);
+  const patternIds = [...new Set(session.items.map((i) => i.pattern_id))];
   const { data: patterns } = await supabaseAdmin
     .from("scam_patterns")
     .select("*")
@@ -219,11 +151,16 @@ export async function rebuildRoundFromSession(session: {
     .map((item) => patternMap.get(item.pattern_id) as PatternRow | undefined)
     .filter((x): x is PatternRow => Boolean(x));
 
+  const featured = sequence.find((p) => p.is_scam);
+  if (!featured) {
+    throw new Error(`Cannot rebuild session ${session.id}: no scam items`);
+  }
+
   return {
     featured_family: session.featured_family,
-    family_label: (exemplar as PatternRow).family_label,
-    family_description: (exemplar as PatternRow).family_description,
-    exemplar: exemplar as PatternRow,
+    family_label: featured.family_label,
+    family_description: featured.family_description,
+    exemplar: featured,
     items: session.items,
     full_patterns: sequence,
     popup_duration_ms: session.popup_duration_ms,

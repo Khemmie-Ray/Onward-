@@ -26,7 +26,7 @@ const SUPERHARD_POSITION = 8;
 
 export function tierKeyForPlay(playNumber: number): TierKey {
   if (playNumber < 1) playNumber = 1;
-  const pos = ((playNumber - 1) % CYCLE_LENGTH) + 1; 
+  const pos = ((playNumber - 1) % CYCLE_LENGTH) + 1;
   if (pos === SUPERHARD_POSITION) return "superhard";
   if (pos === HARD_POSITION) return "hard";
   return "easy";
@@ -81,7 +81,7 @@ const FALLBACK: Record<TierKey, DifficultyTier> = {
     listSize: 100,
     scamRatio: 0.4,
     minPatternDifficulty: 1,
-    maxPatternDifficulty: 2,
+    maxPatternDifficulty: 3,
     minPrecision: null,
     minCorrect: null,
     minRecall: null,
@@ -99,9 +99,9 @@ const FALLBACK: Record<TierKey, DifficultyTier> = {
     scamRatio: 0.45,
     minPatternDifficulty: 2,
     maxPatternDifficulty: 4,
-    minPrecision: 0.65,
+    minPrecision: 0.7,
     minCorrect: null,
-    minRecall: 0.6,
+    minRecall: 0.7,
   },
   superhard: {
     key: "superhard",
@@ -116,9 +116,9 @@ const FALLBACK: Record<TierKey, DifficultyTier> = {
     scamRatio: 0.5,
     minPatternDifficulty: 3,
     maxPatternDifficulty: 5,
-    minPrecision: 0.7,
+    minPrecision: 0.8,
     minCorrect: null,
-    minRecall: 0.7,
+    minRecall: 0.75,
   },
 };
 

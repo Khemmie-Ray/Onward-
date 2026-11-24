@@ -1,3 +1,4 @@
+// frontend/components/dashboard/play/PreRoundBriefing.tsx
 "use client";
 
 import { Loader2, Play } from "lucide-react";
@@ -18,7 +19,8 @@ const SCAM_MOLES = [
 
 function scenarioPreview(exemplar?: ExemplarShape) {
   const c = exemplar?.content ?? {};
-  const body = asStr(c.body) || asStr(c.detail) || exemplar?.teaching || "";
+  // Only the pattern's own example message. No message, no example box.
+  const body = asStr(c.body) || asStr(c.detail);
 
   let meta = "";
   switch (exemplar?.kind) {

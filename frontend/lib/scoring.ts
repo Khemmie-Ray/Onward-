@@ -16,7 +16,7 @@ export const SCORING = {
   },
 
   maxTotalWhacks: 200,
-  maxPerPatternWhacks: 20,
+  maxListPasses: 3,
   maxSpawnedScamsReported: 100,
 
   maxLevel: 100,
@@ -59,11 +59,14 @@ export function gradeRound(input: GradeInput): GradeResult {
   const totalScams = correctWhacks + missedScams;
   const recall = totalScams > 0 ? correctWhacks / totalScams : 0;
 
+  // A tier can only make a round harder. Each rule takes the stricter of the
+  // mode's base and the tier's value, so a hard tier never lowers the bar a
+  // premium round already has.
   const base = mode === "premium" ? SCORING.premium : SCORING.free;
   const o = input.overrides;
-  const minPrecision = o?.minPrecision ?? base.minPrecision;
-  const minCorrect = o?.minCorrect ?? base.minCorrect;
-  const minRecall = o?.minRecall ?? base.minRecall;
+  const minPrecision = Math.max(base.minPrecision, o?.minPrecision ?? 0);
+  const minCorrect = Math.max(base.minCorrect, o?.minCorrect ?? 0);
+  const minRecall = Math.max(base.minRecall, o?.minRecall ?? 0);
 
   const passed =
     precision >= minPrecision &&
