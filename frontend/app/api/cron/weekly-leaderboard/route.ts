@@ -7,22 +7,11 @@ import {
   getPeriodStart,
   getWeekSlug,
 } from "@/lib/leaderboard-period";
-
-/**
- * Weekly leaderboard payout.
- *
- * Winners are awarded POINTS (not G$). They convert points to G$ themselves
- * once verified, which keeps this route off-chain: no gas, no tx failures,
- * no per-winner RPC verification check. Unverified winners simply hold points
- * they cannot convert yet, which is itself the verification incentive.
- *
- * Idempotent: reference_id is keyed to the period, so re-running the cron for
- * the same week is a no-op (award_points rejects the duplicate).
- *
- * Ranking uses the same rule as every other leaderboard surface: correct_whacks
- * over the period, passed rounds only. Payout amounts come from lib/leaderboard
- * so the cron can never drift from what the UI advertises.
- */
+import {
+  getWeeklyQuestStandings,
+  QUEST_PAYOUTS_BY_RANK,
+  QUEST_TOP_PAID_RANK,
+} from "@/lib/quest-leaderboard";
 
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
@@ -30,14 +19,19 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Pay the PREVIOUS full week. Run this at/after the Monday boundary: "now"
-  // is in the new period, so the previous period is the week that just closed.
   const periodStart = getPreviousPeriodStart();
-  const periodEnd = getPeriodStart(); // start of current = end of previous
+  const periodEnd = getPeriodStart(); 
 
   const periodStartStr = periodStart.toISOString().slice(0, 10);
   const periodEndStr = periodEnd.toISOString().slice(0, 10);
   const weekSlug = getWeekSlug(periodStart);
+
+  const questBoard = await payQuestBoard(
+    periodStart,
+    periodStartStr,
+    periodEndStr,
+    weekSlug,
+  );
 
   // Standings for the CLOSED period (not the rolling window the UI shows).
   const { data: sessions, error: sessErr } = await supabaseAdmin
@@ -78,6 +72,7 @@ export async function GET(request: Request) {
       message: "No players this period",
       period_start: periodStartStr,
       period_end: periodEndStr,
+      quest_board: questBoard,
     });
   }
 
@@ -139,8 +134,6 @@ export async function GET(request: Request) {
     }
   }
 
-  // Record the period so the public stats card can report cumulative totals.
-  // Idempotent via a unique (period_start) constraint — see migration.
   const awardedCount = results.filter((r) => r.status === "awarded").length;
   if (awardedCount > 0) {
     const { error: periodErr } = await supabaseAdmin
@@ -167,5 +160,73 @@ export async function GET(request: Request) {
     winners_awarded: awardedCount,
     total_points_awarded: totalPointsAwarded,
     results,
+    quest_board: questBoard,
   });
+}
+
+type PayoutResult = {
+  user_id: string;
+  rank: number;
+  points?: number;
+  status: "awarded" | "already_awarded" | "failed";
+  error?: string;
+};
+
+async function payQuestBoard(
+  periodStart: Date,
+  periodStartStr: string,
+  periodEndStr: string,
+  weekSlug: string,
+): Promise<{ results: PayoutResult[]; error?: string }> {
+  let standings;
+  try {
+    // Any date inside the closed week resolves to that week's standings.
+    standings = await getWeeklyQuestStandings(periodStart);
+  } catch (err) {
+    console.error("[quest board payout] standings failed", err);
+    return {
+      results: [],
+      error: err instanceof Error ? err.message : "unknown",
+    };
+  }
+
+  const results: PayoutResult[] = [];
+  const winners = standings.slice(0, QUEST_TOP_PAID_RANK);
+
+  for (const [index, w] of winners.entries()) {
+    const rank = index + 1;
+    const points = QUEST_PAYOUTS_BY_RANK[rank] ?? 0;
+    if (points === 0) continue;
+
+    try {
+      const result = await awardPoints({
+        userId: w.user_id,
+        delta: points,
+        source: "leaderboard_quests",
+        referenceId: `leaderboard_quests:${periodStartStr}`,
+        metadata: {
+          rank,
+          quest_points: w.quest_points,
+          period_start: periodStartStr,
+          period_end: periodEndStr,
+          week_slug: weekSlug,
+        },
+      });
+      results.push(
+        result.wasNew
+          ? { user_id: w.user_id, rank, points, status: "awarded" }
+          : { user_id: w.user_id, rank, status: "already_awarded" },
+      );
+    } catch (err) {
+      console.error(`[quest board payout] failed for ${w.user_id}`, err);
+      results.push({
+        user_id: w.user_id,
+        rank,
+        status: "failed",
+        error: err instanceof Error ? err.message : "unknown",
+      });
+    }
+  }
+
+  return { results };
 }

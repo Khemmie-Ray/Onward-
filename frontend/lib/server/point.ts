@@ -20,6 +20,7 @@ const POSITIVE_ONLY_SOURCES: ReadonlySet<PointSource> = new Set([
   "daily_login",
   "referral",
   "leaderboard_weekly",
+  "leaderboard_quests",
   "streak_milestone",
   "contest_win",
   "daily_quest",

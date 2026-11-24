@@ -1,4 +1,3 @@
-// frontend/lib/supabase/types.ts
 export type FlipCardContent = {
   front: string;
   hint: string;
@@ -50,6 +49,7 @@ export type PointSource =
   | "daily_login"
   | "referral"
   | "leaderboard_weekly"
+  | "leaderboard_quests"
   | "streak_milestone"
   | "contest_win"
   | "claim_redemption"
@@ -150,6 +150,8 @@ export type DbScamPattern = {
   content: Record<string, unknown>;
   teaching: string;
   created_at: string;
+  /** Order the pattern was added. Drives the daily rotation. */
+  seq: number;
 };
 
 export type DbGameSession = {
@@ -745,11 +747,7 @@ export type Database = {
       };
       compare_course_learn_history: {
         Args: { p_course_slug: string };
-        Returns: {
-          user_id: string;
-          old_completions: number;
-          new_completions: number;
-        }[];
+        Returns: { user_id: string; old_completions: number; new_completions: number }[];
       };
       award_points: {
         Args: {

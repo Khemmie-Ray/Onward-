@@ -1,8 +1,17 @@
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { getPeriodEnd, getPeriodStart } from "@/lib/leaderboard-period";
 
-// PostgREST returns at most 1000 rows per request, so read in pages.
 const PAGE_SIZE = 1000;
+
+export const QUEST_PAYOUTS_BY_RANK: Record<number, number> = {
+  1: 1100,
+  2: 800,
+  3: 600,
+};
+
+export const QUEST_TOP_PAID_RANK = Math.max(
+  ...Object.keys(QUEST_PAYOUTS_BY_RANK).map(Number),
+);
 
 export type QuestStanding = {
   user_id: string;
