@@ -48,6 +48,7 @@ export function RightPanelContent() {
   return (
     <>
       <StatBar />
+      <VoteCard />
       <Panel />
     </>
   );
