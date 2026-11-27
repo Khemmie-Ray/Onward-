@@ -243,6 +243,44 @@ export type DbSpendEvent = {
   created_at: string;
 };
 
+export type DbChainTx = {
+  hash: string;
+  block_number: number;
+  block_time: string;
+  from_address: string;
+  to_address: string | null;
+  success: boolean;
+};
+
+export type DbChainGdTransfer = {
+  tx_hash: string;
+  log_index: number;
+  block_number: number;
+  block_time: string;
+  from_address: string;
+  to_address: string;
+  value: string;
+};
+
+export type DbChainWhitelistEvent = {
+  tx_hash: string;
+  log_index: number;
+  address: string;
+  block_time: string;
+};
+
+export type DbChainAddress = {
+  address: string;
+  is_contract: boolean | null;
+  whitelist_checked_at: string | null;
+};
+
+export type DbChainSyncState = {
+  key: string;
+  last_block: number;
+  updated_at: string;
+};
+
 export type StreakClaimStatus = "pending" | "paid" | "failed";
 
 export type DbStreakRewardClaim = {
@@ -733,6 +771,36 @@ export type Database = {
         Update: Partial<DbDifficultyTier>;
         Relationships: [];
       };
+      chain_txs: {
+        Row: DbChainTx;
+        Insert: DbChainTx;
+        Update: Partial<DbChainTx>;
+        Relationships: [];
+      };
+      chain_gd_transfers: {
+        Row: DbChainGdTransfer;
+        Insert: DbChainGdTransfer;
+        Update: Partial<DbChainGdTransfer>;
+        Relationships: [];
+      };
+      chain_whitelist_events: {
+        Row: DbChainWhitelistEvent;
+        Insert: DbChainWhitelistEvent;
+        Update: Partial<DbChainWhitelistEvent>;
+        Relationships: [];
+      };
+      chain_addresses: {
+        Row: DbChainAddress;
+        Insert: Partial<DbChainAddress> & { address: string };
+        Update: Partial<DbChainAddress>;
+        Relationships: [];
+      };
+      chain_sync_state: {
+        Row: DbChainSyncState;
+        Insert: Partial<DbChainSyncState> & { key: string };
+        Update: Partial<DbChainSyncState>;
+        Relationships: [];
+      };
     };
     Views: {};
     Functions: {
@@ -747,7 +815,11 @@ export type Database = {
       };
       compare_course_learn_history: {
         Args: { p_course_slug: string };
-        Returns: { user_id: string; old_completions: number; new_completions: number }[];
+        Returns: {
+          user_id: string;
+          old_completions: number;
+          new_completions: number;
+        }[];
       };
       award_points: {
         Args: {
@@ -761,6 +833,28 @@ export type Database = {
           new_balance: number;
           was_new: boolean;
         }[];
+      };
+      chain_addresses_due: {
+        Args: { p_limit: number };
+        Returns: { address: string; is_contract: boolean | null }[];
+      };
+      analytics_daily_transactions: {
+        Args: { p_start: string };
+        Returns: {
+          block_date: string | null;
+          direct_tx_count: number;
+          gd_token_transfers: number;
+          gd_volume: number;
+          gd_net_flow: number;
+        }[];
+      };
+      analytics_whitelisted_users: {
+        Args: { p_start: string };
+        Returns: { block_date: string | null; dau_whitelisted: number }[];
+      };
+      analytics_onboarded_users: {
+        Args: { p_start: string };
+        Returns: { cohort_date: string | null; onboarded_users: number }[];
       };
     };
     Enums: {};

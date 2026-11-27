@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/", "/login"] as const;
+const PUBLIC_PATHS = ["/", "/login", "/analytics"] as const;
 
 const AUTH_API_PREFIX = "/api/auth";
 
@@ -24,6 +24,9 @@ export async function proxy(req: NextRequest) {
 
   if (pathname.startsWith(AUTH_API_PREFIX)) return NextResponse.next();
   if (pathname.startsWith(API_PREFIX)) return NextResponse.next();
+  if (pathname === "/analytics" || pathname.startsWith("/analytics/")) {
+    return NextResponse.next();
+  }
 
   const token = await getToken({
     req,
