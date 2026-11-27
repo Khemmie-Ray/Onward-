@@ -7,7 +7,7 @@ import type { Address } from "viem";
 import { ChevronUp, ExternalLink, Loader2, Vote } from "lucide-react";
 import { useIdentityContext } from "@/contexts/IdentityContext";
 import { useFlowVote } from "@/hooks/useFlowVote";
-import { FLOW_URL, flowAllocation } from "@/lib/onchain/flowstate";
+import { flowAllocation } from "@/lib/onchain/flowstate";
 
 export function VoteCard() {
   const { isVerified, isLoading } = useIdentityContext();
@@ -53,7 +53,6 @@ export function VoteCard() {
           id="vote-card-details"
           className="mt-4 animate-fade-up border-t border-canvas-warm pt-4"
         >
-          {/* key resets every step if the wallet changes */}
           <Ballot key={address} address={address as Address} />
         </div>
       )}
@@ -189,16 +188,6 @@ function Ballot({ address }: { address: Address }) {
           )}
         </div>
       )}
-
-      <a
-        href={FLOW_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 text-[11px] text-fg-soft underline underline-offset-2"
-      >
-        See all GoodBuilders projects on Flow State
-        <ExternalLink size={10} />
-      </a>
     </div>
   );
 }
