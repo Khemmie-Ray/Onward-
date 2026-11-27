@@ -5,18 +5,16 @@ import type { NextRequest } from "next/server";
 
 const PUBLIC_PATHS = ["/", "/login"] as const;
 
+const OPEN_PATHS = ["/analytics"] as const;
+
 const AUTH_API_PREFIX = "/api/auth";
 
 const API_PREFIX = "/api";
 
-function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PATHS.some(
+function matches(paths: readonly string[], pathname: string): boolean {
+  return paths.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`),
   );
-}
-
-function isOnboardingPath(pathname: string): boolean {
-  return pathname.startsWith("/onboarding");
 }
 
 export async function proxy(req: NextRequest) {
@@ -24,6 +22,7 @@ export async function proxy(req: NextRequest) {
 
   if (pathname.startsWith(AUTH_API_PREFIX)) return NextResponse.next();
   if (pathname.startsWith(API_PREFIX)) return NextResponse.next();
+  if (matches(OPEN_PATHS, pathname)) return NextResponse.next();
 
   const token = await getToken({
     req,
@@ -31,8 +30,7 @@ export async function proxy(req: NextRequest) {
   });
 
   const isAuthenticated = !!token?.sub;
-  const isPublic = isPublicPath(pathname);
-  const isOnboarding = isOnboardingPath(pathname);
+  const isPublic = matches(PUBLIC_PATHS, pathname);
 
   if (!isAuthenticated && !isPublic) {
     return NextResponse.redirect(new URL("/", req.url));
